@@ -129,18 +129,27 @@ class DifferentiableEQ(nn.Module):
         self, x: torch.Tensor, b_coeffs: torch.Tensor, a_coeffs: torch.Tensor
     ) -> torch.Tensor:
         orig_dtype = x.dtype
-        # Elaborazione temporanea in float64 per annullare l'errore di accumulo rispetto al C++
-        y = x.to(torch.float64)
+        orig_shape = x.shape
+        N = orig_shape[-1]
 
-        # Se b_coeffs non ha la dimensione batch/canale di x, broadcastiamo
-        # b_coeffs shape: [..., 6, 3]
+        # Flatten audio to [num_ch, N] per compatibilità con taf.lfilter
+        y = x.to(torch.float64).reshape(-1, N)
+        num_ch = y.shape[0]
+
         for b in range(6):
             b_b = b_coeffs[..., b, :]
             a_b = a_coeffs[..., b, :]
-            # taf.lfilter con clamp=False evita clipping accidentale a boost positivi
-            y = taf.lfilter(y, a_b, b_b, clamp=False)
 
-        return y.to(orig_dtype)
+            # Broadcast coefficienti su tutti i canali
+            b_b = b_b.reshape(-1, 3)
+            a_b = a_b.reshape(-1, 3)
+            if b_b.shape[0] != num_ch:
+                b_b = b_b.expand(num_ch, 3)
+                a_b = a_b.expand(num_ch, 3)
+
+            y = taf.lfilter(y, a_b, b_b, clamp=False, batching=True)
+
+        return y.reshape(orig_shape).to(orig_dtype)
 
     def _forward_fft(
         self, x: torch.Tensor, b_coeffs: torch.Tensor, a_coeffs: torch.Tensor

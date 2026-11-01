@@ -76,19 +76,19 @@ inline constexpr std::array<ParamDescriptor, NUM_PARAMS> PARAM_SPECS = {{
     // 20..34: Multiband Comp (3 bande x 5 parametri)
     // Low Band (20..24)
     {"comp_low_threshold_db", -30.0,  0.0,    ScaleType::Linear,      "dB"},
-    {"comp_low_ratio",        1.1,    4.0,    ScaleType::Exponential, ""},
+    {"comp_low_ratio",        1.0,    4.0,    ScaleType::Exponential, ""},
     {"comp_low_attack_ms",    10.0,   120.0,  ScaleType::Exponential, "ms"},
     {"comp_low_release_ms",   20.0,   600.0,  ScaleType::Exponential, "ms"},
     {"comp_low_makeup_db",    -3.0,   +6.0,   ScaleType::Linear,      "dB"},
     // Mid Band (25..29)
     {"comp_mid_threshold_db", -30.0,  0.0,    ScaleType::Linear,      "dB"},
-    {"comp_mid_ratio",        1.1,    4.0,    ScaleType::Exponential, ""},
+    {"comp_mid_ratio",        1.0,    4.0,    ScaleType::Exponential, ""},
     {"comp_mid_attack_ms",    5.0,    80.0,   ScaleType::Exponential, "ms"},
     {"comp_mid_release_ms",   20.0,   600.0,  ScaleType::Exponential, "ms"},
     {"comp_mid_makeup_db",    -3.0,   +6.0,   ScaleType::Linear,      "dB"},
     // High Band (30..34)
     {"comp_high_threshold_db", -30.0, 0.0,    ScaleType::Linear,      "dB"},
-    {"comp_high_ratio",        1.1,   4.0,    ScaleType::Exponential, ""},
+    {"comp_high_ratio",        1.0,   4.0,    ScaleType::Exponential, ""},
     {"comp_high_attack_ms",    2.0,   50.0,   ScaleType::Exponential, "ms"},
     {"comp_high_release_ms",   20.0,  600.0,  ScaleType::Exponential, "ms"},
     {"comp_high_makeup_db",    -3.0,  +6.0,   ScaleType::Linear,      "dB"},

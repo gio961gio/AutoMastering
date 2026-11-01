@@ -162,24 +162,28 @@ class AutoMasteringOptimizer:
         return optimal_z, final_master, history
 
     def export_preset_json(self, z: torch.Tensor, output_path: Optional[str] = None) -> str:
-        """Export normalized parameters z to canonical JSON preset format."""
+        """Export normalized parameters z to canonical JSON preset format interoperable with JUCE."""
         z_cpu = z.detach().cpu().reshape(-1)
         theta = map_z_to_theta(z_cpu)
-        theta_dict = unpack_theta_dict(theta)
 
         preset_data = {
             "format": "AutoMastering_Preset_v1",
-            "sample_rate": self.sample_rate,
+            "version": "1.0",
+            "sample_rate": float(self.sample_rate),
             "normalized_z": z_cpu.tolist(),
             "parameters": {},
+            "parameter_details": {},
         }
 
-        # Populate with parameter IDs and physical values
+        # Populate with parameter IDs: both flat numeric values for JUCE and rich metadata
         for i, spec in enumerate(PARAM_SPECS):
             param_id = spec.name
-            preset_data["parameters"][param_id] = {
+            val = float(theta[i].item())
+            preset_data["parameters"][param_id] = val
+            preset_data[param_id] = val  # top-level fallback
+            preset_data["parameter_details"][param_id] = {
                 "index": i,
-                "value": float(theta[i].item()),
+                "value": val,
                 "min": spec.min_val,
                 "max": spec.max_val,
                 "is_log": spec.is_log,

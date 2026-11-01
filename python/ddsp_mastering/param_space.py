@@ -37,21 +37,21 @@ PARAM_SPECS: List[ParamSpec] = [
     ParamSpec("crossover_f_high", 1500.0, 6000.0, True, "Hz"),
 
     # 20..34: Multiband Comp (3 bande x 5 parametri) - Mastering Grade ranges
-    # Low Band (20..24) - preserves sub/kick punch with slower attack
+    # Low Band (20..24) - preserves sub/kick punch with slower attack (ratio 1.0 = true identity bypass)
     ParamSpec("comp_low_threshold_db", -30.0, 0.0, False, "dB"),
-    ParamSpec("comp_low_ratio", 1.1, 4.0, True, ""),
+    ParamSpec("comp_low_ratio", 1.0, 4.0, True, ""),
     ParamSpec("comp_low_attack_ms", 10.0, 120.0, True, "ms"),
     ParamSpec("comp_low_release_ms", 20.0, 600.0, True, "ms"),
     ParamSpec("comp_low_makeup_db", -3.0, 6.0, False, "dB"),
     # Mid Band (25..29) - preserves snare snap
     ParamSpec("comp_mid_threshold_db", -30.0, 0.0, False, "dB"),
-    ParamSpec("comp_mid_ratio", 1.1, 4.0, True, ""),
+    ParamSpec("comp_mid_ratio", 1.0, 4.0, True, ""),
     ParamSpec("comp_mid_attack_ms", 5.0, 80.0, True, "ms"),
     ParamSpec("comp_mid_release_ms", 20.0, 600.0, True, "ms"),
     ParamSpec("comp_mid_makeup_db", -3.0, 6.0, False, "dB"),
     # High Band (30..34) - smooth vocal/cymbal control
     ParamSpec("comp_high_threshold_db", -30.0, 0.0, False, "dB"),
-    ParamSpec("comp_high_ratio", 1.1, 4.0, True, ""),
+    ParamSpec("comp_high_ratio", 1.0, 4.0, True, ""),
     ParamSpec("comp_high_attack_ms", 2.0, 50.0, True, "ms"),
     ParamSpec("comp_high_release_ms", 20.0, 600.0, True, "ms"),
     ParamSpec("comp_high_makeup_db", -3.0, 6.0, False, "dB"),
@@ -154,10 +154,10 @@ THETA_NEUTRAL: torch.Tensor = torch.tensor([
     12000.0, 0.0, 0.707,
     # Crossover (low, high)
     160.0, 3200.0,
-    # Multiband comp: thresh, ratio, attack, release, makeup
-    -12.0, 1.2, 40.0, 120.0, 0.0,
-    -12.0, 1.2, 25.0, 100.0, 0.0,
-    -12.0, 1.2, 15.0, 80.0, 0.0,
+    # Multiband comp: thresh, ratio, attack, release, makeup (ratio 1.0 = true identity)
+    -12.0, 1.0, 40.0, 120.0, 0.0,
+    -12.0, 1.0, 25.0, 100.0, 0.0,
+    -12.0, 1.0, 15.0, 80.0, 0.0,
     # Imager: low, mid, high
     1.0, 1.0, 1.0,
     # Saturator: drive, mix

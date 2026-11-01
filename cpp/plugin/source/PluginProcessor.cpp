@@ -4,48 +4,49 @@
 namespace {
 
 float getDefaultValueForParam(size_t index) {
-    // Valori di default trasparenti e musicali conformi alla specifica
+    // Valori di default rigorosamente allineati a THETA_NEUTRAL
     if (index < 18) {
-        // EQ
+        // EQ (6 bande x 3 parametri)
         size_t param_in_band = index % 3;
         size_t band = index / 3;
         if (param_in_band == 0) {
-            // f0
-            constexpr float f0_defaults[6] = {100.0f, 250.0f, 1000.0f, 3000.0f, 8000.0f, 12000.0f};
+            constexpr float f0_defaults[6] = {60.0f, 250.0f, 1000.0f, 3000.0f, 8000.0f, 12000.0f};
             return f0_defaults[band];
         } else if (param_in_band == 1) {
-            // gain_db
-            return 0.0f;
+            return 0.0f; // gain flat (0 dB)
         } else {
-            // Q
-            return 0.7071f;
+            return 0.7071f; // Butterworth Q
         }
     } else if (index == 18) {
-        // crossover_f_low
-        return 150.0f;
+        return 160.0f; // crossover_f_low (Hz)
     } else if (index == 19) {
-        // crossover_f_high
-        return 3000.0f;
+        return 3200.0f; // crossover_f_high (Hz)
     } else if (index >= 20 && index < 35) {
         // Multiband Comp: thresh, ratio, att, rel, makeup
         size_t p = (index - 20) % 5;
-        if (p == 0) return 0.0f;     // threshold_db (0 = trasparente)
-        if (p == 1) return 1.0f;     // ratio (1:1 = trasparente)
-        if (p == 2) return 10.0f;    // attack_ms
-        if (p == 3) return 100.0f;   // release_ms
-        return 0.0f;                 // makeup_db
+        size_t b = (index - 20) / 5;
+        if (p == 0) return -12.0f;   // threshold_db
+        if (p == 1) return 1.0f;     // ratio (1.0:1 = true identity bypass)
+        if (p == 2) {
+            // attack_ms: 40ms low, 25ms mid, 15ms high
+            constexpr float att_defaults[3] = {40.0f, 25.0f, 15.0f};
+            return att_defaults[b];
+        }
+        if (p == 3) {
+            // release_ms: 120ms low, 100ms mid, 80ms high
+            constexpr float rel_defaults[3] = {120.0f, 100.0f, 80.0f};
+            return rel_defaults[b];
+        }
+        return 0.0f;                 // makeup_db (0 dB = identity)
     } else if (index >= 35 && index < 38) {
         // Imager widths: low, mid, high
         return 1.0f; // 1.0 = identità stereo trasparente
     } else if (index == 38) {
-        // saturator_drive_db
-        return 0.0f;
+        return 0.0f; // saturator_drive_db
     } else if (index == 39) {
-        // saturator_mix
-        return 0.0f; // 100% dry
+        return 0.0f; // saturator_mix (0% = 100% dry)
     } else if (index == 40) {
-        // limiter_push_gain_db
-        return 0.0f; // 0 dB push
+        return 0.0f; // limiter_push_gain_db (0 dB push)
     }
     return 0.0f;
 }
@@ -184,22 +185,50 @@ bool MasteringPluginAudioProcessor::loadParametersFromJson(const juce::String& j
     if (!parsedJson.isObject())
         return false;
 
-    auto* obj = parsedJson.getDynamicObject();
-    if (!obj)
+    auto* rootObj = parsedJson.getDynamicObject();
+    if (!rootObj)
         return false;
 
+    // Optional nested parameters object
+    juce::DynamicObject* paramsObj = nullptr;
+    if (rootObj->hasProperty("parameters") && parsedJson["parameters"].isObject()) {
+        paramsObj = parsedJson["parameters"].getDynamicObject();
+    }
+
+    size_t loadedCount = 0;
     for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
         const auto& spec = core_dsp::PARAM_SPECS[i];
         const juce::String paramID(spec.name.data(), spec.name.size());
 
-        if (obj->hasProperty(paramID)) {
-            const float val = static_cast<float>(obj->getProperty(paramID));
-            if (auto* param = apvts_.getParameter(paramID)) {
-                param->setValueNotifyingHost(param->convertTo0to1(val));
-            }
+        juce::var prop;
+        if (paramsObj != nullptr && paramsObj->hasProperty(paramID)) {
+            prop = paramsObj->getProperty(paramID);
+        } else if (rootObj->hasProperty(paramID)) {
+            prop = rootObj->getProperty(paramID);
+        } else {
+            continue;
+        }
+
+        float val = 0.0f;
+        if (prop.isObject() && prop.getDynamicObject()->hasProperty("value")) {
+            val = static_cast<float>(prop.getDynamicObject()->getProperty("value"));
+        } else if (prop.isDouble() || prop.isInt() || prop.isInt64()) {
+            val = static_cast<float>(prop);
+        } else {
+            continue;
+        }
+
+        if (std::isnan(val) || std::isinf(val))
+            continue;
+
+        val = std::clamp(val, static_cast<float>(spec.min_val), static_cast<float>(spec.max_val));
+
+        if (auto* param = apvts_.getParameter(paramID)) {
+            param->setValueNotifyingHost(param->convertTo0to1(val));
+            ++loadedCount;
         }
     }
-    return true;
+    return loadedCount > 0;
 }
 
 juce::String MasteringPluginAudioProcessor::getParametersAsJson() const {
