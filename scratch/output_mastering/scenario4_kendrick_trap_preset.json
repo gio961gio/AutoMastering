@@ -1,0 +1,377 @@
+{
+  "format": "AutoMastering_Preset_v1",
+  "sample_rate": 48000.0,
+  "normalized_z": [
+    0.5242427587509155,
+    0.40074118971824646,
+    0.5469119548797607,
+    0.3987017273902893,
+    0.5014707446098328,
+    0.6068539023399353,
+    0.3898429572582245,
+    0.5112069845199585,
+    0.6033587455749512,
+    0.495589941740036,
+    0.5539413094520569,
+    0.5747077465057373,
+    0.5493138432502747,
+    0.6389859914779663,
+    0.38580062985420227,
+    0.4876328706741333,
+    0.504873514175415,
+    0.3911929130554199,
+    0.5219684839248657,
+    0.4369460940361023,
+    0.4860403835773468,
+    0.5116155743598938,
+    0.4739992320537567,
+    0.5047136545181274,
+    0.48106348514556885,
+    0.5355290770530701,
+    0.46291255950927734,
+    0.5692986249923706,
+    0.4926747977733612,
+    0.5086147785186768,
+    0.40544161200523376,
+    0.5916135311126709,
+    0.4109041690826416,
+    0.44499731063842773,
+    0.6404477953910828,
+    0.6531237363815308,
+    0.6560970544815063,
+    0.6568426489830017,
+    0.4922119081020355,
+    0.4877946078777313,
+    0.49169015884399414
+  ],
+  "parameters": {
+    "eq_b0_f0": {
+      "index": 0,
+      "value": 75.17564392089844,
+      "min": 20.0,
+      "max": 250.0,
+      "is_log": true,
+      "unit": "Hz"
+    },
+    "eq_b0_gain_db": {
+      "index": 1,
+      "value": -2.382211685180664,
+      "min": -12.0,
+      "max": 12.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "eq_b0_q": {
+      "index": 2,
+      "value": 1.7614972591400146,
+      "min": 0.5,
+      "max": 5.0,
+      "is_log": true,
+      "unit": ""
+    },
+    "eq_b1_f0": {
+      "index": 3,
+      "value": 189.96803283691406,
+      "min": 100.0,
+      "max": 500.0,
+      "is_log": true,
+      "unit": "Hz"
+    },
+    "eq_b1_gain_db": {
+      "index": 4,
+      "value": 0.035297393798828125,
+      "min": -12.0,
+      "max": 12.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "eq_b1_q": {
+      "index": 5,
+      "value": 2.0221991539001465,
+      "min": 0.5,
+      "max": 5.0,
+      "is_log": true,
+      "unit": ""
+    },
+    "eq_b2_f0": {
+      "index": 6,
+      "value": 749.1151123046875,
+      "min": 400.0,
+      "max": 2000.0,
+      "is_log": true,
+      "unit": "Hz"
+    },
+    "eq_b2_gain_db": {
+      "index": 7,
+      "value": 0.2689676284790039,
+      "min": -12.0,
+      "max": 12.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "eq_b2_q": {
+      "index": 8,
+      "value": 2.0059900283813477,
+      "min": 0.5,
+      "max": 5.0,
+      "is_log": true,
+      "unit": ""
+    },
+    "eq_b3_f0": {
+      "index": 9,
+      "value": 2981.715087890625,
+      "min": 1500.0,
+      "max": 6000.0,
+      "is_log": true,
+      "unit": "Hz"
+    },
+    "eq_b3_gain_db": {
+      "index": 10,
+      "value": 1.2945919036865234,
+      "min": -12.0,
+      "max": 12.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "eq_b3_q": {
+      "index": 11,
+      "value": 1.877922773361206,
+      "min": 0.5,
+      "max": 5.0,
+      "is_log": true,
+      "unit": ""
+    },
+    "eq_b4_f0": {
+      "index": 12,
+      "value": 7313.90478515625,
+      "min": 4000.0,
+      "max": 12000.0,
+      "is_log": true,
+      "unit": "Hz"
+    },
+    "eq_b4_gain_db": {
+      "index": 13,
+      "value": 3.3356637954711914,
+      "min": -12.0,
+      "max": 12.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "eq_b4_q": {
+      "index": 14,
+      "value": 1.2155438661575317,
+      "min": 0.5,
+      "max": 5.0,
+      "is_log": true,
+      "unit": ""
+    },
+    "eq_b5_f0": {
+      "index": 15,
+      "value": 9337.7314453125,
+      "min": 5000.0,
+      "max": 18000.0,
+      "is_log": true,
+      "unit": "Hz"
+    },
+    "eq_b5_gain_db": {
+      "index": 16,
+      "value": 0.11696434020996094,
+      "min": -12.0,
+      "max": 12.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "eq_b5_q": {
+      "index": 17,
+      "value": 1.230730414390564,
+      "min": 0.5,
+      "max": 5.0,
+      "is_log": true,
+      "unit": ""
+    },
+    "crossover_f_low": {
+      "index": 18,
+      "value": 172.8463897705078,
+      "min": 80.0,
+      "max": 350.0,
+      "is_log": true,
+      "unit": "Hz"
+    },
+    "crossover_f_high": {
+      "index": 19,
+      "value": 2748.900634765625,
+      "min": 1500.0,
+      "max": 6000.0,
+      "is_log": true,
+      "unit": "Hz"
+    },
+    "comp_low_threshold_db": {
+      "index": 20,
+      "value": -20.55838394165039,
+      "min": -40.0,
+      "max": 0.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "comp_low_ratio": {
+      "index": 21,
+      "value": 4.6304931640625,
+      "min": 1.0,
+      "max": 20.0,
+      "is_log": true,
+      "unit": ""
+    },
+    "comp_low_attack_ms": {
+      "index": 22,
+      "value": 6.161074161529541,
+      "min": 0.5,
+      "max": 100.0,
+      "is_log": true,
+      "unit": "ms"
+    },
+    "comp_low_release_ms": {
+      "index": 23,
+      "value": 102.1944580078125,
+      "min": 10.0,
+      "max": 1000.0,
+      "is_log": true,
+      "unit": "ms"
+    },
+    "comp_low_makeup_db": {
+      "index": 24,
+      "value": 2.65914249420166,
+      "min": -6.0,
+      "max": 12.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "comp_mid_threshold_db": {
+      "index": 25,
+      "value": -18.57883644104004,
+      "min": -40.0,
+      "max": 0.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "comp_mid_ratio": {
+      "index": 26,
+      "value": 4.001871585845947,
+      "min": 1.0,
+      "max": 20.0,
+      "is_log": true,
+      "unit": ""
+    },
+    "comp_mid_attack_ms": {
+      "index": 27,
+      "value": 10.208059310913086,
+      "min": 0.5,
+      "max": 100.0,
+      "is_log": true,
+      "unit": "ms"
+    },
+    "comp_mid_release_ms": {
+      "index": 28,
+      "value": 96.6828842163086,
+      "min": 10.0,
+      "max": 1000.0,
+      "is_log": true,
+      "unit": "ms"
+    },
+    "comp_mid_makeup_db": {
+      "index": 29,
+      "value": 3.1550655364990234,
+      "min": -6.0,
+      "max": 12.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "comp_high_threshold_db": {
+      "index": 30,
+      "value": -23.78233528137207,
+      "min": -40.0,
+      "max": 0.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "comp_high_ratio": {
+      "index": 31,
+      "value": 5.884464263916016,
+      "min": 1.0,
+      "max": 20.0,
+      "is_log": true,
+      "unit": ""
+    },
+    "comp_high_attack_ms": {
+      "index": 32,
+      "value": 4.4103474617004395,
+      "min": 0.5,
+      "max": 100.0,
+      "is_log": true,
+      "unit": "ms"
+    },
+    "comp_high_release_ms": {
+      "index": 33,
+      "value": 77.62374114990234,
+      "min": 10.0,
+      "max": 1000.0,
+      "is_log": true,
+      "unit": "ms"
+    },
+    "comp_high_makeup_db": {
+      "index": 34,
+      "value": 5.528059959411621,
+      "min": -6.0,
+      "max": 12.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "imager_width_low": {
+      "index": 35,
+      "value": 0.7837485074996948,
+      "min": 0.0,
+      "max": 1.2,
+      "is_log": false,
+      "unit": ""
+    },
+    "imager_width_mid": {
+      "index": 36,
+      "value": 1.4841456413269043,
+      "min": 0.5,
+      "max": 2.0,
+      "is_log": false,
+      "unit": ""
+    },
+    "imager_width_high": {
+      "index": 37,
+      "value": 1.4852639436721802,
+      "min": 0.5,
+      "max": 2.0,
+      "is_log": false,
+      "unit": ""
+    },
+    "saturator_drive_db": {
+      "index": 38,
+      "value": 8.859814643859863,
+      "min": 0.0,
+      "max": 18.0,
+      "is_log": false,
+      "unit": "dB"
+    },
+    "saturator_mix": {
+      "index": 39,
+      "value": 0.4877946078777313,
+      "min": 0.0,
+      "max": 1.0,
+      "is_log": false,
+      "unit": ""
+    },
+    "limiter_push_gain_db": {
+      "index": 40,
+      "value": 5.90028190612793,
+      "min": 0.0,
+      "max": 12.0,
+      "is_log": false,
+      "unit": "dB"
+    }
+  }
+}
