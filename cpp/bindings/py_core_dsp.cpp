@@ -580,4 +580,71 @@ PYBIND11_MODULE(py_core_dsp, m) {
         return psi;
     }, "Scansione ricorsiva all'indietro psi ultra-veloce",
        py::arg("d_yg_direct"), py::arg("mask_attack"), py::arg("alpha_a"), py::arg("alpha_r"));
+
+    // Fast scans per Autograd Function del Limiter Lookahead Release Envelope
+    m.def("fast_forward_limiter_envelope", [](py::array_t<double> g_min, double alpha_rel) {
+        auto buf = g_min.request();
+        if (buf.ndim != 2) {
+            throw std::invalid_argument("g_min must have shape [B, N]");
+        }
+        size_t B = static_cast<size_t>(buf.shape[0]);
+        size_t N = static_cast<size_t>(buf.shape[1]);
+
+        auto g_rel = py::array_t<double>({static_cast<py::ssize_t>(B), static_cast<py::ssize_t>(N)});
+        auto mask = py::array_t<bool>({static_cast<py::ssize_t>(B), static_cast<py::ssize_t>(N)});
+
+        const double* gm_ptr = static_cast<const double*>(buf.ptr);
+        double* grel_ptr = static_cast<double*>(g_rel.request().ptr);
+        bool* mask_ptr = static_cast<bool*>(mask.request().ptr);
+
+        for (size_t b = 0; b < B; ++b) {
+            const double* gm_b = gm_ptr + b * N;
+            double* grel_b = grel_ptr + b * N;
+            bool* mask_b = mask_ptr + b * N;
+
+            double g_prev = 1.0;
+            for (size_t n = 0; n < N; ++n) {
+                double gm = gm_b[n];
+                bool is_release = gm > g_prev;
+                mask_b[n] = is_release;
+                double g_curr = is_release ? (alpha_rel * g_prev + (1.0 - alpha_rel) * gm) : gm;
+                grel_b[n] = g_curr;
+                g_prev = g_curr;
+            }
+        }
+        return py::make_tuple(g_rel, mask);
+    }, "Scansione forward limiter release envelope in C++",
+       py::arg("g_min"), py::arg("alpha_rel"));
+
+    m.def("fast_backward_limiter_envelope", [](py::array_t<double> d_grel, py::array_t<bool> mask_release, double alpha_rel) {
+        auto buf_dg = d_grel.request();
+        auto buf_mask = mask_release.request();
+        if (buf_dg.ndim != 2) {
+            throw std::invalid_argument("d_grel must have shape [B, N]");
+        }
+        size_t B = static_cast<size_t>(buf_dg.shape[0]);
+        size_t N = static_cast<size_t>(buf_dg.shape[1]);
+
+        auto d_gmin = py::array_t<double>({static_cast<py::ssize_t>(B), static_cast<py::ssize_t>(N)});
+
+        const double* dg_ptr = static_cast<const double*>(buf_dg.ptr);
+        const bool* mask_ptr = static_cast<const bool*>(buf_mask.ptr);
+        double* dgmin_ptr = static_cast<double*>(d_gmin.request().ptr);
+
+        for (size_t b = 0; b < B; ++b) {
+            const double* dg_b = dg_ptr + b * N;
+            const bool* mask_b = mask_ptr + b * N;
+            double* dgmin_b = dgmin_ptr + b * N;
+
+            double lambda_next = 0.0;
+            for (py::ssize_t n = static_cast<py::ssize_t>(N) - 1; n >= 0; --n) {
+                double lambda_curr = dg_b[n] + lambda_next;
+                bool is_rel = mask_b[n];
+                dgmin_b[n] = is_rel ? ((1.0 - alpha_rel) * lambda_curr) : lambda_curr;
+                lambda_next = is_rel ? (alpha_rel * lambda_curr) : 0.0;
+            }
+        }
+        return d_gmin;
+    }, "Scansione backward limiter release envelope in C++",
+       py::arg("d_grel"), py::arg("mask_release"), py::arg("alpha_rel"));
 }

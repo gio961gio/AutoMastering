@@ -3,10 +3,66 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+try:
+    import py_core_dsp
+    _HAS_PY_CORE_DSP = True
+except ImportError:
+    _HAS_PY_CORE_DSP = False
+
 LOOKAHEAD_SAMPLES = 144
 CEILING_DBFS = -0.3
 C_LIN = 10.0 ** (CEILING_DBFS / 20.0) # ~0.96605087870305
 RELEASE_MS = 80.0
+
+class FastLimiterReleaseFunction(torch.autograd.Function):
+    """
+    Funzione autograd C++ per scansione ricorrente ad altissima velocità del release envelope del limiter.
+    """
+    @staticmethod
+    def forward(ctx, g_min: torch.Tensor, alpha_rel: float) -> torch.Tensor:
+        B, N = g_min.shape
+        if _HAS_PY_CORE_DSP and not g_min.is_cuda and B == 1:
+            gm_np = g_min.detach().cpu().numpy()
+            grel_np, mask_np = py_core_dsp.fast_forward_limiter_envelope(gm_np, float(alpha_rel))
+            g_rel = torch.from_numpy(grel_np).to(device=g_min.device, dtype=g_min.dtype)
+            mask_rel = torch.from_numpy(mask_np).to(device=g_min.device, dtype=torch.bool)
+        else:
+            g_rel = torch.empty_like(g_min)
+            mask_rel = torch.empty((B, N), dtype=torch.bool, device=g_min.device)
+            g_prev = torch.ones(B, dtype=torch.float64, device=g_min.device)
+            for n in range(N):
+                gm = g_min[:, n]
+                is_rel = gm > g_prev
+                mask_rel[:, n] = is_rel
+                g_curr = torch.where(is_rel, alpha_rel * g_prev + (1.0 - alpha_rel) * gm, gm)
+                g_rel[:, n] = g_curr
+                g_prev = g_curr
+
+        ctx.save_for_backward(mask_rel)
+        ctx.alpha_rel = alpha_rel
+        return g_rel
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):
+        (mask_rel,) = ctx.saved_tensors
+        alpha_rel = ctx.alpha_rel
+        B, N = grad_output.shape
+
+        if _HAS_PY_CORE_DSP and not grad_output.is_cuda and B == 1:
+            dg_np = grad_output.detach().cpu().numpy()
+            mask_np = mask_rel.detach().cpu().numpy()
+            dgmin_np = py_core_dsp.fast_backward_limiter_envelope(dg_np, mask_np, float(alpha_rel))
+            d_gmin = torch.from_numpy(dgmin_np).to(device=grad_output.device, dtype=grad_output.dtype)
+        else:
+            d_gmin = torch.empty_like(grad_output)
+            lambda_next = torch.zeros(B, dtype=grad_output.dtype, device=grad_output.device)
+            for n in range(N - 1, -1, -1):
+                dg_curr = grad_output[:, n] + lambda_next
+                is_rel = mask_rel[:, n]
+                d_gmin[:, n] = torch.where(is_rel, (1.0 - alpha_rel) * dg_curr, dg_curr)
+                lambda_next = torch.where(is_rel, alpha_rel * dg_curr, torch.zeros_like(lambda_next))
+
+        return d_gmin, None
 
 class DifferentiableLookaheadLimiter(nn.Module):
     """
@@ -52,17 +108,8 @@ class DifferentiableLookaheadLimiter(nn.Module):
         g_target_padded = F.pad(g_target.unsqueeze(1), (self.lookahead - 1, 0), mode='constant', value=1.0)
         g_min = -F.max_pool1d(-g_target_padded, kernel_size=self.lookahead, stride=1).squeeze(1) # [B, N]
 
-        # 4. Stadio 2: One-Pole Release Envelope
-        # Calcolo sequenziale differenziabile in float64
-        g_rel = torch.empty_like(g_min)
-        alpha = self.alpha_rel
-        g_prev = torch.ones(B, dtype=torch.float64, device=x.device)
-        for n in range(N):
-            gm = g_min[:, n]
-            cond = gm <= g_prev
-            g_curr = torch.where(cond, gm, alpha * g_prev + (1.0 - alpha) * gm)
-            g_rel[:, n] = g_curr
-            g_prev = g_curr
+        # 4. Stadio 2: One-Pole Release Envelope (C++ Fast Autograd Scan)
+        g_rel = FastLimiterReleaseFunction.apply(g_min, self.alpha_rel)
 
         # 5. Stadio 3: Boxcar Moving Average Smoothing di lunghezza NL=144
         g_rel_padded = F.pad(g_rel.unsqueeze(1), (self.lookahead - 1, 0), mode='constant', value=1.0)

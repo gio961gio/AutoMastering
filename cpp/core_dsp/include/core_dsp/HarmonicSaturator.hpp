@@ -28,12 +28,12 @@ public:
         dry_idx_r_ = 0;
     }
 
-    // drive_db in [0, 18], mix in [0, 1]
+    // drive_db in [0, 6], mix in [0, 1]
     void set_parameters(double drive_db, double mix) noexcept {
         drive_db = std::clamp(drive_db, 0.0, 36.0);
         mix_ = std::clamp(mix, 0.0, 1.0);
         gd_ = std::pow(10.0, drive_db / 20.0);
-        inv_sqrt_gd_ = 1.0 / std::sqrt(gd_);
+        inv_gd_ = 1.0 / gd_; // Unit-gain normalization for small signals
     }
 
     void process(const float* in_l, const float* in_r,
@@ -68,7 +68,7 @@ private:
         // 2. Sub-campione 0 a 2*fs (m = 2n, valore 2.0 * x)
         push_sample(state_up, 2.0 * x);
         const double u0 = dot_fir(state_up);
-        const double v0 = std::tanh(gd_ * u0) * inv_sqrt_gd_;
+        const double v0 = std::tanh(gd_ * u0) * inv_gd_;
 
         // Inserisci v0 nel filtro di decimazione e valuta l'uscita wet
         push_sample(state_down, v0);
@@ -77,7 +77,7 @@ private:
         // 3. Sub-campione 1 a 2*fs (m = 2n + 1, valore 0.0)
         push_sample(state_up, 0.0);
         const double u1 = dot_fir(state_up);
-        const double v1 = std::tanh(gd_ * u1) * inv_sqrt_gd_;
+        const double v1 = std::tanh(gd_ * u1) * inv_gd_;
         push_sample(state_down, v1);
 
         // 4. Mix Dry/Wet perfettamente allineato in fase (zero comb-filtering)
@@ -102,7 +102,7 @@ private:
     }
 
     double gd_ = 1.0;
-    double inv_sqrt_gd_ = 1.0;
+    double inv_gd_ = 1.0;
     double mix_ = 0.0;
 
     std::array<double, FIR_HALFBAND_TAPS> state_up_l_{};

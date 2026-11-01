@@ -9,7 +9,21 @@ import numpy as np
 import py_core_dsp
 from ddsp_mastering.optimize import AutoMasteringOptimizer, MasteringBenchmarkSuite
 
-def run_scenario(name, raw_path, ref_path, out_prefix, optimize_sec=0.5, num_steps=15, lr=0.08, duration_sec=10.0):
+def find_highest_energy_window(signal: np.ndarray, window_len: int, hop_len: int = 2400) -> int:
+    """Find start index of window with highest RMS energy."""
+    T = signal.shape[-1]
+    if T <= window_len:
+        return 0
+    # Mean square across channels: (T,)
+    mono_sq = np.mean(signal ** 2, axis=0)
+    # Cumulative sum for fast rolling energy
+    cs = np.pad(np.cumsum(mono_sq), (1, 0))
+    starts = np.arange(0, T - window_len + 1, hop_len)
+    window_energies = cs[starts + window_len] - cs[starts]
+    best_idx = starts[np.argmax(window_energies)]
+    return int(best_idx)
+
+def run_scenario(name, raw_path, ref_path, out_prefix, optimize_sec=1.5, num_steps=30, lr=0.05, duration_sec=10.0):
     print(f"\n=======================================================", flush=True)
     print(f"  RUNNING {name.upper()}", flush=True)
     print(f"=======================================================", flush=True)
@@ -29,10 +43,15 @@ def run_scenario(name, raw_path, ref_path, out_prefix, optimize_sec=0.5, num_ste
     raw_full = np.ascontiguousarray(raw_data[:min_len, :2].T, dtype=np.float32) # (2, T)
     ref_full = np.ascontiguousarray(ref_data[:min_len, :2].T, dtype=np.float32) # (2, T)
 
-    # Representative chunk for gradient optimization
-    opt_len = int(optimize_sec * 48000)
-    raw_chunk = np.ascontiguousarray(raw_full[:, :opt_len])
-    ref_chunk = np.ascontiguousarray(ref_full[:, :opt_len])
+    # Rolling RMS energy window selection (avoids dead gradients on silent/sparse intros)
+    opt_len = min(int(optimize_sec * 48000), min_len)
+    best_start = find_highest_energy_window(raw_full, opt_len)
+    start_time = best_start / 48000.0
+    end_time = (best_start + opt_len) / 48000.0
+    print(f"[WINDOW SELECTION] Selected highest RMS energy window: {start_time:.2f}s - {end_time:.2f}s ({opt_len / 48000.0:.2f}s)", flush=True)
+
+    raw_chunk = np.ascontiguousarray(raw_full[:, best_start : best_start + opt_len])
+    ref_chunk = np.ascontiguousarray(ref_full[:, best_start : best_start + opt_len])
 
     raw_opt_tensor = torch.tensor(raw_chunk, dtype=torch.float32).unsqueeze(0)  # (1, 2, T_opt)
     ref_opt_tensor = torch.tensor(ref_chunk, dtype=torch.float32).unsqueeze(0)  # (1, 2, T_opt)
@@ -121,8 +140,10 @@ if __name__ == "__main__":
     parser.add_argument("--raw", type=str, required=True, help="Path to raw mix WAV (48kHz)")
     parser.add_argument("--ref", type=str, required=True, help="Path to reference master WAV (48kHz)")
     parser.add_argument("--prefix", type=str, default="scenario_test", help="Output prefix name")
-    parser.add_argument("--steps", type=int, default=15, help="Number of Adam optimization steps")
-    parser.add_argument("--lr", type=float, default=0.08, help="Adam learning rate")
+    parser.add_argument("--steps", type=int, default=30, help="Number of Adam optimization steps")
+    parser.add_argument("--lr", type=float, default=0.05, help="Adam learning rate")
+    parser.add_argument("--opt-sec", type=float, default=1.5, help="Duration of optimization window in seconds")
+    parser.add_argument("--duration", type=float, default=10.0, help="Max duration of audio to process in seconds")
     args = parser.parse_args()
 
     run_scenario(
@@ -130,6 +151,8 @@ if __name__ == "__main__":
         raw_path=args.raw,
         ref_path=args.ref,
         out_prefix=args.prefix,
+        optimize_sec=args.opt_sec,
         num_steps=args.steps,
-        lr=args.lr
+        lr=args.lr,
+        duration_sec=args.duration,
     )

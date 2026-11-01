@@ -12,61 +12,61 @@ class ParamSpec(NamedTuple):
     unit: str
 
 PARAM_SPECS: List[ParamSpec] = [
-    # 0..17: Parametric EQ (6 bande x 3 parametri)
+    # 0..17: Parametric EQ (6 bande x 3 parametri) - Mastering Grade ranges
     ParamSpec("eq_b0_f0", 20.0, 250.0, True, "Hz"),
-    ParamSpec("eq_b0_gain_db", -12.0, 12.0, False, "dB"),
-    ParamSpec("eq_b0_q", 0.5, 5.0, True, ""),
+    ParamSpec("eq_b0_gain_db", -6.0, 6.0, False, "dB"),
+    ParamSpec("eq_b0_q", 0.4, 2.5, True, ""),
     ParamSpec("eq_b1_f0", 100.0, 500.0, True, "Hz"),
-    ParamSpec("eq_b1_gain_db", -12.0, 12.0, False, "dB"),
-    ParamSpec("eq_b1_q", 0.5, 5.0, True, ""),
+    ParamSpec("eq_b1_gain_db", -6.0, 6.0, False, "dB"),
+    ParamSpec("eq_b1_q", 0.4, 2.5, True, ""),
     ParamSpec("eq_b2_f0", 400.0, 2000.0, True, "Hz"),
-    ParamSpec("eq_b2_gain_db", -12.0, 12.0, False, "dB"),
-    ParamSpec("eq_b2_q", 0.5, 5.0, True, ""),
+    ParamSpec("eq_b2_gain_db", -6.0, 6.0, False, "dB"),
+    ParamSpec("eq_b2_q", 0.4, 2.5, True, ""),
     ParamSpec("eq_b3_f0", 1500.0, 6000.0, True, "Hz"),
-    ParamSpec("eq_b3_gain_db", -12.0, 12.0, False, "dB"),
-    ParamSpec("eq_b3_q", 0.5, 5.0, True, ""),
+    ParamSpec("eq_b3_gain_db", -6.0, 6.0, False, "dB"),
+    ParamSpec("eq_b3_q", 0.4, 2.5, True, ""),
     ParamSpec("eq_b4_f0", 4000.0, 12000.0, True, "Hz"),
-    ParamSpec("eq_b4_gain_db", -12.0, 12.0, False, "dB"),
-    ParamSpec("eq_b4_q", 0.5, 5.0, True, ""),
+    ParamSpec("eq_b4_gain_db", -6.0, 6.0, False, "dB"),
+    ParamSpec("eq_b4_q", 0.4, 2.5, True, ""),
     ParamSpec("eq_b5_f0", 5000.0, 18000.0, True, "Hz"),
-    ParamSpec("eq_b5_gain_db", -12.0, 12.0, False, "dB"),
-    ParamSpec("eq_b5_q", 0.5, 5.0, True, ""),
+    ParamSpec("eq_b5_gain_db", -6.0, 6.0, False, "dB"),
+    ParamSpec("eq_b5_q", 0.4, 2.5, True, ""),
 
     # 18..19: Crossover LR4 (2 parametri)
     ParamSpec("crossover_f_low", 80.0, 350.0, True, "Hz"),
     ParamSpec("crossover_f_high", 1500.0, 6000.0, True, "Hz"),
 
-    # 20..34: Multiband Comp (3 bande x 5 parametri)
-    # Low Band (20..24)
-    ParamSpec("comp_low_threshold_db", -40.0, 0.0, False, "dB"),
-    ParamSpec("comp_low_ratio", 1.0, 20.0, True, ""),
-    ParamSpec("comp_low_attack_ms", 0.5, 100.0, True, "ms"),
-    ParamSpec("comp_low_release_ms", 10.0, 1000.0, True, "ms"),
-    ParamSpec("comp_low_makeup_db", -6.0, 12.0, False, "dB"),
-    # Mid Band (25..29)
-    ParamSpec("comp_mid_threshold_db", -40.0, 0.0, False, "dB"),
-    ParamSpec("comp_mid_ratio", 1.0, 20.0, True, ""),
-    ParamSpec("comp_mid_attack_ms", 0.5, 100.0, True, "ms"),
-    ParamSpec("comp_mid_release_ms", 10.0, 1000.0, True, "ms"),
-    ParamSpec("comp_mid_makeup_db", -6.0, 12.0, False, "dB"),
-    # High Band (30..34)
-    ParamSpec("comp_high_threshold_db", -40.0, 0.0, False, "dB"),
-    ParamSpec("comp_high_ratio", 1.0, 20.0, True, ""),
-    ParamSpec("comp_high_attack_ms", 0.5, 100.0, True, "ms"),
-    ParamSpec("comp_high_release_ms", 10.0, 1000.0, True, "ms"),
-    ParamSpec("comp_high_makeup_db", -6.0, 12.0, False, "dB"),
+    # 20..34: Multiband Comp (3 bande x 5 parametri) - Mastering Grade ranges
+    # Low Band (20..24) - preserves sub/kick punch with slower attack
+    ParamSpec("comp_low_threshold_db", -30.0, 0.0, False, "dB"),
+    ParamSpec("comp_low_ratio", 1.1, 4.0, True, ""),
+    ParamSpec("comp_low_attack_ms", 10.0, 120.0, True, "ms"),
+    ParamSpec("comp_low_release_ms", 20.0, 600.0, True, "ms"),
+    ParamSpec("comp_low_makeup_db", -3.0, 6.0, False, "dB"),
+    # Mid Band (25..29) - preserves snare snap
+    ParamSpec("comp_mid_threshold_db", -30.0, 0.0, False, "dB"),
+    ParamSpec("comp_mid_ratio", 1.1, 4.0, True, ""),
+    ParamSpec("comp_mid_attack_ms", 5.0, 80.0, True, "ms"),
+    ParamSpec("comp_mid_release_ms", 20.0, 600.0, True, "ms"),
+    ParamSpec("comp_mid_makeup_db", -3.0, 6.0, False, "dB"),
+    # High Band (30..34) - smooth vocal/cymbal control
+    ParamSpec("comp_high_threshold_db", -30.0, 0.0, False, "dB"),
+    ParamSpec("comp_high_ratio", 1.1, 4.0, True, ""),
+    ParamSpec("comp_high_attack_ms", 2.0, 50.0, True, "ms"),
+    ParamSpec("comp_high_release_ms", 20.0, 600.0, True, "ms"),
+    ParamSpec("comp_high_makeup_db", -3.0, 6.0, False, "dB"),
 
-    # 35..37: Stereo Imager (3 parametri)
-    ParamSpec("imager_width_low", 0.0, 1.2, False, ""),
-    ParamSpec("imager_width_mid", 0.5, 2.0, False, ""),
-    ParamSpec("imager_width_high", 0.5, 2.0, False, ""),
+    # 35..37: Stereo Imager (3 parametri) - natural width bounds
+    ParamSpec("imager_width_low", 0.4, 1.1, False, ""),
+    ParamSpec("imager_width_mid", 0.7, 1.4, False, ""),
+    ParamSpec("imager_width_high", 0.7, 1.4, False, ""),
 
-    # 38..39: Harmonic Saturator (2 parametri)
-    ParamSpec("saturator_drive_db", 0.0, 18.0, False, "dB"),
+    # 38..39: Harmonic Saturator (2 parametri) - musical tape saturation bounds
+    ParamSpec("saturator_drive_db", 0.0, 6.0, False, "dB"),
     ParamSpec("saturator_mix", 0.0, 1.0, False, ""),
 
     # 40: Lookahead Limiter (1 parametro)
-    ParamSpec("limiter_push_gain_db", 0.0, 12.0, False, "dB"),
+    ParamSpec("limiter_push_gain_db", 0.0, 8.0, False, "dB"),
 ]
 
 # Tensors costanti per calcolo vettorizzato su GPU/CPU
@@ -132,6 +132,42 @@ def map_theta_to_z(theta: torch.Tensor) -> torch.Tensor:
 
     z = torch.where(is_log, z_log, z_lin)
     return torch.clamp(z, 0.0, 1.0)
+
+
+# ---------------------------------------------------------------------------
+# PRESET FISICO NEUTRO (Mastering Transparent Bypass Baseline)
+# ---------------------------------------------------------------------------
+# Valori fisici corrispondenti a un bypass acustico trasparente:
+# - EQ flat (0 dB gain, Q=0.707 Butterworth)
+# - Crossover standard 160 Hz e 3200 Hz
+# - Compressore trasparente (Ratio 1.2:1, makeup 0 dB, attack lenti per preservare i transienti)
+# - Stereo imager neutro (width = 1.0)
+# - Saturatore spento (drive = 0 dB, mix = 0.0 dry)
+# - Limiter neutro (push gain = 0 dB)
+THETA_NEUTRAL: torch.Tensor = torch.tensor([
+    # EQ (f0, gain, q) x 6
+    60.0, 0.0, 0.707,
+    250.0, 0.0, 0.707,
+    1000.0, 0.0, 0.707,
+    3000.0, 0.0, 0.707,
+    8000.0, 0.0, 0.707,
+    12000.0, 0.0, 0.707,
+    # Crossover (low, high)
+    160.0, 3200.0,
+    # Multiband comp: thresh, ratio, attack, release, makeup
+    -12.0, 1.2, 40.0, 120.0, 0.0,
+    -12.0, 1.2, 25.0, 100.0, 0.0,
+    -12.0, 1.2, 15.0, 80.0, 0.0,
+    # Imager: low, mid, high
+    1.0, 1.0, 1.0,
+    # Saturator: drive, mix
+    0.0, 0.0,
+    # Limiter push
+    0.0
+], dtype=torch.float64)
+
+# Vettore normalizzato neutro z_neutral in (0, 1)
+Z_NEUTRAL: torch.Tensor = map_theta_to_z(THETA_NEUTRAL).to(dtype=torch.float32)
 
 
 def unpack_theta_dict(theta: torch.Tensor) -> Dict[str, torch.Tensor]:

@@ -10,6 +10,7 @@ import torch.nn as nn
 
 from ddsp_mastering.loss.stft import MultiResolutionSTFTLoss
 from ddsp_mastering.loss.loudness import DifferentiableLoudnessLoss
+from ddsp_mastering.param_space import Z_NEUTRAL
 
 
 class MasteringPerceptualLoss(nn.Module):
@@ -115,10 +116,10 @@ class MasteringPerceptualLoss(nn.Module):
         metrics.update(loudness_metrics)
         total_loss = total_loss + self.weight_loudness * loudness_val
 
-        # 3. Parameter Regularization Loss (pulls z towards neutral 0.5)
+        # 3. Parameter Regularization Loss (pulls z towards physical neutral preset Z_NEUTRAL)
         if normalized_params is not None:
-            # Prior: penalize distance from neutral center z = 0.5
-            param_reg = torch.mean((normalized_params - 0.5) ** 2)
+            z_target = Z_NEUTRAL.to(device=normalized_params.device, dtype=normalized_params.dtype)
+            param_reg = torch.mean((normalized_params - z_target) ** 2)
             metrics["param_reg_loss"] = param_reg.item()
             total_loss = total_loss + self.weight_param_reg * param_reg
 

@@ -70,7 +70,7 @@ class DifferentiableHarmonicSaturator(nn.Module):
         mix_f64 = torch.clamp(mix.to(torch.float64).reshape(-1, 1, 1), 0.0, 1.0)
 
         gd = torch.pow(10.0, drive_f64 / 20.0)
-        inv_sqrt_gd = 1.0 / torch.sqrt(gd)
+        inv_gd = 1.0 / gd
 
         # 1. Upsampling 2x (Zero-stuffing + Causal FIR)
         x_up = torch.zeros((num_channels, 1, 2 * N), device=x.device, dtype=torch.float64)
@@ -79,8 +79,8 @@ class DifferentiableHarmonicSaturator(nn.Module):
         # Convoluzione causale: padding sinistro di 30 campioni
         u_up = F.conv1d(x_up, self.h, padding=30)[:, :, : 2 * N]
 
-        # 2. Waveshaper tanh compensato
-        v_up = torch.tanh(gd * u_up) * inv_sqrt_gd
+        # 2. Waveshaper tanh compensato (Unit gain for small signals)
+        v_up = torch.tanh(gd * u_up) * inv_gd
 
         # 3. Downsampling 2x (Causal FIR con stride 2)
         y_wet = F.conv1d(v_up, self.h, padding=30, stride=2)[:, :, :N]

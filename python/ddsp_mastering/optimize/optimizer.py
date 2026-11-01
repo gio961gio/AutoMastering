@@ -16,6 +16,7 @@ from ddsp_mastering.loss.combined import MasteringPerceptualLoss
 from ddsp_mastering.param_space import (
     PARAM_SPECS,
     NUM_PARAMS,
+    Z_NEUTRAL,
     map_z_to_theta,
     unpack_theta_dict,
 )
@@ -88,11 +89,13 @@ class AutoMasteringOptimizer:
 
         # Initialize in unconstrained logit space: u = logit(z)
         if initial_z is None:
-            # Neutral 0.5 in logit space is 0.0
-            u = nn.Parameter(torch.zeros(NUM_PARAMS, dtype=torch.float32, device=raw_mix.device))
+            # Physically neutral mastering preset baseline
+            z_init = torch.clamp(Z_NEUTRAL.to(device=raw_mix.device), 1e-4, 1.0 - 1e-4)
+            u_init = torch.log(z_init / (1.0 - z_init))
+            u = nn.Parameter(u_init.clone().detach())
         else:
             # Inverse sigmoid: log(z / (1 - z))
-            z_clamped = torch.clamp(initial_z.reshape(NUM_PARAMS), 0.001, 0.999)
+            z_clamped = torch.clamp(initial_z.reshape(NUM_PARAMS), 1e-4, 1.0 - 1e-4)
             u_init = torch.log(z_clamped / (1.0 - z_clamped))
             u = nn.Parameter(u_init.clone().detach().to(device=raw_mix.device))
 
@@ -116,7 +119,7 @@ class AutoMasteringOptimizer:
             if self.use_hybrid_eq and step < int(self.num_steps * 0.7):
                 eq_mode = "fft"
             else:
-                eq_mode = "fft"  # FFT mode is stable, fast, and differentiable
+                eq_mode = "iir"  # Fine steps use true IIR biquad filters matching C++
 
             pred_audio = self.chain(raw_mix, z=z, eq_mode=eq_mode)
 
@@ -144,16 +147,17 @@ class AutoMasteringOptimizer:
                 history["lufs"].append(metrics["lufs_pred"])
             history["lr"].append(scheduler.get_last_lr()[0])
 
-            if verbose and (step % 10 == 0 or step == self.num_steps - 1):
+            if verbose and (step % 5 == 0 or step == self.num_steps - 1):
                 print(
                     f"Step {step:02d}/{self.num_steps} | Loss: {loss.item():.4f} | "
                     f"LUFS: {metrics.get('lufs_pred', 0.0):.2f} (Target: {effective_target_lufs:.2f}) | "
-                    f"LR: {scheduler.get_last_lr()[0]:.4f}"
+                    f"LR: {scheduler.get_last_lr()[0]:.4f}",
+                    flush=True
                 )
 
         optimal_z = torch.sigmoid(u).detach()
         with torch.no_grad():
-            final_master = self.chain(raw_mix, z=optimal_z, eq_mode="fft")
+            final_master = self.chain(raw_mix, z=optimal_z, eq_mode="iir")
 
         return optimal_z, final_master, history
 
