@@ -1,18 +1,23 @@
-"""Loss functions for DDSP AutoMastering."""
+"""Loss functions for differentiable audio mastering."""
 
-from ddsp_mastering.loss.stft import SingleResolutionSTFTLoss, MultiResolutionSTFTLoss
-from ddsp_mastering.loss.loudness import (
+from .loudness import (
     DifferentiableKWeighting,
     DifferentiableLoudnessLoss,
     get_k_weighting_coefficients,
 )
-from ddsp_mastering.loss.combined import MasteringPerceptualLoss
+from .stft import (
+    SingleResolutionSTFTLoss,
+    MultiResolutionSTFTLoss,
+)
+from .combined import MasteringPerceptualLoss
+from .stylistic import AggregatePerceptualLoss
 
 __all__ = [
-    "SingleResolutionSTFTLoss",
-    "MultiResolutionSTFTLoss",
     "DifferentiableKWeighting",
     "DifferentiableLoudnessLoss",
     "get_k_weighting_coefficients",
+    "SingleResolutionSTFTLoss",
+    "MultiResolutionSTFTLoss",
     "MasteringPerceptualLoss",
+    "AggregatePerceptualLoss",
 ]

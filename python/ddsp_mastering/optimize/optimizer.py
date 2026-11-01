@@ -1,18 +1,23 @@
-"""End-to-End Self-Supervised AutoMastering Optimizer.
+"""End-to-End Self-Supervised AutoMastering Optimizer with Multi-Chunk Evaluation.
 
 Optimizes 41-dimensional mastering parameters in unconstrained logit space
 u in R^41 (mapped via z = sigmoid(u)) using Adam with Cosine Annealing,
 gradient clipping, and multi-objective perceptual loss guidance.
+
+Supports both:
+  - "same_track": Paired time-aligned chunks with multi-resolution STFT & LUFS loss.
+  - "stylistic": Aggregate perceptual feature loss across representative song windows.
 """
 
 import json
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
 from ddsp_mastering.dsp.chain import DifferentiableMasteringChain
 from ddsp_mastering.loss.combined import MasteringPerceptualLoss
+from ddsp_mastering.loss.stylistic import AggregatePerceptualLoss
 from ddsp_mastering.param_space import (
     PARAM_SPECS,
     NUM_PARAMS,
@@ -52,55 +57,81 @@ class AutoMasteringOptimizer:
             weight_loudness=weight_loudness,
             weight_param_reg=weight_param_reg,
         )
+        self.stylistic_loss_fn = AggregatePerceptualLoss(
+            sample_rate=sample_rate,
+            weight_spectral=weight_stft,
+            weight_loudness=weight_loudness,
+            weight_param_reg=weight_param_reg,
+        )
         self.benchmark = MasteringBenchmarkSuite(sample_rate=sample_rate)
 
-    def optimize(
+    def optimize_multi_chunk(
         self,
-        raw_mix: torch.Tensor,
-        target_reference: Optional[torch.Tensor] = None,
+        mix_chunks: List[torch.Tensor],
+        ref_chunks: Optional[List[torch.Tensor]] = None,
+        reference_mode: str = "same_track",
+        chunk_weights: Optional[List[float]] = None,
         initial_z: Optional[torch.Tensor] = None,
         verbose: bool = False,
         align_latency: bool = True,
-    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, List[float]]]:
-        """Run optimization loop to find optimal mastering parameters z*.
+    ) -> Tuple[torch.Tensor, List[torch.Tensor], Dict[str, List[float]]]:
+        """Run optimization loop across multiple representative audio chunks.
 
         Args:
-            raw_mix: Unmastered audio tensor (1, 2, T).
-            target_reference: Optional reference target master audio (1, 2, T).
-            initial_z: Optional initial parameters z in [0, 1]^41 (defaults to neutral 0.5).
+            mix_chunks: List of unmastered chunk tensors [(1, 2, T_k), ...]
+            ref_chunks: List of reference chunk tensors [(1, 2, T_k), ...], if available.
+            reference_mode: "same_track" (point-to-point) or "stylistic" (aggregate features).
+            chunk_weights: Optional weights per chunk. Normalized automatically to sum to 1.0.
+            initial_z: Optional initial parameters z in [0, 1]^41.
             verbose: Whether to print progress during optimization.
-            align_latency: Whether to compensate for chain latency when comparing against target_reference.
-                Set to False when target_reference is already delayed by the chain.
+            align_latency: Whether to slice off chain latency (same_track only).
 
         Returns:
-            Tuple of (optimal_z, mastered_audio, loss_history).
+            Tuple of (optimal_z, list_of_mastered_chunks, loss_history).
         """
-        assert raw_mix.dim() == 3 and raw_mix.shape[0] == 1, "Expected shape (1, 2, T)"
+        assert len(mix_chunks) > 0, "Expected at least 1 audio chunk"
+        for i, c in enumerate(mix_chunks):
+            assert c.dim() == 3 and c.shape[0] == 1, f"Chunk {i} must have shape (1, 2, T)"
 
-        # Determine target LUFS: if self.target_lufs is explicitly set, use it;
-        # otherwise, if target_reference is provided, match its LUFS; else default to -14.0
+        K = len(mix_chunks)
+        device = mix_chunks[0].device
+
+        # Setup chunk weighting
+        if chunk_weights is None:
+            weights = [1.0 / K] * K
+        else:
+            assert len(chunk_weights) == K, "chunk_weights length must match mix_chunks length"
+            total_w = sum(chunk_weights)
+            assert total_w > 0, "Sum of chunk weights must be positive"
+            weights = [w / total_w for w in chunk_weights]
+
+        # Determine effective target LUFS
         effective_target_lufs = self.target_lufs
         if effective_target_lufs is None:
-            if target_reference is not None:
+            if ref_chunks is not None and len(ref_chunks) > 0:
                 with torch.no_grad():
-                    effective_target_lufs = self.loss_fn.loudness_loss.calculate_lufs(target_reference).item()
+                    lufs_vals = [
+                        self.loss_fn.loudness_loss.calculate_lufs(rc).item()
+                        for rc in ref_chunks
+                    ]
+                    effective_target_lufs = float(sum(lufs_vals) / len(lufs_vals))
             else:
                 effective_target_lufs = -14.0
 
         # Initialize in unconstrained logit space: u = logit(z)
         if initial_z is None:
-            # Physically neutral mastering preset baseline
-            z_init = torch.clamp(Z_NEUTRAL.to(device=raw_mix.device), 1e-4, 1.0 - 1e-4)
+            z_init = torch.clamp(Z_NEUTRAL.to(device=device), 1e-4, 1.0 - 1e-4)
             u_init = torch.log(z_init / (1.0 - z_init))
             u = nn.Parameter(u_init.clone().detach())
         else:
-            # Inverse sigmoid: log(z / (1 - z))
-            z_clamped = torch.clamp(initial_z.reshape(NUM_PARAMS), 1e-4, 1.0 - 1e-4)
+            z_clamped = torch.clamp(initial_z.reshape(NUM_PARAMS).to(device=device), 1e-4, 1.0 - 1e-4)
             u_init = torch.log(z_clamped / (1.0 - z_clamped))
-            u = nn.Parameter(u_init.clone().detach().to(device=raw_mix.device))
+            u = nn.Parameter(u_init.clone().detach())
 
         optimizer = optim.Adam([u], lr=self.lr)
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.num_steps, eta_min=self.lr * 0.05)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=self.num_steps, eta_min=self.lr * 0.05
+        )
 
         history: Dict[str, List[float]] = {
             "loss": [],
@@ -119,19 +150,42 @@ class AutoMasteringOptimizer:
             if self.use_hybrid_eq and step < int(self.num_steps * 0.7):
                 eq_mode = "fft"
             else:
-                eq_mode = "iir"  # Fine steps use true IIR biquad filters matching C++
+                eq_mode = "iir"
 
-            pred_audio = self.chain(raw_mix, z=z, eq_mode=eq_mode)
+            step_loss = torch.tensor(0.0, device=device, dtype=torch.float32)
+            step_stft = 0.0
+            step_lufs = 0.0
 
-            loss, metrics = self.loss_fn(
-                pred_audio=pred_audio,
-                target_audio=target_reference,
-                target_lufs=effective_target_lufs,
-                normalized_params=z,
-                align_latency=align_latency,
-            )
+            for k in range(K):
+                mix_k = mix_chunks[k]
+                pred_k = self.chain(mix_k, z=z, eq_mode=eq_mode)
 
-            loss.backward()
+                if reference_mode == "stylistic":
+                    ref_k = ref_chunks[k % len(ref_chunks)] if ref_chunks else None
+                    if ref_k is None:
+                        raise ValueError("Reference audio chunk required for stylistic mode")
+                    chunk_loss, chunk_metrics = self.stylistic_loss_fn(
+                        pred_audio=pred_k,
+                        ref_audio=ref_k,
+                        normalized_params=z,
+                        target_lufs=effective_target_lufs,
+                    )
+                    step_stft += weights[k] * chunk_metrics.get("stylistic_spectral_loss", 0.0)
+                else:
+                    ref_k = ref_chunks[k] if ref_chunks and k < len(ref_chunks) else None
+                    chunk_loss, chunk_metrics = self.loss_fn(
+                        pred_audio=pred_k,
+                        target_audio=ref_k,
+                        target_lufs=effective_target_lufs,
+                        normalized_params=z,
+                        align_latency=align_latency,
+                    )
+                    step_stft += weights[k] * chunk_metrics.get("stft_loss_total", 0.0)
+
+                step_loss = step_loss + weights[k] * chunk_loss
+                step_lufs += weights[k] * chunk_metrics.get("lufs_pred", 0.0)
+
+            step_loss.backward()
 
             # Gradient clipping to prevent sudden spikes
             torch.nn.utils.clip_grad_norm_([u], max_norm=1.0)
@@ -139,27 +193,53 @@ class AutoMasteringOptimizer:
             optimizer.step()
             scheduler.step()
 
-            # Record history
-            history["loss"].append(loss.item())
-            if "stft_loss_total" in metrics:
-                history["stft_loss"].append(metrics["stft_loss_total"])
-            if "lufs_pred" in metrics:
-                history["lufs"].append(metrics["lufs_pred"])
+            history["loss"].append(step_loss.item())
+            history["stft_loss"].append(step_stft)
+            history["lufs"].append(step_lufs)
             history["lr"].append(scheduler.get_last_lr()[0])
 
             if verbose and (step % 5 == 0 or step == self.num_steps - 1):
                 print(
-                    f"Step {step:02d}/{self.num_steps} | Loss: {loss.item():.4f} | "
-                    f"LUFS: {metrics.get('lufs_pred', 0.0):.2f} (Target: {effective_target_lufs:.2f}) | "
+                    f"Step {step:02d}/{self.num_steps} | Loss: {step_loss.item():.4f} | "
+                    f"LUFS: {step_lufs:.2f} (Target: {effective_target_lufs:.2f}) | "
                     f"LR: {scheduler.get_last_lr()[0]:.4f}",
-                    flush=True
+                    flush=True,
                 )
 
         optimal_z = torch.sigmoid(u).detach()
         with torch.no_grad():
-            final_master = self.chain(raw_mix, z=optimal_z, eq_mode="iir")
+            final_chunks = [
+                self.chain(c, z=optimal_z, eq_mode="iir")
+                for c in mix_chunks
+            ]
 
-        return optimal_z, final_master, history
+        return optimal_z, final_chunks, history
+
+    def optimize(
+        self,
+        raw_mix: torch.Tensor,
+        target_reference: Optional[torch.Tensor] = None,
+        initial_z: Optional[torch.Tensor] = None,
+        verbose: bool = False,
+        align_latency: bool = True,
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, List[float]]]:
+        """Backward-compatible single-window optimization loop."""
+        ref_list = [target_reference] if target_reference is not None else None
+        opt_z, mastered_chunks, history = self.optimize_multi_chunk(
+            mix_chunks=[raw_mix],
+            ref_chunks=ref_list,
+            reference_mode="same_track",
+            initial_z=initial_z,
+            verbose=verbose,
+            align_latency=align_latency,
+        )
+        return opt_z, mastered_chunks[0], history
+
+    def master_full_track(self, full_mix: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        """Apply optimized parameters z to master the full audio track without truncation."""
+        with torch.no_grad():
+            mastered = self.chain(full_mix, z=z, eq_mode="iir")
+        return mastered
 
     def export_preset_json(self, z: torch.Tensor, output_path: Optional[str] = None) -> str:
         """Export normalized parameters z to canonical JSON preset format interoperable with JUCE."""

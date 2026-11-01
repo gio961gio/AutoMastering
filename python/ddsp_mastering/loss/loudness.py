@@ -176,12 +176,16 @@ class DifferentiableLoudnessLoss(nn.Module):
 
     def calculate_peak_dbfs(self, x: torch.Tensor) -> torch.Tensor:
         """Compute smooth differentiable peak amplitude in dBFS."""
-        # Max peak over stereo channels and time
-        # Soft maximum with high beta for smooth gradient flow
         abs_x = torch.abs(x)
         peak_val = torch.max(abs_x.reshape(x.shape[0], -1), dim=-1)[0]
         peak_dbfs = 20.0 * torch.log10(peak_val + 1e-6)
         return peak_dbfs
+
+    def calculate_plr(self, x: torch.Tensor) -> torch.Tensor:
+        """Compute differentiable Peak-to-Loudness Ratio (PLR / Crest Factor) in dB."""
+        peak_dbfs = self.calculate_peak_dbfs(x)
+        lufs = self.calculate_lufs(x)
+        return peak_dbfs - lufs
 
     def forward(
         self,

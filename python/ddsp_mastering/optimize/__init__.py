@@ -1,9 +1,11 @@
-"""Optimization and benchmark suite modules."""
+"""Optimization, benchmarking, and session manifest modules."""
 
-from ddsp_mastering.optimize.metrics import MasteringBenchmarkSuite
-from ddsp_mastering.optimize.optimizer import AutoMasteringOptimizer
+from .optimizer import AutoMasteringOptimizer
+from .metrics import MasteringBenchmarkSuite
+from .manifest import MasteringManifest
 
 __all__ = [
-    "MasteringBenchmarkSuite",
     "AutoMasteringOptimizer",
+    "MasteringBenchmarkSuite",
+    "MasteringManifest",
 ]

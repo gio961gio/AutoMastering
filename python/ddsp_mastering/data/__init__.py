@@ -1,9 +1,29 @@
-"""Data pipeline and self-supervised synthetic dataset modules."""
+"""Data pipeline, reference protocol, and multi-chunk evaluation modules."""
 
-from ddsp_mastering.data.dataset import AudioDataset
-from ddsp_mastering.data.synthetic import SyntheticMasteringPairGenerator
+from .dataset import AudioDataset
+from .synthetic import SyntheticMasteringPairGenerator
+from .reference_protocol import (
+    ReferenceMode,
+    AlignmentResult,
+    verify_audio_pair,
+    estimate_time_alignment,
+    apply_same_track_alignment,
+    assert_stylistic_guards,
+)
+from .chunking import (
+    ChunkSpec,
+    MultiChunkSelector,
+)
 
 __all__ = [
     "AudioDataset",
     "SyntheticMasteringPairGenerator",
+    "ReferenceMode",
+    "AlignmentResult",
+    "verify_audio_pair",
+    "estimate_time_alignment",
+    "apply_same_track_alignment",
+    "assert_stylistic_guards",
+    "ChunkSpec",
+    "MultiChunkSelector",
 ]

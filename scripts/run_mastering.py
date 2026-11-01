@@ -1,75 +1,157 @@
+"""AutoMastering Production Execution Script (Sprint 2 Architecture).
+
+Implements:
+  - Both Reference Modes: 'same_track' (with time alignment) and 'stylistic' (aggregate perceptual loss).
+  - Multi-Chunk Evaluation across 4-6 diverse, representative windows.
+  - Complete full-track mastering (no truncation) via C++20 Core DSP.
+  - Full session provenance manifest generation.
+"""
+
 import sys
-sys.path.insert(0, 'python')
 import os
 import json
-import torch
-import soundfile as sf
+import argparse
+from typing import Optional
 import numpy as np
+import soundfile as sf
+import torch
 
 import py_core_dsp
-from ddsp_mastering.optimize import AutoMasteringOptimizer, MasteringBenchmarkSuite
+from ddsp_mastering.data import (
+    ReferenceMode,
+    AlignmentResult,
+    estimate_time_alignment,
+    apply_same_track_alignment,
+    MultiChunkSelector,
+    ChunkSpec,
+)
+from ddsp_mastering.optimize import (
+    AutoMasteringOptimizer,
+    MasteringBenchmarkSuite,
+    MasteringManifest,
+)
+from ddsp_mastering.param_space import (
+    NUM_PARAMS,
+    PARAM_SPECS,
+    map_z_to_theta,
+    unpack_theta_dict,
+)
+
 
 def find_highest_energy_window(signal: np.ndarray, window_len: int, hop_len: int = 2400) -> int:
-    """Find start index of window with highest RMS energy."""
+    """Find start index of window with highest RMS energy (kept for backward compatibility)."""
     T = signal.shape[-1]
     if T <= window_len:
         return 0
-    # Mean square across channels: (T,)
     mono_sq = np.mean(signal ** 2, axis=0)
-    # Cumulative sum for fast rolling energy
     cs = np.pad(np.cumsum(mono_sq), (1, 0))
     starts = np.arange(0, T - window_len + 1, hop_len)
     window_energies = cs[starts + window_len] - cs[starts]
     best_idx = starts[np.argmax(window_energies)]
     return int(best_idx)
 
-def run_scenario(name, raw_path, ref_path, out_prefix, optimize_sec=1.5, num_steps=30, lr=0.05, duration_sec=10.0):
+
+def run_mastering_session(
+    raw_path: str,
+    ref_path: str,
+    out_prefix: str = "master_session",
+    mode: str = "same_track",
+    num_chunks: int = 4,
+    chunk_len_sec: float = 3.0,
+    seed: int = 42,
+    num_steps: int = 40,
+    lr: float = 0.04,
+    duration_sec: Optional[float] = None,
+    out_dir: str = "scratch/output_mastering",
+):
     print(f"\n=======================================================", flush=True)
-    print(f"  RUNNING {name.upper()}", flush=True)
+    print(f"  AUTOMASTERING POLIMI — SPRINT 2 PRODUCTION ENGINE", flush=True)
+    print(f"  Mode: {mode.upper()} | Chunks: {num_chunks} x {chunk_len_sec:.1f}s | Seed: {seed}", flush=True)
     print(f"=======================================================", flush=True)
+
+    ref_mode = ReferenceMode(mode)
 
     # 1. Load full audio files
     raw_data, raw_sr = sf.read(raw_path)
     ref_data, ref_sr = sf.read(ref_path)
 
-    assert raw_sr == 48000 and ref_sr == 48000, "Expected 48 kHz audio"
+    if raw_sr != 48000 or ref_sr != 48000:
+        raise ValueError(f"Expected 48 kHz audio, got raw={raw_sr}Hz, ref={ref_sr}Hz")
 
     if raw_data.ndim == 1:
         raw_data = np.stack([raw_data, raw_data], axis=-1)
     if ref_data.ndim == 1:
         ref_data = np.stack([ref_data, ref_data], axis=-1)
 
-    min_len = min(raw_data.shape[0], ref_data.shape[0], int(48000 * duration_sec))
-    raw_full = np.ascontiguousarray(raw_data[:min_len, :2].T, dtype=np.float32) # (2, T)
-    ref_full = np.ascontiguousarray(ref_data[:min_len, :2].T, dtype=np.float32) # (2, T)
+    # Handle duration truncation if explicitly requested by user; otherwise preserve 100% full length
+    if duration_sec is not None and duration_sec > 0:
+        max_samples = int(duration_sec * 48000)
+        raw_data = raw_data[:max_samples]
+        if ref_mode == ReferenceMode.SAME_TRACK:
+            ref_data = ref_data[:max_samples]
 
-    # Rolling RMS energy window selection (avoids dead gradients on silent/sparse intros)
-    opt_len = min(int(optimize_sec * 48000), min_len)
-    best_start = find_highest_energy_window(raw_full, opt_len)
-    start_time = best_start / 48000.0
-    end_time = (best_start + opt_len) / 48000.0
-    print(f"[WINDOW SELECTION] Selected highest RMS energy window: {start_time:.2f}s - {end_time:.2f}s ({opt_len / 48000.0:.2f}s)", flush=True)
+    raw_full = np.ascontiguousarray(raw_data.T[:2], dtype=np.float32)  # [2, T_raw]
+    ref_full = np.ascontiguousarray(ref_data.T[:2], dtype=np.float32)  # [2, T_ref]
 
-    raw_chunk = np.ascontiguousarray(raw_full[:, best_start : best_start + opt_len])
-    ref_chunk = np.ascontiguousarray(ref_full[:, best_start : best_start + opt_len])
+    raw_duration = raw_full.shape[1] / 48000.0
+    ref_duration = ref_full.shape[1] / 48000.0
+    print(f"[AUDIO LOADED] Mix: {raw_duration:.2f}s | Reference: {ref_duration:.2f}s", flush=True)
 
-    raw_opt_tensor = torch.tensor(raw_chunk, dtype=torch.float32).unsqueeze(0)  # (1, 2, T_opt)
-    ref_opt_tensor = torch.tensor(ref_chunk, dtype=torch.float32).unsqueeze(0)  # (1, 2, T_opt)
+    # 2. Time Alignment (Same-Track only)
+    alignment_meta = {}
+    if ref_mode == ReferenceMode.SAME_TRACK:
+        print("[ALIGNMENT] Estimating time alignment via normalized cross-correlation...", flush=True)
+        alignment = estimate_time_alignment(raw_full, ref_full, sample_rate=48000.0)
+        alignment_meta = alignment.to_dict()
+        print(
+            f"  -> Lag: {alignment.lag_samples} samples ({alignment.lag_seconds * 1000.0:+.2f} ms) | "
+            f"Sub-sample offset: {alignment.subsample_offset:+.3f} | "
+            f"Corr: {alignment.correlation_coefficient:.4f} (Reliable: {alignment.is_aligned})",
+            flush=True,
+        )
+        # Symmetrically align reference on mix timeline for paired evaluation
+        raw_aligned, ref_aligned = apply_same_track_alignment(raw_full, ref_full, alignment)
+    else:
+        print("[STYLISTIC MODE] Waveform cross-correlation skipped. Aggregate perceptual matching active.", flush=True)
+        raw_aligned = raw_full
+        ref_aligned = ref_full
+        alignment = None
 
-    raw_full_tensor = torch.tensor(raw_full, dtype=torch.float32).unsqueeze(0)  # (1, 2, T_full)
-    ref_full_tensor = torch.tensor(ref_full, dtype=torch.float32).unsqueeze(0)  # (1, 2, T_full)
+    # 3. Multi-Chunk Representative Selection
+    print(f"\n[MULTI-CHUNK SELECTION] Selecting {num_chunks} representative windows ({chunk_len_sec}s each)...", flush=True)
+    selector = MultiChunkSelector(
+        sample_rate=48000.0,
+        num_chunks=num_chunks,
+        chunk_duration_sec=chunk_len_sec,
+        seed=seed,
+    )
+    mix_chunks_spec = selector.select_chunks(raw_aligned)
+    mix_chunks_np = selector.extract_chunk_tensors(raw_aligned, mix_chunks_spec)
 
-    # 2. Evaluate full unmastered vs reference metrics
-    suite = MasteringBenchmarkSuite(sample_rate=48000.0)
-    init_metrics = suite.evaluate(raw_full_tensor, ref_full_tensor, align_latency=False)
-    print(f"[INITIAL UNMASTERED vs REFERENCE]", flush=True)
-    print(f"  - RAW Loudness: {init_metrics['pred_lufs']:.2f} LUFS (Reference Target: {init_metrics['target_lufs']:.2f} LUFS)", flush=True)
-    print(f"  - Spectral Convergence: {init_metrics['spectral_convergence']:.4f}", flush=True)
-    print(f"  - Log-Spectral Distance: {init_metrics['log_spectral_distance_db']:.2f} dB", flush=True)
-    print(f"  - Delta Dynamic Range (PLR): {init_metrics['delta_plr_db']:.2f} dB", flush=True)
-    print(f"  - RAW Peak: {init_metrics['pred_peak_dbfs']:.2f} dBFS", flush=True)
+    print(f"  Selected {len(mix_chunks_spec)} diverse chunks across the track:", flush=True)
+    for c in mix_chunks_spec:
+        print(
+            f"   Chunk {c.chunk_id}: {c.start_sec:.2f}s - {c.end_sec:.2f}s | "
+            f"RMS: {c.rms_db:.1f} dBFS | Crest: {c.crest_factor_db:.1f} dB | Centroid: {c.spectral_centroid_hz:.0f} Hz",
+            flush=True,
+        )
 
-    # 3. AutoMastering Optimization Loop (PyTorch DDSP Twin)
+    # Convert to PyTorch tensors [1, 2, T_chunk]
+    mix_chunk_tensors = [torch.tensor(c).unsqueeze(0) for c in mix_chunks_np]
+
+    if ref_mode == ReferenceMode.SAME_TRACK:
+        # Paired chunks extracted at exact same offsets
+        ref_chunk_tensors = [
+            torch.tensor(ref_aligned[:, c.start_sample : c.end_sample]).unsqueeze(0)
+            for c in mix_chunks_spec
+        ]
+    else:
+        # Reference chunks extracted independently from reference track
+        ref_chunks_spec = selector.select_chunks(ref_full)
+        ref_chunks_np = selector.extract_chunk_tensors(ref_full, ref_chunks_spec)
+        ref_chunk_tensors = [torch.tensor(c).unsqueeze(0) for c in ref_chunks_np]
+
+    # 4. Multi-Chunk AutoMastering Optimization Loop
     optimizer = AutoMasteringOptimizer(
         sample_rate=48000.0,
         lr=lr,
@@ -78,80 +160,121 @@ def run_scenario(name, raw_path, ref_path, out_prefix, optimize_sec=1.5, num_ste
         weight_stft=1.0,
         weight_loudness=0.8,
         weight_param_reg=0.01,
+        use_hybrid_eq=True,
     )
 
-    print(f"\n[OPTIMIZING] Finding optimal 41 parameters via backpropagation ({num_steps} steps on {optimize_sec}s chunk)...", flush=True)
-    z_opt, _, history = optimizer.optimize(
-        raw_mix=raw_opt_tensor,
-        target_reference=ref_opt_tensor,
+    print(f"\n[OPTIMIZING] Running multi-chunk backpropagation ({num_steps} steps)...", flush=True)
+    z_opt, _, history = optimizer.optimize_multi_chunk(
+        mix_chunks=mix_chunk_tensors,
+        ref_chunks=ref_chunk_tensors,
+        reference_mode=mode,
         verbose=True,
         align_latency=True,
     )
 
-    # 4. Process FULL audio with C++20 Core DSP Engine
-    print(f"\n[C++20 MASTERING ENGINE] Processing full {min_len / 48000.0:.1f}s audio at lightning speed...", flush=True)
+    # 5. Full Track Mastering via C++20 Core DSP Engine (No Truncation!)
+    print(f"\n[C++20 MASTERING ENGINE] Processing full {raw_duration:.2f}s track...", flush=True)
     cpp_chain = py_core_dsp.MasteringChain(48000.0)
     cpp_chain.set_parameters_z(z_opt.tolist())
-    mastered_full_np = cpp_chain.process(raw_full) # (2, T) contiguous float32
-    mastered_full_tensor = torch.tensor(mastered_full_np).unsqueeze(0)
+    mastered_full_np = cpp_chain.process(raw_full)  # [2, T_raw] full audio!
 
-    # 5. Evaluate final full metrics
-    final_metrics = suite.evaluate(mastered_full_tensor, ref_full_tensor, align_latency=True)
-    print(f"\n[FINAL MASTERED vs REFERENCE]", flush=True)
-    print(f"  - Mastered Loudness: {final_metrics['pred_lufs']:.2f} LUFS (Reference Target: {final_metrics['target_lufs']:.2f} LUFS)", flush=True)
-    print(f"  - Spectral Convergence: {final_metrics['spectral_convergence']:.4f} (improved by {init_metrics['spectral_convergence'] - final_metrics['spectral_convergence']:+.4f})", flush=True)
-    print(f"  - Log-Spectral Distance: {final_metrics['log_spectral_distance_db']:.2f} dB (improved by {init_metrics['log_spectral_distance_db'] - final_metrics['log_spectral_distance_db']:+.2f} dB)", flush=True)
-    print(f"  - Mastered Peak: {final_metrics['pred_peak_dbfs']:.2f} dBFS (Ceiling violation: {final_metrics['ceiling_violation_db']:.2f} dB)", flush=True)
-    print(f"  - Delta Dynamic Range (PLR): {final_metrics['delta_plr_db']:.2f} dB", flush=True)
+    # 6. Quantitative Pre/Post Evaluation
+    suite = MasteringBenchmarkSuite(sample_rate=48000.0)
+    raw_tensor = torch.tensor(raw_full).unsqueeze(0)
+    mastered_tensor = torch.tensor(mastered_full_np).unsqueeze(0)
 
-    # 6. Export full audio WAVs and JSON preset
-    out_dir = "scratch/output_mastering"
+    # For same_track, compare full tracks; for stylistic, compare perceptual stats
+    min_eval_len = min(raw_full.shape[1], ref_full.shape[1])
+    ref_eval_tensor = torch.tensor(ref_full[:, :min_eval_len]).unsqueeze(0)
+    raw_eval_tensor = torch.tensor(raw_full[:, :min_eval_len]).unsqueeze(0)
+    mastered_eval_tensor = torch.tensor(mastered_full_np[:, :min_eval_len]).unsqueeze(0)
+
+    pre_metrics = suite.evaluate(raw_eval_tensor, ref_eval_tensor, align_latency=(ref_mode == ReferenceMode.SAME_TRACK))
+    post_metrics = suite.evaluate(mastered_eval_tensor, ref_eval_tensor, align_latency=(ref_mode == ReferenceMode.SAME_TRACK))
+
+    print(f"\n[BENCHMARK EVALUATION]", flush=True)
+    print(f"  - Pre  Mastering Loudness: {pre_metrics['pred_lufs']:.2f} LUFS (Reference: {pre_metrics['target_lufs']:.2f} LUFS)", flush=True)
+    print(f"  - Post Mastering Loudness: {post_metrics['pred_lufs']:.2f} LUFS", flush=True)
+    print(f"  - Post Dynamic Range (PLR): {post_metrics['delta_plr_db']:.2f} dB", flush=True)
+    print(f"  - Peak Output: {post_metrics['pred_peak_dbfs']:.2f} dBFS (Ceiling violation: {post_metrics['ceiling_violation_db']:.2f} dB)", flush=True)
+
+    # 7. Export Outputs & Manifest
     os.makedirs(out_dir, exist_ok=True)
-
-    unmastered_wav_path = os.path.join(out_dir, f"{out_prefix}_unmastered.wav")
     mastered_wav_path = os.path.join(out_dir, f"{out_prefix}_mastered.wav")
-    ref_wav_path = os.path.join(out_dir, f"{out_prefix}_reference.wav")
     preset_json_path = os.path.join(out_dir, f"{out_prefix}_preset.json")
+    manifest_path = os.path.join(out_dir, f"{out_prefix}_manifest.json")
 
-    sf.write(unmastered_wav_path, raw_full.T, 48000)
+    # Save full mastered WAV
     sf.write(mastered_wav_path, mastered_full_np.T, 48000)
-    sf.write(ref_wav_path, ref_full.T, 48000)
+    # Save canonical preset JSON
     optimizer.export_preset_json(z_opt, output_path=preset_json_path)
 
-    print(f"\n[FILES SAVED ON DISK]", flush=True)
-    print(f"  -> Unmastered: {unmastered_wav_path}", flush=True)
-    print(f"  -> Mastered:   {mastered_wav_path}", flush=True)
-    print(f"  -> Reference:  {ref_wav_path}", flush=True)
-    print(f"  -> Preset:     {preset_json_path}", flush=True)
+    # Build and save session manifest
+    theta = map_z_to_theta(z_opt)
+    param_dict = {spec.name: float(theta[i].item()) for i, spec in enumerate(PARAM_SPECS)}
 
-    return {
-        "name": name,
-        "init": init_metrics,
-        "final": final_metrics,
-        "unmastered": unmastered_wav_path,
-        "mastered": mastered_wav_path,
-        "reference": ref_wav_path,
-        "preset": preset_json_path,
-    }
+    manifest = MasteringManifest(
+        reference_mode=mode,
+        input_track_path=raw_path,
+        input_sample_rate=48000.0,
+        input_duration_sec=raw_duration,
+        reference_track_path=ref_path,
+        reference_sample_rate=48000.0,
+        reference_duration_sec=ref_duration,
+        alignment=alignment_meta,
+        chunks=[c.to_dict() for c in mix_chunks_spec],
+        chunk_selection_config={
+            "num_chunks": num_chunks,
+            "chunk_duration_sec": chunk_len_sec,
+            "seed": seed,
+        },
+        optimization_config={
+            "steps": num_steps,
+            "lr": lr,
+            "use_hybrid_eq": True,
+        },
+        normalized_z=z_opt.tolist(),
+        physical_theta=theta.tolist(),
+        parameters=param_dict,
+        metrics_pre=pre_metrics,
+        metrics_post=post_metrics,
+        software_info={
+            "python": sys.version.split()[0],
+            "torch": torch.__version__,
+        },
+    )
+    manifest.to_json(output_path=manifest_path)
+
+    print(f"\n[FILES SAVED ON DISK]", flush=True)
+    print(f"  -> Full Mastered WAV: {mastered_wav_path}", flush=True)
+    print(f"  -> Canonical Preset:  {preset_json_path}", flush=True)
+    print(f"  -> Session Manifest:  {manifest_path}", flush=True)
+
+    return manifest
+
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description="Run AutoMastering scenario matching")
+    parser = argparse.ArgumentParser(description="AutoMastering Sprint 2 Multi-Chunk Engine")
     parser.add_argument("--raw", type=str, required=True, help="Path to raw mix WAV (48kHz)")
     parser.add_argument("--ref", type=str, required=True, help="Path to reference master WAV (48kHz)")
-    parser.add_argument("--prefix", type=str, default="scenario_test", help="Output prefix name")
+    parser.add_argument("--prefix", type=str, default="master_session", help="Output prefix name")
+    parser.add_argument("--mode", type=str, choices=["same_track", "stylistic"], default="same_track")
+    parser.add_argument("--chunks", type=int, default=4, help="Number of representative chunks")
+    parser.add_argument("--chunk-len", type=float, default=3.0, help="Duration of each chunk in seconds")
+    parser.add_argument("--seed", type=int, default=42, help="Deterministic chunk selection seed")
     parser.add_argument("--steps", type=int, default=30, help="Number of Adam optimization steps")
-    parser.add_argument("--lr", type=float, default=0.05, help="Adam learning rate")
-    parser.add_argument("--opt-sec", type=float, default=1.5, help="Duration of optimization window in seconds")
-    parser.add_argument("--duration", type=float, default=10.0, help="Max duration of audio to process in seconds")
+    parser.add_argument("--lr", type=float, default=0.04, help="Learning rate")
+    parser.add_argument("--duration", type=float, default=None, help="Optional duration limit in seconds (default: full track)")
     args = parser.parse_args()
 
-    run_scenario(
-        name=args.prefix,
+    run_mastering_session(
         raw_path=args.raw,
         ref_path=args.ref,
         out_prefix=args.prefix,
-        optimize_sec=args.opt_sec,
+        mode=args.mode,
+        num_chunks=args.chunks,
+        chunk_len_sec=args.chunk_len,
+        seed=args.seed,
         num_steps=args.steps,
         lr=args.lr,
         duration_sec=args.duration,
