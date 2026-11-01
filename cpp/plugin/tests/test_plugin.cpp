@@ -152,11 +152,11 @@ int main() {
         juce::String jsonStr = processor.getParametersAsJson();
         TEST_ASSERT(jsonStr.isNotEmpty(), "Exported JSON must not be empty");
 
-        // Modifica un parametro
+        // Modifica un parametro (all'interno del range mastering-grade 0..6 dB)
         if (auto* p = processor.getAPVTS().getParameter("saturator_drive_db")) {
-            p->setValueNotifyingHost(p->convertTo0to1(9.5f));
+            p->setValueNotifyingHost(p->convertTo0to1(4.5f));
         }
-        TEST_ASSERT(std::abs(processor.getAPVTS().getRawParameterValue("saturator_drive_db")->load() - 9.5f) < 0.1f,
+        TEST_ASSERT(std::abs(processor.getAPVTS().getRawParameterValue("saturator_drive_db")->load() - 4.5f) < 0.1f,
                     "Parameter update failed");
 
         // Ricarica il JSON originale
@@ -183,6 +183,84 @@ int main() {
             TEST_ASSERT(std::abs(z_in[i] - z_out[i]) < 1e-3f, "Normalized parameter roundtrip mismatch");
         }
         std::cout << "  -> Roundtrip vettore z in (0, 1)^41 verificato con successo!" << std::endl;
+    }
+
+    // TEST 7: Interoperabilita Preset JSON Python -> JUCE e gestione errori
+    std::cout << "\n[TEST 7] Interoperabilita Preset JSON Python -> JUCE e gestione errori..." << std::endl;
+    {
+        // JSON canonico prodotto da Python con nodo annidato parameters e metadati
+        const juce::String pythonJson = R"({
+            "format": "AutoMastering_Preset_v1",
+            "version": "1.0",
+            "sample_rate": 48000.0,
+            "parameters": {
+                "eq_b0_f0": 85.0,
+                "eq_b0_gain_db": 3.0,
+                "eq_b0_q": 1.2,
+                "saturator_drive_db": 2.5,
+                "saturator_mix": 0.5,
+                "comp_low_ratio": 1.5,
+                "comp_low_threshold_db": -18.0
+            },
+            "parameter_details": {
+                "eq_b0_f0": {"value": 85.0, "unit": "Hz"}
+            }
+        })";
+
+        bool loaded = processor.loadParametersFromJson(pythonJson);
+        TEST_ASSERT(loaded, "Failed to parse and load canonical Python JSON preset");
+        float f0_val = processor.getAPVTS().getRawParameterValue("eq_b0_f0")->load();
+        TEST_ASSERT(std::abs(f0_val - 85.0f) < 0.1f, "Parameter eq_b0_f0 was not loaded correctly from Python JSON");
+
+        float drive_val = processor.getAPVTS().getRawParameterValue("saturator_drive_db")->load();
+        TEST_ASSERT(std::abs(drive_val - 2.5f) < 0.1f, "Parameter saturator_drive_db was not loaded correctly");
+
+        // Test JSON non valido / corrotto
+        TEST_ASSERT(!processor.loadParametersFromJson("invalid json string"), "Corrupt JSON must return false");
+        TEST_ASSERT(!processor.loadParametersFromJson("{}"), "Empty JSON with no valid params must return false");
+        TEST_ASSERT(!processor.loadParametersFromJson(R"({"random_key": 123})"), "JSON with unknown keys must return false");
+
+        std::cout << "  -> Interoperabilita Python -> JUCE e gestione errori validate con successo!" << std::endl;
+    }
+
+    // TEST 8: True Bypass a latenza compensata (159 campioni) in C++
+    std::cout << "\n[TEST 8] True Bypass a latenza compensata (159 campioni) in C++..." << std::endl;
+    {
+        core_dsp::MasteringChain chain(fs);
+        chain.prepare(fs, 512);
+
+        // Abilita True Bypass
+        chain.set_bypass(true);
+        TEST_ASSERT(chain.is_bypass() == true, "Chain must report bypass active");
+
+        // Genera segnale di test stereo non correlato
+        constexpr size_t N_TEST = 1000;
+        std::vector<float> in_l(N_TEST), in_r(N_TEST);
+        std::vector<float> out_l(N_TEST), out_r(N_TEST);
+        for (size_t i = 0; i < N_TEST; ++i) {
+            in_l[i] = dist(rng);
+            in_r[i] = dist(rng);
+        }
+
+        chain.process(in_l.data(), in_r.data(), out_l.data(), out_r.data(), N_TEST);
+
+        // Dopo la latenza di 159 campioni, out[i] deve essere identico a in[i - 159]
+        constexpr size_t latency = core_dsp::MasteringChain::get_latency_samples();
+        TEST_ASSERT(latency == 159, "Expected latency 159");
+
+        double max_diff = 0.0;
+        for (size_t i = latency; i < N_TEST; ++i) {
+            double diff_l = std::abs(out_l[i] - in_l[i - latency]);
+            double diff_r = std::abs(out_r[i] - in_r[i - latency]);
+            max_diff = std::max({max_diff, diff_l, diff_r});
+        }
+        std::cout << "  True Bypass Max Absolute Difference post-latency: " << max_diff << std::endl;
+        TEST_ASSERT(max_diff < 1e-7, "True Bypass output must match delayed input exactly");
+
+        // Disabilita bypass e verifica ritorno a modalità processing
+        chain.set_bypass(false);
+        TEST_ASSERT(chain.is_bypass() == false, "Chain must report bypass inactive");
+        std::cout << "  -> True Bypass validato: identita float esatta dopo 159 campioni di latenza!" << std::endl;
     }
 
     std::cout << "\n====================================================" << std::endl;

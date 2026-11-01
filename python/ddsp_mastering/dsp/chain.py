@@ -55,7 +55,7 @@ class DifferentiableMasteringChain(nn.Module):
             x: [..., 2, N] Segnale audio stereo
             z: [..., 41] Vettore parametri normalizzati in (0, 1) (opzionale se passato theta)
             theta: [..., 41] Vettore parametri fisici reali (opzionale se passato z)
-            eq_mode: 'iir' (bit-accurate) o 'fft' (fast training)
+            eq_mode: 'iir' (numerical parity with C++ reference within tested tolerances) o 'fft' (fast training approximation)
         Returns:
             y_out: [..., 2, N] Audio masterizzato finale
         """

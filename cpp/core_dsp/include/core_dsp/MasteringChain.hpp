@@ -31,6 +31,17 @@ public:
         mb_comp_.reset();
         saturator_.reset();
         limiter_.reset();
+        bypass_delay_l_.fill(0.0f);
+        bypass_delay_r_.fill(0.0f);
+        bypass_write_idx_ = 0;
+    }
+
+    void set_bypass(bool bypass) noexcept {
+        bypass_ = bypass;
+    }
+
+    [[nodiscard]] bool is_bypass() const noexcept {
+        return bypass_;
     }
 
     void set_sample_rate(double sample_rate) noexcept {
@@ -112,12 +123,25 @@ public:
         set_parameters_z(std::span<const double>(z.data(), z.size()));
     }
 
-    // Elabora un blocco stereo contiguo attraverso tutti i 6 stadi
+    // Elabora un blocco stereo contiguo attraverso tutti i 6 stadi (o bypass a latenza compensata)
     void process(
         const float* in_l, const float* in_r,
         float* out_l, float* out_r,
         size_t num_samples
     ) {
+        if (bypass_) {
+            for (size_t i = 0; i < num_samples; ++i) {
+                float delayed_l = bypass_delay_l_[bypass_write_idx_];
+                float delayed_r = bypass_delay_r_[bypass_write_idx_];
+                bypass_delay_l_[bypass_write_idx_] = in_l[i];
+                bypass_delay_r_[bypass_write_idx_] = in_r[i];
+                bypass_write_idx_ = (bypass_write_idx_ + 1) % TOTAL_CHAIN_LATENCY_SAMPLES;
+                out_l[i] = delayed_l;
+                out_r[i] = delayed_r;
+            }
+            return;
+        }
+
         ensure_scratch_buffers(num_samples);
 
         // 1. Parametric EQ 6-Band
@@ -187,6 +211,12 @@ private:
     }
 
     double sample_rate_ = DEFAULT_SAMPLE_RATE;
+    bool bypass_ = false;
+
+    // Linea di ritardo per True Bypass a latenza compensata (159 campioni)
+    std::array<float, TOTAL_CHAIN_LATENCY_SAMPLES> bypass_delay_l_{};
+    std::array<float, TOTAL_CHAIN_LATENCY_SAMPLES> bypass_delay_r_{};
+    size_t bypass_write_idx_ = 0;
 
     // Stadi DSP
     BiquadCascade6Band eq_;

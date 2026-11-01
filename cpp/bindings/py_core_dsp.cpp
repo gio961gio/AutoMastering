@@ -414,6 +414,14 @@ public:
         chain_.set_parameters_z(z);
     }
 
+    void set_bypass(bool bypass) {
+        chain_.set_bypass(bypass);
+    }
+
+    bool is_bypass() const {
+        return chain_.is_bypass();
+    }
+
     size_t get_latency_samples() const {
         return chain_.get_latency_samples();
     }
@@ -513,6 +521,8 @@ PYBIND11_MODULE(py_core_dsp, m) {
         .def("set_parameters_theta", &PyMasteringChain::set_parameters_theta, py::arg("theta"))
         .def("set_parameters_z", &PyMasteringChain::set_parameters_z, py::arg("z"))
         .def("get_latency_samples", &PyMasteringChain::get_latency_samples)
+        .def("set_bypass", &PyMasteringChain::set_bypass, py::arg("bypass"))
+        .def("is_bypass", &PyMasteringChain::is_bypass)
         .def("process", &PyMasteringChain::process);
 
     // Fast scans per Autograd Function del Compressore

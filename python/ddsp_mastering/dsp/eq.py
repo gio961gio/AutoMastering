@@ -113,7 +113,7 @@ class DifferentiableEQ(nn.Module):
         """
         Applica la cascata EQ all'audio x.
         x: [..., C, N] (es. [2, N] stereo o [B, 2, N])
-        mode: 'iir' (bit-accurate) o 'fft' (fast training)
+        mode: 'iir' (numerical parity with C++ reference within tested tolerances) o 'fft' (fast training approximation)
         """
         mode = mode or self.default_mode
         b_coeffs, a_coeffs = self.compute_biquad_coeffs(f0, gain_db, q)

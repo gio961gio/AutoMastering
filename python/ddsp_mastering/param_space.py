@@ -135,12 +135,12 @@ def map_theta_to_z(theta: torch.Tensor) -> torch.Tensor:
 
 
 # ---------------------------------------------------------------------------
-# PRESET FISICO NEUTRO (Mastering Transparent Bypass Baseline)
+# PRESET FISICO NEUTRO (Conservative Neutral Starting Preset)
 # ---------------------------------------------------------------------------
-# Valori fisici corrispondenti a un bypass acustico trasparente:
+# Valori fisici iniziali conservativi per l'ottimizzatore (separati dal True Bypass):
 # - EQ flat (0 dB gain, Q=0.707 Butterworth)
 # - Crossover standard 160 Hz e 3200 Hz
-# - Compressore trasparente (Ratio 1.2:1, makeup 0 dB, attack lenti per preservare i transienti)
+# - Compressore ad assetto trasparente (Ratio 1.0:1 identità, makeup 0 dB)
 # - Stereo imager neutro (width = 1.0)
 # - Saturatore spento (drive = 0 dB, mix = 0.0 dry)
 # - Limiter neutro (push gain = 0 dB)
