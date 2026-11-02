@@ -348,6 +348,163 @@ int main() {
         std::cout << "  -> Schema JSON AutoMastering_Preset_v1 validato al 100%!" << std::endl;
     }
 
+    // TEST 12: End-to-End Python Exporter Fixture -> JUCE Parser (G2.1, G2.2, G2.3, G2.4)
+    std::cout << "\n[TEST 12] Verifica End-to-End Fixture Python -> JUCE Parser (41 parametri, Mode A/B, Version & Atomicity)..." << std::endl;
+    {
+        const std::vector<juce::String> candidatePaths = {
+            "python/tests/fixtures/python_exported_preset_v1.json",
+            "../python/tests/fixtures/python_exported_preset_v1.json",
+            "../../python/tests/fixtures/python_exported_preset_v1.json"
+        };
+
+        juce::File fixtureFile;
+        bool foundFixture = false;
+        for (const auto& relPath : candidatePaths) {
+            juce::File f = juce::File::getCurrentWorkingDirectory().getChildFile(relPath);
+            if (f.existsAsFile()) {
+                fixtureFile = f;
+                foundFixture = true;
+                break;
+            }
+        }
+        TEST_ASSERT(foundFixture, "Authentic Python preset fixture file not found in expected paths");
+
+        const juce::String pyJsonStr = fixtureFile.loadFileAsString();
+        TEST_ASSERT(pyJsonStr.isNotEmpty(), "Python fixture file is empty");
+
+        juce::var pyParsed;
+        TEST_ASSERT(juce::JSON::parse(pyJsonStr, pyParsed).wasOk(), "Python fixture must be valid JSON");
+        TEST_ASSERT(pyParsed["format"].toString() == "AutoMastering_Preset_v1", "Fixture format must be AutoMastering_Preset_v1");
+        TEST_ASSERT(pyParsed["version"].toString() == "1.0", "Fixture version must be 1.0");
+
+        const auto* z_arr = pyParsed["normalized_z"].getArray();
+        TEST_ASSERT(z_arr != nullptr && z_arr->size() == static_cast<int>(core_dsp::NUM_PARAMS), "Fixture normalized_z must have 41 elements");
+
+        const auto* paramsObj = pyParsed["parameters"].getDynamicObject();
+        TEST_ASSERT(paramsObj != nullptr, "Fixture parameters object must exist");
+
+        std::array<float, core_dsp::NUM_PARAMS> expected_z{};
+        std::array<float, core_dsp::NUM_PARAMS> expected_theta{};
+        bool z_not_all_equal = false;
+        bool z_not_all_half = false;
+
+        for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
+            const auto& spec = core_dsp::PARAM_SPECS[i];
+            const juce::String paramID(spec.name.data(), spec.name.size());
+            TEST_ASSERT(paramsObj->hasProperty(paramID), ("Missing canonical param in fixture: " + paramID.toStdString()).c_str());
+
+            expected_z[i] = static_cast<float>(static_cast<double>((*z_arr)[static_cast<int>(i)]));
+            expected_theta[i] = static_cast<float>(static_cast<double>(paramsObj->getProperty(paramID)));
+
+            TEST_ASSERT(std::isfinite(expected_z[i]) && expected_z[i] >= 0.0f && expected_z[i] <= 1.0f, "Expected z out of [0,1]");
+            TEST_ASSERT(std::isfinite(expected_theta[i]) && expected_theta[i] >= static_cast<float>(spec.min_val) - 1e-4f
+                        && expected_theta[i] <= static_cast<float>(spec.max_val) + 1e-4f, "Expected theta out of bounds");
+
+            if (i > 0 && std::abs(expected_z[i] - expected_z[0]) > 1e-3f) z_not_all_equal = true;
+            if (std::abs(expected_z[i] - 0.5f) > 1e-3f) z_not_all_half = true;
+        }
+        TEST_ASSERT(z_not_all_equal && z_not_all_half, "Python fixture z must contain distinct, non-trivial interior values");
+
+        // G2.2 — Mode A: Caricamento preset completo (con normalized_z e parameters)
+        MasteringPluginAudioProcessor pyProc;
+        pyProc.prepareToPlay(fs, 512);
+        TEST_ASSERT(pyProc.loadParametersFromJson(pyJsonStr), "Failed to load authentic Python fixture in Mode A");
+
+        const auto loaded_z_modeA = pyProc.getNormalizedParameters();
+        for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
+            const auto& spec = core_dsp::PARAM_SPECS[i];
+            const juce::String paramID(spec.name.data(), spec.name.size());
+            const float actual_theta = pyProc.getAPVTS().getRawParameterValue(paramID)->load();
+            const float theta_tol = std::max(1e-3f, 1e-4f * std::abs(expected_theta[i]));
+            TEST_ASSERT(std::abs(actual_theta - expected_theta[i]) <= theta_tol,
+                        ("Mode A theta mismatch on " + paramID.toStdString()).c_str());
+            TEST_ASSERT(std::abs(loaded_z_modeA[i] - expected_z[i]) <= 1e-4f,
+                        ("Mode A normalized_z mismatch on " + paramID.toStdString()).c_str());
+        }
+
+        // G2.3 — Mode B: Caricamento con normalized_z rimosso (solo mappa esplicita parameters di 41 elementi)
+        MasteringPluginAudioProcessor pyProcModeB;
+        pyProcModeB.prepareToPlay(fs, 512);
+
+        juce::var parsedModeB;
+        juce::JSON::parse(pyJsonStr, parsedModeB);
+        parsedModeB.getDynamicObject()->removeProperty("normalized_z");
+        const juce::String jsonModeB = juce::JSON::toString(parsedModeB, true);
+
+        TEST_ASSERT(pyProcModeB.loadParametersFromJson(jsonModeB), "Failed to load Python fixture in Mode B (parameters map only)");
+        const auto loaded_z_modeB = pyProcModeB.getNormalizedParameters();
+        for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
+            const auto& spec = core_dsp::PARAM_SPECS[i];
+            const juce::String paramID(spec.name.data(), spec.name.size());
+            const float actual_theta = pyProcModeB.getAPVTS().getRawParameterValue(paramID)->load();
+            const float theta_tol = std::max(1e-3f, 1e-4f * std::abs(expected_theta[i]));
+            TEST_ASSERT(std::abs(actual_theta - expected_theta[i]) <= theta_tol,
+                        ("Mode B theta mismatch on " + paramID.toStdString()).c_str());
+            TEST_ASSERT(std::abs(loaded_z_modeB[i] - expected_z[i]) <= 1e-4f,
+                        ("Mode B normalized_z mismatch on " + paramID.toStdString()).c_str());
+        }
+
+        // G2.4 — Validazione versione schema e atomicita (nessun aggiornamento parziale APVTS su errore)
+        std::array<float, core_dsp::NUM_PARAMS> snapshot_theta{};
+        for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
+            const juce::String paramID(core_dsp::PARAM_SPECS[i].name.data(), core_dsp::PARAM_SPECS[i].name.size());
+            snapshot_theta[i] = pyProc.getAPVTS().getRawParameterValue(paramID)->load();
+        }
+
+        auto assertStateUnchanged = [&]() {
+            for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
+                const juce::String paramID(core_dsp::PARAM_SPECS[i].name.data(), core_dsp::PARAM_SPECS[i].name.size());
+                const float cur = pyProc.getAPVTS().getRawParameterValue(paramID)->load();
+                TEST_ASSERT(cur == snapshot_theta[i], ("APVTS mutated on rejected preset at param " + paramID.toStdString()).c_str());
+            }
+        };
+
+        // Versione non supportata "2.0"
+        {
+            juce::var badVer;
+            juce::JSON::parse(pyJsonStr, badVer);
+            badVer.getDynamicObject()->setProperty("version", "2.0");
+            TEST_ASSERT(!pyProc.loadParametersFromJson(juce::JSON::toString(badVer)), "Unsupported version 2.0 must be rejected");
+            assertStateUnchanged();
+        }
+        // Versione mancante
+        {
+            juce::var noVer;
+            juce::JSON::parse(pyJsonStr, noVer);
+            noVer.getDynamicObject()->removeProperty("version");
+            TEST_ASSERT(!pyProc.loadParametersFromJson(juce::JSON::toString(noVer)), "Missing version must be rejected");
+            assertStateUnchanged();
+        }
+        // Valore fuori range a metà vettore (indice 20) in Mode B
+        {
+            juce::var outOfRange;
+            juce::JSON::parse(jsonModeB, outOfRange);
+            auto* pObj = outOfRange["parameters"].getDynamicObject();
+            pObj->setProperty("eq_b0_gain_db", -5.5); // valido, non deve essere applicato parzialmente!
+            pObj->setProperty("comp_low_threshold_db", -999.0); // fuori range [-30, 0]
+            TEST_ASSERT(!pyProc.loadParametersFromJson(juce::JSON::toString(outOfRange)), "Out-of-range parameter must be rejected");
+            assertStateUnchanged();
+        }
+        // Valore non numerico ("NaN") in normalized_z
+        {
+            juce::var nanZ;
+            juce::JSON::parse(pyJsonStr, nanZ);
+            nanZ["normalized_z"].getArray()->set(15, juce::var("NaN"));
+            TEST_ASSERT(!pyProc.loadParametersFromJson(juce::JSON::toString(nanZ)), "NaN string in normalized_z must be rejected");
+            assertStateUnchanged();
+        }
+        // Valore fuori dominio (> 1.0) in normalized_z
+        {
+            juce::var badZ;
+            juce::JSON::parse(pyJsonStr, badZ);
+            badZ["normalized_z"].getArray()->set(10, juce::var(1.25));
+            TEST_ASSERT(!pyProc.loadParametersFromJson(juce::JSON::toString(badZ)), "Out-of-domain normalized_z > 1.0 must be rejected");
+            assertStateUnchanged();
+        }
+
+        std::cout << "  -> Fixture Python -> JUCE (Mode A/B, 41/41 parametri, schema version 1.0 e atomicita) verificata al 100%!" << std::endl;
+    }
+
     std::cout << "\n====================================================" << std::endl;
     std::cout << "  TUTTI I TEST DEL TICKET 1.6 COMPLETATI CON SUCCESSO!  " << std::endl;
     std::cout << "====================================================" << std::endl;

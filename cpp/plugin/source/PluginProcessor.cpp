@@ -204,98 +204,111 @@ bool MasteringPluginAudioProcessor::loadParametersFromJson(const juce::String& j
     if (!rootObj)
         return false;
 
-    // 1. Validazione contratto schema AutoMastering_Preset_v1
-    if (!rootObj->hasProperty("format") || rootObj->getProperty("format").toString() != "AutoMastering_Preset_v1")
+    auto isNumericVar = [](const juce::var& v) noexcept -> bool {
+        return (v.isDouble() || v.isInt() || v.isInt64()) && !v.isBool() && !v.isString();
+    };
+
+    // 1. Validazione contratto schema AutoMastering_Preset_v1 e versione supportata (1.0)
+    if (!rootObj->hasProperty("format") || !rootObj->getProperty("format").isString() ||
+        rootObj->getProperty("format").toString() != "AutoMastering_Preset_v1")
         return false;
 
-    // 2. Validazione sample_rate se presente
+    if (!rootObj->hasProperty("version") || !rootObj->getProperty("version").isString() ||
+        rootObj->getProperty("version").toString() != "1.0")
+        return false;
+
+    // 2. Validazione sample_rate se presente (contratto 48 kHz)
     if (rootObj->hasProperty("sample_rate")) {
-        const double sr = static_cast<double>(rootObj->getProperty("sample_rate"));
-        if (!std::isfinite(sr) || sr <= 0.0)
+        const auto& srProp = rootObj->getProperty("sample_rate");
+        if (!isNumericVar(srProp))
+            return false;
+        const double sr = static_cast<double>(srProp);
+        if (!std::isfinite(sr) || std::abs(sr - 48000.0) > 1e-2)
             return false;
     }
 
-    // 3. Estrazione e validazione di tutti i 41 parametri
-    std::array<float, core_dsp::NUM_PARAMS> new_thetas{};
-    bool loaded_successfully = false;
+    // 3. Validazione rigorosa e atomica di tutti i 41 parametri
+    const bool has_z = rootObj->hasProperty("normalized_z");
+    const bool has_params = rootObj->hasProperty("parameters");
 
-    // Priorita A: vettore compatto normalized_z in (0, 1)^41
-    if (rootObj->hasProperty("normalized_z") && parsedJson["normalized_z"].isArray()) {
+    std::array<float, core_dsp::NUM_PARAMS> z_thetas{};
+    std::array<float, core_dsp::NUM_PARAMS> param_thetas{};
+
+    if (has_z) {
+        if (!parsedJson["normalized_z"].isArray())
+            return false;
         const auto* z_arr = parsedJson["normalized_z"].getArray();
-        if (z_arr != nullptr && z_arr->size() == static_cast<int>(core_dsp::NUM_PARAMS)) {
-            bool all_valid = true;
-            for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
-                const auto& v = (*z_arr)[static_cast<int>(i)];
-                if (!v.isDouble() && !v.isInt() && !v.isInt64()) {
-                    all_valid = false;
-                    break;
-                }
-                const double z_val = static_cast<double>(v);
-                if (!std::isfinite(z_val) || z_val < -1e-6 || z_val > 1.0 + 1e-6) {
-                    all_valid = false;
-                    break;
-                }
-                const auto& spec = core_dsp::PARAM_SPECS[i];
-                new_thetas[i] = static_cast<float>(spec.map_z(std::clamp(z_val, 0.0, 1.0)));
-            }
-            if (all_valid) {
-                loaded_successfully = true;
-            }
+        if (z_arr == nullptr || z_arr->size() != static_cast<int>(core_dsp::NUM_PARAMS))
+            return false;
+
+        for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
+            const auto& v = (*z_arr)[static_cast<int>(i)];
+            if (!isNumericVar(v))
+                return false;
+            const double z_val = static_cast<double>(v);
+            if (!std::isfinite(z_val) || z_val < -1e-6 || z_val > 1.0 + 1e-6)
+                return false;
+            const auto& spec = core_dsp::PARAM_SPECS[i];
+            z_thetas[i] = static_cast<float>(spec.map_z(std::clamp(z_val, 0.0, 1.0)));
         }
     }
 
-    // Priorita B: mappa esplicita 'parameters' con tutti i 41 parametri
-    if (!loaded_successfully) {
-        const juce::DynamicObject* paramsObj = nullptr;
-        if (rootObj->hasProperty("parameters") && parsedJson["parameters"].isObject()) {
-            paramsObj = parsedJson["parameters"].getDynamicObject();
-        } else {
-            paramsObj = rootObj;
-        }
-
-        bool all_valid = true;
+    auto validateParamsMap = [&](const juce::DynamicObject* paramsObj) -> bool {
+        if (paramsObj == nullptr)
+            return false;
         for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
             const auto& spec = core_dsp::PARAM_SPECS[i];
             const juce::String paramID(spec.name.data(), spec.name.size());
 
-            if (!paramsObj->hasProperty(paramID)) {
-                all_valid = false;
-                break; // Preset incompleto!
-            }
+            if (!paramsObj->hasProperty(paramID))
+                return false;
 
             const auto& prop = paramsObj->getProperty(paramID);
             float val = 0.0f;
-            if (prop.isObject() && prop.getDynamicObject()->hasProperty("value")) {
-                val = static_cast<float>(prop.getDynamicObject()->getProperty("value"));
-            } else if (prop.isDouble() || prop.isInt() || prop.isInt64()) {
+            if (prop.isObject() && prop.getDynamicObject() != nullptr && prop.getDynamicObject()->hasProperty("value")) {
+                const auto& innerVal = prop.getDynamicObject()->getProperty("value");
+                if (!isNumericVar(innerVal))
+                    return false;
+                val = static_cast<float>(innerVal);
+            } else if (isNumericVar(prop)) {
                 val = static_cast<float>(prop);
             } else {
-                all_valid = false;
-                break;
+                return false;
             }
 
-            if (!std::isfinite(val)) {
-                all_valid = false;
-                break;
-            }
+            if (!std::isfinite(val))
+                return false;
 
-            if (val < static_cast<float>(spec.min_val) - 1e-3f || val > static_cast<float>(spec.max_val) + 1e-3f) {
-                all_valid = false;
-                break;
-            }
+            if (val < static_cast<float>(spec.min_val) - 1e-3f || val > static_cast<float>(spec.max_val) + 1e-3f)
+                return false;
 
-            new_thetas[i] = std::clamp(val, static_cast<float>(spec.min_val), static_cast<float>(spec.max_val));
+            param_thetas[i] = std::clamp(val, static_cast<float>(spec.min_val), static_cast<float>(spec.max_val));
         }
+        return true;
+    };
 
-        if (all_valid) {
-            loaded_successfully = true;
+    if (has_params) {
+        if (!parsedJson["parameters"].isObject())
+            return false;
+        if (!validateParamsMap(parsedJson["parameters"].getDynamicObject()))
+            return false;
+    } else if (!has_z) {
+        // Nessun normalized_z e nessuna mappa 'parameters': verifica fallback top-level
+        if (!validateParamsMap(rootObj))
+            return false;
+    }
+
+    if (has_z && has_params) {
+        for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
+            const float tol = std::max(1e-2f, 1e-2f * std::abs(z_thetas[i]));
+            if (std::abs(z_thetas[i] - param_thetas[i]) > tol)
+                return false;
         }
     }
 
-    if (!loaded_successfully)
-        return false;
+    const auto& new_thetas = has_z ? z_thetas : param_thetas;
 
-    // Applica tutti i 41 parametri atomicamente ad APVTS
+    // Applica tutti i 41 parametri atomicamente ad APVTS solo dopo che l'intera validazione è superata
     for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
         const auto& spec = core_dsp::PARAM_SPECS[i];
         const juce::String paramID(spec.name.data(), spec.name.size());
