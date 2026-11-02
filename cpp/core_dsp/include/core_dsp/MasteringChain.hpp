@@ -129,16 +129,19 @@ public:
         float* out_l, float* out_r,
         size_t num_samples
     ) {
-        if (bypass_) {
-            for (size_t i = 0; i < num_samples; ++i) {
-                float delayed_l = bypass_delay_l_[bypass_write_idx_];
-                float delayed_r = bypass_delay_r_[bypass_write_idx_];
-                bypass_delay_l_[bypass_write_idx_] = in_l[i];
-                bypass_delay_r_[bypass_write_idx_] = in_r[i];
-                bypass_write_idx_ = (bypass_write_idx_ + 1) % TOTAL_CHAIN_LATENCY_SAMPLES;
+        // Aggiorna continuamente la linea di ritardo per bypass privo di discontinuità o gap
+        for (size_t i = 0; i < num_samples; ++i) {
+            float delayed_l = bypass_delay_l_[bypass_write_idx_];
+            float delayed_r = bypass_delay_r_[bypass_write_idx_];
+            bypass_delay_l_[bypass_write_idx_] = in_l[i];
+            bypass_delay_r_[bypass_write_idx_] = in_r[i];
+            bypass_write_idx_ = (bypass_write_idx_ + 1) % TOTAL_CHAIN_LATENCY_SAMPLES;
+            if (bypass_) {
                 out_l[i] = delayed_l;
                 out_r[i] = delayed_r;
             }
+        }
+        if (bypass_) {
             return;
         }
 

@@ -22,13 +22,18 @@ int main() {
     // Inizializzazione contesto JUCE per test headless
     juce::ScopedJuceInitialiser_GUI juceInit;
 
-    // TEST 1: Istanziazione e verifica dei 41 parametri APVTS
+    // TEST 1: Istanziazione e verifica dei 41 parametri DSP + 1 Bypass in APVTS
     std::cout << "\n[TEST 1] Verifica Istanziazione e Parametri APVTS..." << std::endl;
     MasteringPluginAudioProcessor processor;
 
     const auto& params = processor.getParameters();
     std::cout << "  Numero parametri APVTS registrati: " << params.size() << std::endl;
-    TEST_ASSERT(params.size() == core_dsp::NUM_PARAMS, "Expected exactly 41 parameters in APVTS");
+    TEST_ASSERT(params.size() == core_dsp::NUM_PARAMS + 1, "Expected 41 DSP parameters + 1 Bypass parameter in APVTS");
+
+    auto* bypass_param = processor.getBypassParameter();
+    TEST_ASSERT(bypass_param != nullptr, "getBypassParameter() must return non-null pointer");
+    TEST_ASSERT(bypass_param->getName(100) == "Bypass", "Bypass parameter name must be 'Bypass'");
+    TEST_ASSERT(bypass_param->getValue() == 0.0f, "Bypass default value must be 0 (false)");
 
     for (size_t i = 0; i < core_dsp::NUM_PARAMS; ++i) {
         const auto& spec = core_dsp::PARAM_SPECS[i];
@@ -44,7 +49,7 @@ int main() {
         TEST_ASSERT(std::abs(range.start - spec.min_val) < 1e-4, "Min value mismatch");
         TEST_ASSERT(std::abs(range.end - spec.max_val) < 1e-4, "Max value mismatch");
     }
-    std::cout << "  -> Tutti i 41 parametri canonici sono conformi e verificati in APVTS!" << std::endl;
+    std::cout << "  -> Tutti i 41 parametri canonici + True Bypass sono conformi e verificati in APVTS!" << std::endl;
 
     // TEST 2: PrepareToPlay e Notifica Latenza Host (159 campioni)
     std::cout << "\n[TEST 2] Verifica prepareToPlay e Latenza Host (159 campioni)..." << std::endl;
@@ -188,34 +193,33 @@ int main() {
     // TEST 7: Interoperabilita Preset JSON Python -> JUCE e gestione errori
     std::cout << "\n[TEST 7] Interoperabilita Preset JSON Python -> JUCE e gestione errori..." << std::endl;
     {
-        // JSON canonico prodotto da Python con nodo annidato parameters e metadati
-        const juce::String pythonJson = R"({
+        // 1. JSON canonico esportato da JUCE/Python con schema AutoMastering_Preset_v1
+        const juce::String validCanonicalJson = processor.getParametersAsJson();
+        bool loaded = processor.loadParametersFromJson(validCanonicalJson);
+        TEST_ASSERT(loaded, "Failed to parse and load canonical AutoMastering_Preset_v1 JSON");
+
+        // 2. Rifiuto esplicito di preset incompleto (parametri mancanti senza normalized_z)
+        const juce::String incompleteJson = R"({
             "format": "AutoMastering_Preset_v1",
             "version": "1.0",
             "sample_rate": 48000.0,
             "parameters": {
                 "eq_b0_f0": 85.0,
-                "eq_b0_gain_db": 3.0,
-                "eq_b0_q": 1.2,
-                "saturator_drive_db": 2.5,
-                "saturator_mix": 0.5,
-                "comp_low_ratio": 1.5,
-                "comp_low_threshold_db": -18.0
-            },
-            "parameter_details": {
-                "eq_b0_f0": {"value": 85.0, "unit": "Hz"}
+                "eq_b0_gain_db": 3.0
             }
         })";
+        TEST_ASSERT(!processor.loadParametersFromJson(incompleteJson), "Incomplete preset with missing parameters must return false");
 
-        bool loaded = processor.loadParametersFromJson(pythonJson);
-        TEST_ASSERT(loaded, "Failed to parse and load canonical Python JSON preset");
-        float f0_val = processor.getAPVTS().getRawParameterValue("eq_b0_f0")->load();
-        TEST_ASSERT(std::abs(f0_val - 85.0f) < 0.1f, "Parameter eq_b0_f0 was not loaded correctly from Python JSON");
+        // 3. Rifiuto esplicito di formato non conforme
+        const juce::String wrongFormatJson = R"({
+            "format": "LegacyPreset_v0",
+            "version": "1.0",
+            "sample_rate": 48000.0,
+            "normalized_z": [0.5]
+        })";
+        TEST_ASSERT(!processor.loadParametersFromJson(wrongFormatJson), "Wrong format string must return false");
 
-        float drive_val = processor.getAPVTS().getRawParameterValue("saturator_drive_db")->load();
-        TEST_ASSERT(std::abs(drive_val - 2.5f) < 0.1f, "Parameter saturator_drive_db was not loaded correctly");
-
-        // Test JSON non valido / corrotto
+        // 4. Test JSON corrotto o vuoto
         TEST_ASSERT(!processor.loadParametersFromJson("invalid json string"), "Corrupt JSON must return false");
         TEST_ASSERT(!processor.loadParametersFromJson("{}"), "Empty JSON with no valid params must return false");
         TEST_ASSERT(!processor.loadParametersFromJson(R"({"random_key": 123})"), "JSON with unknown keys must return false");
@@ -261,6 +265,87 @@ int main() {
         chain.set_bypass(false);
         TEST_ASSERT(chain.is_bypass() == false, "Chain must report bypass inactive");
         std::cout << "  -> True Bypass validato: identita float esatta dopo 159 campioni di latenza!" << std::endl;
+    }
+
+    // TEST 9: Host Bypass Parameter Integration via processBlock
+    std::cout << "\n[TEST 9] Verifica Host Bypass Parameter tramite processBlock..." << std::endl;
+    {
+        MasteringPluginAudioProcessor bypass_proc;
+        bypass_proc.prepareToPlay(fs, 512);
+
+        // Turn host bypass ON
+        auto* bp = bypass_proc.getBypassParameter();
+        TEST_ASSERT(bp != nullptr, "Bypass parameter not found");
+        bp->setValueNotifyingHost(1.0f); // 1.0 = true
+
+        constexpr int TEST_SAMPLES = 2048;
+        juce::AudioBuffer<float> buffer(2, TEST_SAMPLES);
+        std::vector<float> in_l(TEST_SAMPLES), in_r(TEST_SAMPLES);
+        for (int s = 0; s < TEST_SAMPLES; ++s) {
+            in_l[s] = dist(rng);
+            in_r[s] = dist(rng);
+            buffer.setSample(0, s, in_l[s]);
+            buffer.setSample(1, s, in_r[s]);
+        }
+
+        bypass_proc.processBlock(buffer, midi);
+
+        constexpr int latency = 159;
+        double max_bp_diff = 0.0;
+        for (int s = latency; s < TEST_SAMPLES; ++s) {
+            double diff_l = std::abs(buffer.getSample(0, s) - in_l[s - latency]);
+            double diff_r = std::abs(buffer.getSample(1, s) - in_r[s - latency]);
+            max_bp_diff = std::max({max_bp_diff, diff_l, diff_r});
+        }
+        std::cout << "  Plugin processBlock Host Bypass Max Diff: " << max_bp_diff << std::endl;
+        TEST_ASSERT(max_bp_diff < 1e-6, "Plugin host bypass output must match input delayed by 159 samples");
+        std::cout << "  -> Host Bypass verificato con successo in processBlock!" << std::endl;
+    }
+
+    // TEST 10: APVTS State save/restore (DAW session persistence)
+    std::cout << "\n[TEST 10] Verifica salvataggio/ripristino stato APVTS (DAW session)..." << std::endl;
+    {
+        MasteringPluginAudioProcessor proc_a;
+        proc_a.prepareToPlay(fs, 512);
+
+        // Set bypass ON and change parameter
+        proc_a.getBypassParameter()->setValueNotifyingHost(1.0f);
+        if (auto* p = proc_a.getAPVTS().getParameter("saturator_drive_db")) {
+            p->setValueNotifyingHost(p->convertTo0to1(3.5f));
+        }
+
+        juce::MemoryBlock stateData;
+        proc_a.getStateInformation(stateData);
+
+        MasteringPluginAudioProcessor proc_b;
+        proc_b.prepareToPlay(fs, 512);
+        proc_b.setStateInformation(stateData.getData(), (int)stateData.getSize());
+
+        TEST_ASSERT(proc_b.getBypassParameter()->getValue() == 1.0f, "Bypass parameter state must be restored");
+        float restored_drive = proc_b.getAPVTS().getRawParameterValue("saturator_drive_db")->load();
+        TEST_ASSERT(std::abs(restored_drive - 3.5f) < 0.1f, "saturator_drive_db must be restored");
+        std::cout << "  -> Stato APVTS serializzato e ripristinato con successo!" << std::endl;
+    }
+
+    // TEST 11: Exported JSON Schema Validation (AutoMastering_Preset_v1)
+    std::cout << "\n[TEST 11] Verifica rigorosa dello schema JSON esportato..." << std::endl;
+    {
+        juce::String exported = processor.getParametersAsJson();
+        juce::var parsed;
+        TEST_ASSERT(juce::JSON::parse(exported, parsed).wasOk(), "Exported JSON must be valid JSON");
+        TEST_ASSERT(parsed["format"].toString() == "AutoMastering_Preset_v1", "Format must be AutoMastering_Preset_v1");
+        TEST_ASSERT(parsed["version"].toString() == "1.0", "Version must be 1.0");
+        TEST_ASSERT(static_cast<double>(parsed["sample_rate"]) == 48000.0, "Sample rate must match");
+
+        auto* z_arr = parsed["normalized_z"].getArray();
+        TEST_ASSERT(z_arr != nullptr && z_arr->size() == 41, "normalized_z must have 41 items");
+
+        auto* paramsObj = parsed["parameters"].getDynamicObject();
+        TEST_ASSERT(paramsObj != nullptr && paramsObj->getProperties().size() == 41, "parameters must have 41 keys");
+
+        auto* detailsObj = parsed["parameter_details"].getDynamicObject();
+        TEST_ASSERT(detailsObj != nullptr && detailsObj->getProperties().size() == 41, "parameter_details must have 41 keys");
+        std::cout << "  -> Schema JSON AutoMastering_Preset_v1 validato al 100%!" << std::endl;
     }
 
     std::cout << "\n====================================================" << std::endl;

@@ -50,6 +50,11 @@ public:
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts_; }
     const core_dsp::MasteringChain& getChain() const noexcept { return chain_; }
 
+    // Host Bypass Parameter exposure (ITU / DAW standard true bypass)
+    juce::AudioProcessorParameter* getBypassParameter() const override {
+        return apvts_.getParameter("bypass");
+    }
+
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     static constexpr int SUB_BLOCK_SIZE = 32;
@@ -58,6 +63,7 @@ private:
     core_dsp::MasteringChain chain_;
     juce::AudioProcessorValueTreeState apvts_;
 
+    std::atomic<float>* raw_bypass_{nullptr};
     std::array<std::atomic<float>*, core_dsp::NUM_PARAMS> raw_params_{};
     std::array<juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>, core_dsp::NUM_PARAMS> smoothed_params_{};
     std::array<double, core_dsp::NUM_PARAMS> current_theta_{};

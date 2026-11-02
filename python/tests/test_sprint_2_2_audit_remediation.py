@@ -563,6 +563,71 @@ def test_b2_f02_limiter_sample_peak_ceiling_characterization_and_cpp_parity():
     np.testing.assert_allclose(out_py_clicks[0].numpy(), out_cpp_clicks, atol=1e-5, rtol=1e-5)
 
 
+# ---------------------------------------------------------------------------
+# B4 (F-03): JUCE VST3 Plugin True Bypass & JSON Interoperability Tests
+# ---------------------------------------------------------------------------
+
+def test_b4_f03_juce_plugin_headless_binary_execution():
+    """Verify B4 / F-03: Execute JUCE C++ headless test suite (11 comprehensive test stages)."""
+    import subprocess
+    import os
+
+    exe_path = os.path.join("build_juce", "plugin_headless_tests.exe")
+    if not os.path.exists(exe_path):
+        pytest.skip(f"Binary {exe_path} not found. Run CMake build first.")
+
+    res = subprocess.run([exe_path], capture_output=True, text=True)
+    assert res.returncode == 0, f"Headless JUCE test suite failed with code {res.returncode}:\n{res.stdout}\n{res.stderr}"
+
+    # Verify key test stages in stdout
+    assert "Numero parametri APVTS registrati: 42" in res.stdout
+    assert "Latenza segnalata all'Host: 159 campioni" in res.stdout
+    assert "Parita numerica macchina garantita (<= -140 dBFS)!" in res.stdout
+    assert "Serializzazione e iniezione preset JSON validate al 100%!" in res.stdout
+    assert "Roundtrip vettore z in (0, 1)^41 verificato con successo!" in res.stdout
+    assert "Interoperabilita Python -> JUCE e gestione errori validate con successo!" in res.stdout
+    assert "True Bypass validato: identita float esatta dopo 159 campioni di latenza!" in res.stdout
+    assert "Host Bypass verificato con successo in processBlock!" in res.stdout
+    assert "Stato APVTS serializzato e ripristinato con successo!" in res.stdout
+    assert "Schema JSON AutoMastering_Preset_v1 validato al 100%!" in res.stdout
+
+
+def test_b4_f03_python_preset_schema_and_juce_interoperability():
+    """Verify B4 / F-03: Python export_preset_json complies strictly with AutoMastering_Preset_v1."""
+    import json
+    from ddsp_mastering.optimize.optimizer import AutoMasteringOptimizer
+    from ddsp_mastering.param_space import PARAM_SPECS
+
+    opt = AutoMasteringOptimizer(sample_rate=48000.0)
+    rng = torch.Generator().manual_seed(12345)
+    random_z = torch.rand(41, generator=rng)
+
+    json_str = opt.export_preset_json(random_z)
+    preset = json.loads(json_str)
+
+    # 1. Top-level mandatory schema contract
+    assert preset["format"] == "AutoMastering_Preset_v1"
+    assert preset["version"] == "1.0"
+    assert preset["sample_rate"] == 48000.0
+    assert len(preset["normalized_z"]) == 41
+    assert len(preset["parameters"]) == 41
+    assert len(preset["parameter_details"]) == 41
+
+    # 2. Every single of the 41 parameters must match PARAM_SPECS
+    for i, spec in enumerate(PARAM_SPECS):
+        name = spec.name
+        assert name in preset["parameters"]
+        val = preset["parameters"][name]
+        assert spec.min_val <= val <= spec.max_val, f"Parameter {name}={val} out of bounds [{spec.min_val}, {spec.max_val}]"
+
+        details = preset["parameter_details"][name]
+        assert details["index"] == i
+        assert details["min"] == spec.min_val
+        assert details["max"] == spec.max_val
+        assert details["unit"] == spec.unit
+
+
+
 
 
 
