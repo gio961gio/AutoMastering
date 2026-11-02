@@ -49,7 +49,10 @@ from scripts.human_validation import (
     PACKAGE_VERSION,
 )
 from scripts.human_validation.analyze_exports import measure_audio_signal
-from scripts.human_validation.make_blind_set import create_blind_listening_set
+from scripts.human_validation.make_blind_set import (
+    create_blind_listening_set,
+    resolve_session_seed,
+)
 from scripts.human_validation.make_level_matched import create_level_matched_wavs
 from scripts.human_validation.offline_renderer import render_offline_with_tail_flush
 from scripts.human_validation.validate_inputs import (
@@ -219,7 +222,7 @@ def run_experiment_b_sprint2(
     chunk_len_sec: float = 3.0,
     num_steps: int = 30,
     lr: float = 0.04,
-    seed: int = 2026,
+    seed: Optional[int] = None,
     section_duration_sec: float = 12.0,
     explicit_sections: Optional[List[Tuple[str, float, float]]] = None,
     desired_sound_notes: str = "",
@@ -239,6 +242,7 @@ def run_experiment_b_sprint2(
             f"and refuses to fabricate a synthetic reference."
         )
 
+    effective_seed = resolve_session_seed(seed)
     ref_mode = ReferenceMode(mode)
     os.makedirs(output_dir, exist_ok=True)
     actual_keys_dir = keys_dir if keys_dir is not None else os.path.join(output_dir, "keys")
@@ -292,7 +296,7 @@ def run_experiment_b_sprint2(
         sample_rate=48000.0,
         num_chunks=num_chunks,
         chunk_duration_sec=chunk_len_sec,
-        seed=seed,
+        seed=effective_seed,
     )
     mix_chunks_spec = selector.select_chunks(raw_aligned)
     mix_chunks_np = selector.extract_chunk_tensors(raw_aligned, mix_chunks_spec)
@@ -435,7 +439,7 @@ def run_experiment_b_sprint2(
 
         # Blind set for this section (both program-level and level-matched)
         # Secret keys are saved strictly in actual_keys_dir, separate from delivery audio
-        prog_seed = int(seed + (idx + 1) * 1009)
+        prog_seed = int(effective_seed + (idx + 1) * 1009)
         prog_key_file = os.path.join(actual_keys_dir, f"{prefix}_{sec_id}_program_blind_key.json")
         sec_blind_prog_dir = os.path.join(sections_blind_dir, f"{sec_id}_program_level")
         blind_prog = create_blind_listening_set(
@@ -448,9 +452,10 @@ def run_experiment_b_sprint2(
             session_id=f"{prefix}_{sec_id}_program",
             key_output_path=prog_key_file,
             overwrite=overwrite,
+            parent_experiment_seed=effective_seed,
         )
 
-        lm_seed = int(seed + (idx + 1) * 2017)
+        lm_seed = int(effective_seed + (idx + 1) * 2017)
         lm_key_file = os.path.join(actual_keys_dir, f"{prefix}_{sec_id}_level_matched_blind_key.json")
         sec_blind_lm_dir = os.path.join(sections_blind_dir, f"{sec_id}_level_matched")
         blind_lm = create_blind_listening_set(
@@ -463,6 +468,7 @@ def run_experiment_b_sprint2(
             session_id=f"{prefix}_{sec_id}_level_matched",
             key_output_path=lm_key_file,
             overwrite=overwrite,
+            parent_experiment_seed=effective_seed,
         )
 
         sec_entry = dict(sec)
@@ -474,10 +480,10 @@ def run_experiment_b_sprint2(
         }
         sec_entry["level_matched_report"] = lm_report
         sec_entry["blind_program_level"] = {
-            k: v for k, v in blind_prog.items() if k != "_internal_key"
+            k: v for k, v in blind_prog.items() if k not in ("_internal_key", "seed")
         }
         sec_entry["blind_level_matched"] = {
-            k: v for k, v in blind_lm.items() if k != "_internal_key"
+            k: v for k, v in blind_lm.items() if k not in ("_internal_key", "seed")
         }
         sec_entry["secret_keys"] = {
             "program_level_key": os.path.abspath(prog_key_file),
@@ -489,6 +495,7 @@ def run_experiment_b_sprint2(
     sections_payload: Dict[str, Any] = {
         "track_prefix": prefix,
         "reference_mode": mode,
+        "seed": int(effective_seed),
         "optimization_training_chunks": [c.to_dict() for c in mix_chunks_spec],
         "reference_chunks": ref_chunks_spec_dicts,
         "listening_sections": section_artifacts,
@@ -527,6 +534,7 @@ def run_experiment_b_sprint2(
     manifest_payload: Dict[str, Any] = {
         "track_prefix": prefix,
         "reference_mode": mode,
+        "seed": int(effective_seed),
         "desired_sound_notes": desired_sound_notes,
         "engine_provenance": {
             "engine_reference_code_commit": ENGINE_REFERENCE_CODE_COMMIT,
@@ -541,7 +549,7 @@ def run_experiment_b_sprint2(
             "single_preset_per_track": True,
             "num_chunks": int(num_chunks),
             "chunk_duration_sec": float(chunk_len_sec),
-            "seed": int(seed),
+            "seed": int(effective_seed),
             "num_steps": int(num_steps),
             "learning_rate": float(lr),
             "use_hybrid_eq": True,
@@ -578,6 +586,7 @@ def run_experiment_b_sprint2(
     return {
         "track_prefix": prefix,
         "reference_mode": mode,
+        "seed": int(effective_seed),
         "original_or_bypass_wav": os.path.abspath(orig_wav_path),
         "mastered_full_wav": os.path.abspath(master_wav_path),
         "preset_json": os.path.abspath(preset_json_path),
@@ -615,7 +624,12 @@ def main() -> None:
     parser.add_argument("--chunk-len", type=float, default=3.0, help="Optimization chunk length in seconds (default: 3.0).")
     parser.add_argument("--steps", type=int, default=30, help="Optimization steps (default: 30).")
     parser.add_argument("--lr", type=float, default=0.04, help="Learning rate (default: 0.04).")
-    parser.add_argument("--seed", type=int, default=2026, help="Random seed (default: 2026).")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Optional random seed for deterministic chunk & blind ordering (default: None -> auto-generated 64-bit random seed).",
+    )
     parser.add_argument(
         "--section-len",
         type=float,

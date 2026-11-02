@@ -338,3 +338,118 @@ def test_sprint2_manifest_and_exports_integration(tmp_path):
     key_files = os.listdir(res["secret_keys_dir"])
     assert len(key_files) >= 2
     assert all(k.endswith(".json") for k in key_files)
+
+
+def test_sprint1_and_sprint2_seed_propagation_and_delivery_hygiene(tmp_path, monkeypatch):
+    """Verify Sprint 1 and Sprint 2 resolve omitted seed once via secrets.randbits(64), pass it to chunking & derived section keys, and leak zero unblinding info into delivery folders."""
+    import scripts.human_validation.make_blind_set as mbs
+    import scripts.human_validation.render_sprint2 as rs2
+
+    generated_seeds = iter([0xCAFEBABE11223344, 0xDEADBEEF55667788])
+    randbits_calls = []
+
+    def fake_randbits(k: int) -> int:
+        randbits_calls.append(k)
+        return next(generated_seeds)
+
+    monkeypatch.setattr(mbs.secrets, "randbits", fake_randbits)
+
+    # Spy on MultiChunkSelector to verify Sprint 2 passes the single effective_seed to chunk selection
+    observed_chunk_seeds = []
+    OrigSelector = rs2.MultiChunkSelector
+
+    class SpySelector(OrigSelector):
+        def __init__(self, *args, **kwargs):
+            observed_chunk_seeds.append(kwargs.get("seed"))
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(rs2, "MultiChunkSelector", SpySelector)
+
+    sr = 48000
+    t = np.arange(int(sr * 1.5)) / float(sr)
+    raw_sig = np.vstack([0.25 * np.sin(2 * np.pi * 300 * t), 0.25 * np.cos(2 * np.pi * 300 * t)]).astype(np.float32)
+    ref_sig = np.vstack([0.30 * np.sin(2 * np.pi * 300 * t), 0.30 * np.cos(2 * np.pi * 300 * t)]).astype(np.float32)
+
+    raw_wav = tmp_path / "mix_48k.wav"
+    ref_wav = tmp_path / "ref_48k.wav"
+    sf.write(str(raw_wav), raw_sig.T, sr, subtype="FLOAT")
+    sf.write(str(ref_wav), ref_sig.T, sr, subtype="FLOAT")
+
+    # 1. Sprint 1 with omitted seed (seed=None) -> calls secrets.randbits(64) exactly once
+    s1_out = tmp_path / "s1_auto_seed"
+    s1_keys = tmp_path / "s1_keys"
+    s1_res = run_experiment_a_sprint1(
+        input_wav_path=str(raw_wav),
+        output_dir=str(s1_out),
+        keys_dir=str(s1_keys),
+        track_id="t01",
+        legacy_mode="clamped_to_current_bounds",
+        seed=None,
+    )
+    assert randbits_calls == [64]
+    expected_s1_seed = 0xCAFEBABE11223344
+    assert s1_res["seed"] == expected_s1_seed
+
+    s1_meta = json.loads((s1_out / "t01_metadata.json").read_text(encoding="utf-8"))
+    assert s1_meta["seed"] == expected_s1_seed
+    assert "seed" not in s1_meta["blind_session"]
+
+    s1_key_data = json.loads((s1_keys / "t01_sprint1_blind_key.json").read_text(encoding="utf-8"))
+    assert s1_key_data["seed"] == expected_s1_seed
+
+    # Verify Sprint 1 blind_delivery has zero seed or ground-truth leakage
+    for fpath in (s1_out / "blind_delivery").rglob("*"):
+        if fpath.is_file() and fpath.suffix == ".csv":
+            txt = fpath.read_text(encoding="utf-8")
+            assert str(expected_s1_seed) not in txt
+            assert "A_true_bypass" not in txt
+            assert "B_legacy_baseline" not in txt
+            assert "C_corrected_neutral" not in txt
+
+    # 2. Sprint 2 with omitted seed (seed=None) -> calls secrets.randbits(64) exactly once and reuses it everywhere
+    s2_out = tmp_path / "s2_auto_seed"
+    s2_keys = tmp_path / "s2_keys"
+    s2_res = rs2.run_experiment_b_sprint2(
+        raw_wav_path=str(raw_wav),
+        ref_wav_path=str(ref_wav),
+        output_dir=str(s2_out),
+        keys_dir=str(s2_keys),
+        prefix="t01",
+        mode="same_track",
+        num_chunks=2,
+        chunk_len_sec=0.4,
+        num_steps=1,
+        section_duration_sec=0.4,
+        seed=None,
+    )
+    # Total randbits calls across Sprint 1 + Sprint 2 must be 2 (one per experiment, NOT extra calls per section)
+    assert randbits_calls == [64, 64]
+    expected_s2_seed = 0xDEADBEEF55667788
+    assert s2_res["seed"] == expected_s2_seed
+    assert observed_chunk_seeds == [expected_s2_seed]
+
+    # Check Sprint 2 private manifest and sections JSON record the effective seed
+    s2_manifest = json.loads(Path(s2_res["manifest_json"]).read_text(encoding="utf-8"))
+    assert s2_manifest["seed"] == expected_s2_seed
+    assert s2_manifest["optimization_config"]["seed"] == expected_s2_seed
+
+    s2_sections = json.loads(Path(s2_res["sections_json"]).read_text(encoding="utf-8"))
+    assert s2_sections["seed"] == expected_s2_seed
+
+    # Check all 6 section private keys (3 sections x [program, level_matched]) record derived session seed + parent experiment_seed
+    s2_key_files = sorted(s2_keys.glob("*.json"))
+    assert len(s2_key_files) == 6
+    for kf in s2_key_files:
+        kd = json.loads(kf.read_text(encoding="utf-8"))
+        assert kd["experiment_seed"] == expected_s2_seed
+        assert isinstance(kd["seed"], int) and kd["seed"] > expected_s2_seed
+
+    # Verify Sprint 2 sections_blind_delivery has zero seed, key, or ground-truth leakage
+    delivery_root = Path(s2_res["sections_blind_delivery_dir"])
+    for fpath in delivery_root.rglob("*"):
+        assert "key" not in fpath.name.lower()
+        if fpath.is_file() and fpath.suffix == ".csv":
+            txt = fpath.read_text(encoding="utf-8")
+            assert str(expected_s2_seed) not in txt
+            assert "original_or_bypass" not in txt
+            assert "mastered" not in txt

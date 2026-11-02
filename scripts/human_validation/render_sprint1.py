@@ -59,7 +59,10 @@ from scripts.human_validation.analyze_exports import (
     compute_null_test_metrics,
     measure_audio_signal,
 )
-from scripts.human_validation.make_blind_set import create_blind_listening_set
+from scripts.human_validation.make_blind_set import (
+    create_blind_listening_set,
+    resolve_session_seed,
+)
 from scripts.human_validation.make_level_matched import create_level_matched_wavs
 from scripts.human_validation.offline_renderer import (
     compute_diagnostic_headroom_trim,
@@ -243,7 +246,7 @@ def run_experiment_a_sprint1(
     diagnostic_target_dbtp: float = -6.0,
     legacy_mode: str = "strict",
     keys_dir: Optional[str] = None,
-    seed: int = 2026,
+    seed: Optional[int] = None,
     overwrite: bool = False,
 ) -> Dict[str, Any]:
     """Execute Experiment A (Sprint 1) on a 48 kHz input WAV."""
@@ -251,6 +254,7 @@ def run_experiment_a_sprint1(
     if legacy_mode not in valid_modes:
         raise ValueError(f"Invalid legacy_mode '{legacy_mode}'. Must be one of {valid_modes}.")
 
+    effective_seed = resolve_session_seed(seed)
     os.makedirs(output_dir, exist_ok=True)
     exports_dir = os.path.join(output_dir, "exports")
     manifests_dir = os.path.join(output_dir, "manifests")
@@ -481,7 +485,7 @@ def run_experiment_a_sprint1(
     blind_res = create_blind_listening_set(
         variant_files=lm_files_for_blind,
         output_dir=blind_delivery_dir,
-        seed=seed,
+        seed=effective_seed,
         session_id=f"{track_id}_sprint1",
         key_output_path=key_file_path,
         overwrite=overwrite,
@@ -489,6 +493,7 @@ def run_experiment_a_sprint1(
 
     summary_payload: Dict[str, Any] = {
         "track_id": track_id,
+        "seed": effective_seed,
         "status": (
             "FINDING_LEGACY_BASELINE_NOT_REPRODUCIBLE_STRICT"
             if legacy_mode == "strict"
@@ -506,7 +511,7 @@ def run_experiment_a_sprint1(
         "blind_delivery_dir": os.path.abspath(blind_delivery_dir),
         "secret_keys_dir": os.path.abspath(actual_keys_dir),
         "blind_session": {
-            k: v for k, v in blind_res.items() if k != "_internal_key"
+            k: v for k, v in blind_res.items() if k not in ("_internal_key", "seed")
         },
     }
     with open(meta_file, "w", encoding="utf-8") as f:
@@ -565,8 +570,8 @@ def main() -> None:
     parser.add_argument(
         "--seed",
         type=int,
-        default=2026,
-        help="Deterministic seed for blind set ordering (default: 2026).",
+        default=None,
+        help="Optional deterministic seed for blind set ordering (default: None -> auto-generated 64-bit random seed).",
     )
     parser.add_argument(
         "--overwrite",

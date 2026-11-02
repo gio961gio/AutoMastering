@@ -26,12 +26,13 @@ for _p in (str(_REPO_ROOT), str(_PYTHON_DIR)):
 from scripts.human_validation.make_blind_set import (
     create_blind_listening_set,
     generate_blind_mapping,
+    resolve_session_seed,
 )
 from scripts.human_validation.render_sprint2 import select_listening_sections
 
 
 def test_generate_blind_mapping_bijective_and_reproducible():
-    """Verify blind mapping is a complete bijection and deterministic for a fixed seed."""
+    """Verify blind mapping is a complete bijection, deterministic for a fixed seed, and varies across distinct seeds."""
     variants = ["A_true_bypass", "B_legacy_baseline", "C_corrected_neutral"]
     map1 = generate_blind_mapping(variants, seed=2026)
     map2 = generate_blind_mapping(variants, seed=2026)
@@ -41,9 +42,88 @@ def test_generate_blind_mapping_bijective_and_reproducible():
     assert set(map1.values()) == set(variants)
     assert len(set(map1.values())) == 3
 
+    # Two distinct explicit seeds can produce different permutations
+    map_seed_a = generate_blind_mapping(variants, seed=1)
+    map_seed_b = generate_blind_mapping(variants, seed=2026)
+    assert map_seed_a != map_seed_b
+
     # Reject duplicate variant names
     with pytest.raises(ValueError, match="unique"):
         generate_blind_mapping(["dup", "dup"], seed=2026)
+
+
+def test_omitted_seed_generates_independent_64bit_seeds_and_no_unblinding_in_delivery(tmp_path, monkeypatch):
+    """Verify omitted seed uses secrets.randbits(64), records seed in private key, and leaks zero unblinding data into delivery."""
+    import scripts.human_validation.make_blind_set as mbs
+
+    mock_seeds = iter([0x123456789ABCDEF0, 0xFEDCBA9876543210])
+    called_bits = []
+
+    def fake_randbits(k: int) -> int:
+        called_bits.append(k)
+        return next(mock_seeds)
+
+    monkeypatch.setattr(mbs.secrets, "randbits", fake_randbits)
+
+    sr = 48000
+    t = np.arange(2400) / float(sr)
+    sig_a = np.vstack([0.2 * np.sin(2 * np.pi * 200 * t), 0.2 * np.sin(2 * np.pi * 200 * t)]).astype(np.float32)
+    sig_b = np.vstack([0.3 * np.sin(2 * np.pi * 500 * t), 0.3 * np.sin(2 * np.pi * 500 * t)]).astype(np.float32)
+
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    pa = src_dir / "original_or_bypass.wav"
+    pb = src_dir / "mastered.wav"
+    sf.write(str(pa), sig_a.T, sr, subtype="FLOAT")
+    sf.write(str(pb), sig_b.T, sr, subtype="FLOAT")
+
+    keys_dir = tmp_path / "private_keys"
+    blind_dir_1 = tmp_path / "blind_delivery_1"
+    blind_dir_2 = tmp_path / "blind_delivery_2"
+
+    # Run 1 without explicit seed
+    res1 = create_blind_listening_set(
+        variant_files={"original_or_bypass": str(pa), "mastered": str(pb)},
+        output_dir=str(blind_dir_1),
+        key_dir=str(keys_dir),
+        seed=None,
+        session_id="sess_auto_1",
+    )
+    # Run 2 without explicit seed
+    res2 = create_blind_listening_set(
+        variant_files={"original_or_bypass": str(pa), "mastered": str(pb)},
+        output_dir=str(blind_dir_2),
+        key_dir=str(keys_dir),
+        seed=None,
+        session_id="sess_auto_2",
+    )
+
+    assert called_bits == [64, 64]
+
+    key1 = json.loads(Path(res1["secret_key_json"]).read_text(encoding="utf-8"))
+    key2 = json.loads(Path(res2["secret_key_json"]).read_text(encoding="utf-8"))
+
+    assert key1["seed"] == 0x123456789ABCDEF0
+    assert key2["seed"] == 0xFEDCBA9876543210
+    assert key1["seed"] != key2["seed"]
+
+    # Re-running with explicit seed=key1["seed"] must reproduce key1's exact permutation
+    map_repro = generate_blind_mapping(["original_or_bypass", "mastered"], seed=key1["seed"])
+    assert map_repro == key1["mapping_anonymous_to_ground_truth"]
+
+    # Verify zero unblinding data (no seed, no ground-truth names, no key JSON) inside blind_delivery_1
+    delivery_files = list(blind_dir_1.rglob("*"))
+    assert len(delivery_files) == 3  # blind_A.wav, blind_B.wav, sess_auto_1_listening_sheet.csv
+    for fpath in delivery_files:
+        assert "key" not in fpath.name.lower()
+        assert "original_or_bypass" not in fpath.name
+        assert "mastered" not in fpath.name
+        if fpath.suffix == ".csv":
+            csv_content = fpath.read_text(encoding="utf-8")
+            assert str(key1["seed"]) not in csv_content
+            assert "original_or_bypass" not in csv_content
+            assert "mastered" not in csv_content
+            assert "mapping" not in csv_content.lower()
 
 
 def test_create_blind_listening_set_writes_anonymous_wavs_and_separate_key(tmp_path):

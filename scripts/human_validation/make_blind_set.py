@@ -11,6 +11,7 @@ import csv
 import json
 import os
 import random
+import secrets
 import string
 import sys
 from pathlib import Path
@@ -30,16 +31,23 @@ from scripts.human_validation.validate_inputs import (
 )
 
 
+def resolve_session_seed(seed: Optional[int] = None) -> int:
+    """Return the explicit integer seed if provided, or generate a fresh 64-bit random seed."""
+    if seed is not None:
+        return int(seed)
+    return int(secrets.randbits(64))
+
+
 def generate_blind_mapping(
     variant_names: List[str],
-    seed: int = 2026,
+    seed: Optional[int] = None,
     prefix: str = "blind_",
 ) -> Dict[str, str]:
     """Generate a reproducible bijective mapping {blind_label: variant_name}.
 
     Args:
         variant_names: List of distinct ground-truth variant identifiers.
-        seed: Random seed for deterministic permutation (default: 2026).
+        seed: Random seed for deterministic permutation (if None, generates a random 64-bit seed).
         prefix: Prefix for anonymous labels (default: 'blind_').
 
     Returns:
@@ -50,8 +58,9 @@ def generate_blind_mapping(
     if len(set(variant_names)) != len(variant_names):
         raise ValueError(f"variant_names must be unique, got duplicates in {variant_names}.")
 
+    effective_seed = resolve_session_seed(seed)
     sorted_variants = sorted(variant_names)
-    rng = random.Random(int(seed))
+    rng = random.Random(effective_seed)
     shuffled = list(sorted_variants)
     rng.shuffle(shuffled)
 
@@ -70,24 +79,26 @@ def generate_blind_mapping(
 def create_blind_listening_set(
     variant_files: Dict[str, str],
     output_dir: str,
-    seed: int = 2026,
+    seed: Optional[int] = None,
     session_id: str = "session",
     key_output_path: Optional[str] = None,
     key_dir: Optional[str] = None,
     allow_co_located_key: bool = False,
     overwrite: bool = False,
+    parent_experiment_seed: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Create anonymized WAV files for blind evaluation and save the secret key separately.
 
     Args:
         variant_files: Mapping of {ground_truth_variant_id: wav_file_path}.
         output_dir: Directory where anonymous WAVs and blank worksheet are written.
-        seed: Deterministic RNG seed.
+        seed: Deterministic RNG seed. If None, generates a fresh 64-bit random seed.
         session_id: Identifier for the blind session.
         key_output_path: Optional explicit path for the secret key JSON.
         key_dir: Optional dedicated directory for keys. Defaults to `<output_dir>/../keys`.
         allow_co_located_key: Whether to allow saving the key inside output_dir (default: False).
         overwrite: Allow overwriting existing files.
+        parent_experiment_seed: Optional master experiment seed from which this session seed was derived.
 
     Returns:
         Dictionary containing the blind session metadata and mapping.
@@ -95,6 +106,7 @@ def create_blind_listening_set(
     if not variant_files:
         raise ValueError("variant_files cannot be empty.")
 
+    effective_seed = resolve_session_seed(seed)
     os.makedirs(output_dir, exist_ok=True)
     if key_output_path is None:
         if key_dir is not None:
@@ -126,7 +138,7 @@ def create_blind_listening_set(
     check_overwrite_allowed(abs_key_path, overwrite=overwrite)
     check_overwrite_allowed(sheet_csv_path, overwrite=overwrite)
 
-    mapping = generate_blind_mapping(list(variant_files.keys()), seed=seed, prefix="blind_")
+    mapping = generate_blind_mapping(list(variant_files.keys()), seed=effective_seed, prefix="blind_")
 
     blind_files_info: Dict[str, Dict[str, Any]] = {}
     public_files_list: List[Dict[str, Any]] = []
@@ -202,17 +214,20 @@ def create_blind_listening_set(
     key_payload: Dict[str, Any] = {
         "warning": "DO NOT OPEN BEFORE COMPLETING THE BLIND LISTENING EVALUATION.",
         "session_id": session_id,
-        "seed": int(seed),
+        "seed": int(effective_seed),
         "mapping_anonymous_to_ground_truth": mapping,
         "mapping_ground_truth_to_anonymous": {v: k for k, v in mapping.items()},
         "details": blind_files_info,
     }
+    if parent_experiment_seed is not None:
+        key_payload["experiment_seed"] = int(parent_experiment_seed)
+
     with open(key_output_path, "w", encoding="utf-8") as f:
         json.dump(key_payload, f, indent=2)
 
     return {
         "session_id": session_id,
-        "seed": int(seed),
+        "seed": int(effective_seed),
         "output_dir": os.path.abspath(output_dir),
         "listening_sheet_csv": os.path.abspath(sheet_csv_path),
         "secret_key_json": os.path.abspath(key_output_path),
@@ -245,8 +260,8 @@ def main() -> None:
     parser.add_argument(
         "--seed",
         type=int,
-        default=2026,
-        help="Random seed for deterministic blind ordering (default: 2026).",
+        default=None,
+        help="Optional random seed for deterministic blind ordering (default: None -> auto-generated 64-bit random seed).",
     )
     parser.add_argument(
         "--session-id",

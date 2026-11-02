@@ -118,7 +118,7 @@ python -m scripts.human_validation.render_sprint1 \
   - `manifests/track01_A_manifest.json`, `track01_B_manifest.json`, `track01_C_manifest.json`
   - **`blind_delivery/` (cartella da consegnare all'ascoltatore):** contiene esclusivamente `blind_A.wav`, `blind_B.wav`, `blind_C.wav` e la scheda vuota `track01_sprint1_listening_sheet.csv`. **Non contiene alcun file di chiave.**
 - **Nella cartella privata `human_validation/private/keys/` (riservata al supervisore):**
-  - `track01_sprint1_blind_key.json` (**non aprire né condividere prima di aver completato l'ascolto!**).
+  - `track01_sprint1_blind_key.json` (**non aprire né condividere prima di aver completato l'ascolto!**). Quando `--seed` non viene specificato, il sistema genera automaticamente un seed casuale a 64 bit (`secrets.randbits(64)`) e lo registra nel file chiave e in `track01_metadata.json` per garantire la riproducibilità a posteriori senza esporlo nella cartella di consegna.
 
 ---
 
@@ -188,7 +188,7 @@ python -m scripts.human_validation.render_sprint2 \
   - `trackXX_section01_level_matched_blind_key.json`
   - `trackXX_section02_...`
   - `trackXX_section03_...`
-  (Ciascun file memorizza il seed deterministico univoco impiegato per quella specifica sessione).
+  (Quando `--seed` viene omesso, `render_sprint2` genera un unico seed casuale a 64 bit all'inizio dell'esecuzione, lo riutilizza per la selezione dei chunk e per la derivazione deterministica dei seed delle sezioni, e registra sia `seed` sia `experiment_seed` nei file chiave privati e in `trackXX_manifest.json` senza mai inserirli in `trackXX_sections_blind_delivery/`).
 
 ---
 
