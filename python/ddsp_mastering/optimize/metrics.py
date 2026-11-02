@@ -16,7 +16,10 @@ import torch
 import torch.nn.functional as F
 import torchaudio.functional as taf
 
-from ddsp_mastering.loss.loudness import DifferentiableLoudnessLoss
+from ddsp_mastering.loss.loudness import (
+    DifferentiableLoudnessLoss,
+    calculate_integrated_loudness_bs1770,
+)
 from ddsp_mastering.loss.stft import MultiResolutionSTFTLoss
 
 
@@ -168,19 +171,29 @@ class MasteringBenchmarkSuite:
             target_audio = target_audio.unsqueeze(0)
 
         # Common Aggregate Descriptors (valid across tracks of differing lengths)
-        pred_lufs = self.loudness_calc.calculate_lufs(pred_audio).item()
-        target_lufs = self.loudness_calc.calculate_lufs(target_audio).item()
-        delta_lufs = abs(pred_lufs - target_lufs)
+        # Standard-compliant ITU-R BS.1770-5 Integrated Loudness
+        try:
+            pred_lufs = calculate_integrated_loudness_bs1770(pred_audio, sample_rate=self.sample_rate)
+        except ValueError:
+            # Fallback to ungated proxy only if audio is shorter than a 400ms gating block
+            pred_lufs = self.loudness_calc.calculate_ungated_k_weighted_loudness(pred_audio).mean().item()
+
+        try:
+            target_lufs = calculate_integrated_loudness_bs1770(target_audio, sample_rate=self.sample_rate)
+        except ValueError:
+            target_lufs = self.loudness_calc.calculate_ungated_k_weighted_loudness(target_audio).mean().item()
+
+        delta_lufs = abs(pred_lufs - target_lufs) if (math.isfinite(pred_lufs) and math.isfinite(target_lufs)) else float("inf")
 
         pred_peak_linear = torch.max(torch.abs(pred_audio)).item()
         pred_peak_dbfs = 20.0 * math.log10(pred_peak_linear + 1e-12)
         ceiling_violation_db = max(0.0, pred_peak_dbfs - (-0.3000))
 
-        pred_plr = pred_peak_dbfs - pred_lufs
+        pred_plr = (pred_peak_dbfs - pred_lufs) if math.isfinite(pred_lufs) else float("nan")
         target_peak_linear = torch.max(torch.abs(target_audio)).item()
         target_peak_dbfs = 20.0 * math.log10(target_peak_linear + 1e-12)
-        target_plr = target_peak_dbfs - target_lufs
-        delta_plr = abs(pred_plr - target_plr)
+        target_plr = (target_peak_dbfs - target_lufs) if math.isfinite(target_lufs) else float("nan")
+        delta_plr = abs(pred_plr - target_plr) if (math.isfinite(pred_plr) and math.isfinite(target_plr)) else float("nan")
 
         pred_ms_ratio = self.calculate_mid_side_energy_ratio(pred_audio)
         target_ms_ratio = self.calculate_mid_side_energy_ratio(target_audio)
@@ -188,6 +201,7 @@ class MasteringBenchmarkSuite:
 
         results: Dict[str, Union[float, str, List[str], None]] = {
             "reference_mode": reference_mode,
+            "loudness_standard": "ITU-R BS.1770-5 (11/2023) Integrated",
             "pred_lufs": pred_lufs,
             "target_lufs": target_lufs,
             "delta_lufs": delta_lufs,

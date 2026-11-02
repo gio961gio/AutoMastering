@@ -291,5 +291,175 @@ def test_f06_compressor_and_limiter_cpu_batching_parity():
             torch.testing.assert_close(out_lim[b:b+1], out_b, atol=1e-6, rtol=1e-6)
 
 
+# ---------------------------------------------------------------------------
+# B1 (F-01): ITU-R BS.1770-5 Integrated Loudness & Causal K-Weighting Tests
+# ---------------------------------------------------------------------------
+
+def test_b1_f01_integrated_loudness_matches_reference_pyloudnorm_within_tolerance():
+    """Verify B1 / F-01: Integrated loudness matches pyloudnorm within 0.05 LU on complex signals."""
+    import pyloudnorm as pyln
+    from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
+
+    sr = 48000
+    meter = pyln.Meter(sr)
+
+    # Signal 1: 1 kHz tone at -23.0 dBFS RMS
+    t = np.arange(sr * 5) / sr
+    amp = np.sqrt(2.0) * (10.0 ** (-23.0 / 20.0))
+    tone = amp * np.sin(2 * np.pi * 1000.0 * t)
+    stereo_tone = np.stack([tone, np.zeros_like(tone)], axis=-1)
+
+    pyln_tone = meter.integrated_loudness(stereo_tone)
+    our_tone = calculate_integrated_loudness_bs1770(stereo_tone, sample_rate=sr)
+
+    assert abs(our_tone - (-23.0)) < 0.05, f"EBU calibration tone expected -23 LUFS, got {our_tone}"
+    assert abs(pyln_tone - our_tone) < 0.05, f"Discrepancy with pyloudnorm: {abs(pyln_tone - our_tone)} LU"
+
+    # Signal 2: Multitone dynamic signal with pauses
+    rng = np.random.RandomState(42)
+    sig_l = 0.1 * np.sin(2 * np.pi * 440.0 * t) + 0.05 * np.sin(2 * np.pi * 2500.0 * t)
+    sig_r = 0.08 * np.sin(2 * np.pi * 880.0 * t) + 0.04 * rng.randn(len(t))
+    # Add quiet section in the middle
+    sig_l[sr*2:sr*3] = 0.0001
+    sig_r[sr*2:sr*3] = 0.0001
+    stereo_sig = np.stack([sig_l, sig_r], axis=-1)
+
+    pyln_sig = meter.integrated_loudness(stereo_sig)
+    our_sig = calculate_integrated_loudness_bs1770(stereo_sig, sample_rate=sr)
+    assert abs(pyln_sig - our_sig) < 0.05, f"Discrepancy on dynamic signal: {abs(pyln_sig - our_sig)} LU"
+
+
+def test_b1_f01_gating_absolute_and_relative_mechanisms():
+    """Verify B1 / F-01: Absolute (-70 LKFS) and relative (-10 LU) gating correctly exclude quiet blocks."""
+    import pyloudnorm as pyln
+    from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
+
+    sr = 48000
+    meter = pyln.Meter(sr)
+
+    # 8-second signal:
+    # 0s - 4s: Active music section (-16 LKFS)
+    # 4s - 8s: Low level section below -70 LKFS (-100 dBFS)
+    t4 = np.arange(sr * 4) / sr
+    loud_part = 0.15 * np.sin(2 * np.pi * 1000.0 * t4)
+    silent_part = 1e-5 * np.sin(2 * np.pi * 1000.0 * t4)
+
+    sig_loud_only = np.stack([loud_part, loud_part], axis=0) # shape (2, 4*sr)
+    sig_with_silence = np.concatenate([sig_loud_only, np.stack([silent_part, silent_part], axis=0)], axis=-1)
+
+    lufs_loud_only = calculate_integrated_loudness_bs1770(sig_loud_only, sample_rate=sr)
+    lufs_with_silence = calculate_integrated_loudness_bs1770(sig_with_silence, sample_rate=sr)
+    pyln_with_silence = meter.integrated_loudness(sig_with_silence.T)
+
+    # In BS.1770, pure silence blocks (4.4s-8.0s) are completely excluded by the absolute gate.
+    # Without gating, 4s of silence would drop loudness by 3.01 dB.
+    # With absolute gating, only 3 boundary blocks overlap, keeping the difference < 0.25 dB,
+    # and exactly matching pyloudnorm to within 0.05 LU.
+    assert abs(lufs_with_silence - pyln_with_silence) < 0.05
+    assert abs(lufs_loud_only - lufs_with_silence) < 0.25
+
+    # Test Relative Gate:
+    # 0s - 4s: Loud part at ~ -16 LKFS
+    # 4s - 8s: Moderate part at ~ -36 LKFS (passes absolute -70 LKFS, but is >10 LU below prelim level)
+    mod_part = 0.001 * np.sin(2 * np.pi * 1000.0 * t4) # ~ 43 dB lower
+    sig_with_quiet = np.concatenate([sig_loud_only, np.stack([mod_part, mod_part], axis=0)], axis=-1)
+
+    lufs_with_quiet = calculate_integrated_loudness_bs1770(sig_with_quiet, sample_rate=sr)
+    pyln_with_quiet = meter.integrated_loudness(sig_with_quiet.T)
+    # The relative gate must drop the -36 LKFS blocks, matching pyloudnorm within 0.05 LU
+    assert abs(lufs_with_quiet - pyln_with_quiet) < 0.05
+
+
+def test_b1_f01_silence_and_short_audio_error_handling():
+    """Verify B1 / F-01: Audio shorter than 400ms raises ValueError; total silence returns -inf."""
+    from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
+
+    sr = 48000
+    # 1. Audio shorter than 400ms (e.g. 300ms = 14400 samples)
+    short_audio = np.zeros((2, int(0.300 * sr)), dtype=np.float32)
+    with pytest.raises(ValueError, match="shorter than minimum gating block"):
+        calculate_integrated_loudness_bs1770(short_audio, sample_rate=sr)
+
+    # 2. Total silence of 2.0s: all blocks are 0, must return -float('inf')
+    silent_audio = np.zeros((2, 2 * sr), dtype=np.float32)
+    res = calculate_integrated_loudness_bs1770(silent_audio, sample_rate=sr)
+    assert res == -float("inf")
+
+
+def test_b1_f01_k_weighting_odd_even_lengths_and_no_circular_wrap_around():
+    """Verify B1 / F-01: K-weighting filters odd and even lengths and exhibits strict causality (no FFT wrap-around)."""
+    from ddsp_mastering.loss.loudness import DifferentiableKWeighting
+
+    sr = 48000
+    k_filter = DifferentiableKWeighting(sample_rate=sr)
+
+    # 1. Even and odd lengths
+    for length in [48000, 48001, 19203]:
+        x = torch.randn(1, 2, length, dtype=torch.float32)
+        y = k_filter(x)
+        assert y.shape == x.shape
+        assert torch.isfinite(y).all()
+
+    # 2. Causality and zero circular wrap-around test:
+    # Buffer of 48000 zeros with a single unit impulse placed at the very last sample (T-1).
+    # If the filter is causal IIR, samples 0 through T-2 MUST BE STRICTLY ZERO.
+    # If it were circular FFT filtering, the impulse response tail would wrap around to sample 0!
+    T = 48000
+    impulse_at_end = torch.zeros(1, 2, T, dtype=torch.float64)
+    impulse_at_end[..., -1] = 1.0
+
+    y_imp = k_filter(impulse_at_end)
+
+    # Check all samples before the impulse: must be identically zero
+    pre_impulse_max = torch.max(torch.abs(y_imp[..., :-1])).item()
+    assert pre_impulse_max == 0.0, f"Causality violation! Non-zero values before impulse: {pre_impulse_max}"
+    # The impulse sample itself should be non-zero (Stage 1 b1[0] * Stage 2 b2[0])
+    assert abs(y_imp[0, 0, -1].item()) > 0.1
+
+
+def test_b1_f01_differentiable_loudness_loss_gradient_flow():
+    """Verify B1 / F-01: DifferentiableLoudnessLoss backward pass propagates finite, non-null gradients."""
+    from ddsp_mastering.loss.loudness import DifferentiableLoudnessLoss
+
+    sr = 48000
+    loss_fn = DifferentiableLoudnessLoss(sample_rate=sr, target_lufs=-14.0)
+
+    x = torch.randn(2, 2, sr * 2, dtype=torch.float32, requires_grad=True)
+    loss, metrics = loss_fn(x)
+
+    assert "loudness_proxy_pred" in metrics
+    assert "loudness_proxy_target" in metrics
+    assert "loudness_loss_total" in metrics
+
+    loss.backward()
+    assert x.grad is not None
+    assert x.grad.shape == x.shape
+    assert torch.isfinite(x.grad).all()
+    assert torch.norm(x.grad).item() > 0.0
+
+
+def test_b1_f01_mastering_benchmark_suite_uses_integrated_standard():
+    """Verify B1 / F-01: MasteringBenchmarkSuite uses ITU-R BS.1770-5 Integrated standard."""
+    from ddsp_mastering.optimize.metrics import MasteringBenchmarkSuite
+    from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
+
+    sr = 48000
+    suite = MasteringBenchmarkSuite(sample_rate=sr)
+
+    # 5-second test audio
+    t = torch.arange(sr * 5) / sr
+    audio_a = 0.1 * torch.sin(2 * np.pi * 1000.0 * t).repeat(2, 1) # (2, T)
+    audio_b = 0.05 * torch.sin(2 * np.pi * 1000.0 * t).repeat(2, 1)
+
+    res = suite.evaluate(audio_a, audio_b, reference_mode="same_track", align_latency=False)
+
+    assert res["loudness_standard"] == "ITU-R BS.1770-5 (11/2023) Integrated"
+    expected_pred = calculate_integrated_loudness_bs1770(audio_a, sample_rate=sr)
+    assert abs(res["pred_lufs"] - expected_pred) < 1e-6
+    expected_target = calculate_integrated_loudness_bs1770(audio_b, sample_rate=sr)
+    assert abs(res["target_lufs"] - expected_target) < 1e-6
+
+
+
 
 
