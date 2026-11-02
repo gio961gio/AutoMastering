@@ -446,9 +446,12 @@ public:
         const float* in_ptr = static_cast<const float*>(buf.ptr);
         float* out_ptr = static_cast<float*>(result.request().ptr);
 
-        chain_.process(in_ptr, in_ptr + num_samples,
-                       out_ptr, out_ptr + num_samples,
-                       num_samples);
+        {
+            py::gil_scoped_release release;
+            chain_.process(in_ptr, in_ptr + num_samples,
+                           out_ptr, out_ptr + num_samples,
+                           num_samples);
+        }
         return result;
     }
 
@@ -552,20 +555,23 @@ PYBIND11_MODULE(py_core_dsp, m) {
         double* yg_ptr = static_cast<double*>(yg.request().ptr);
         bool* mask_ptr = static_cast<bool*>(mask.request().ptr);
 
-        for (size_t b = 0; b < B; ++b) {
-            const double* gc_b = gc_ptr + b * N;
-            double* yg_b = yg_ptr + b * N;
-            bool* mask_b = mask_ptr + b * N;
+        {
+            py::gil_scoped_release release;
+            for (size_t b = 0; b < B; ++b) {
+                const double* gc_b = gc_ptr + b * N;
+                double* yg_b = yg_ptr + b * N;
+                bool* mask_b = mask_ptr + b * N;
 
-            double yg_prev = 0.0;
-            for (size_t n = 0; n < N; ++n) {
-                double gc_n = gc_b[n];
-                bool m_n = gc_n > yg_prev;
-                mask_b[n] = m_n;
-                double alpha = m_n ? alpha_a : alpha_r;
-                double yg_curr = alpha * yg_prev + (1.0 - alpha) * gc_n;
-                yg_b[n] = yg_curr;
-                yg_prev = yg_curr;
+                double yg_prev = 0.0;
+                for (size_t n = 0; n < N; ++n) {
+                    double gc_n = gc_b[n];
+                    bool m_n = gc_n > yg_prev;
+                    mask_b[n] = m_n;
+                    double alpha = m_n ? alpha_a : alpha_r;
+                    double yg_curr = alpha * yg_prev + (1.0 - alpha) * gc_n;
+                    yg_b[n] = yg_curr;
+                    yg_prev = yg_curr;
+                }
             }
         }
         return py::make_tuple(yg, mask);
@@ -586,16 +592,19 @@ PYBIND11_MODULE(py_core_dsp, m) {
         const bool* mask_ptr = static_cast<const bool*>(buf_mask.ptr);
         double* psi_ptr = static_cast<double*>(psi.request().ptr);
 
-        for (size_t b = 0; b < B; ++b) {
-            const double* dyg_b = dyg_ptr + b * N;
-            const bool* mask_b = mask_ptr + b * N;
-            double* psi_b = psi_ptr + b * (N + 1);
+        {
+            py::gil_scoped_release release;
+            for (size_t b = 0; b < B; ++b) {
+                const double* dyg_b = dyg_ptr + b * N;
+                const bool* mask_b = mask_ptr + b * N;
+                double* psi_b = psi_ptr + b * (N + 1);
 
-            psi_b[N] = 0.0;
-            psi_b[N - 1] = dyg_b[N - 1];
-            for (py::ssize_t n = static_cast<py::ssize_t>(N) - 2; n >= 0; --n) {
-                double alpha_next = mask_b[n + 1] ? alpha_a : alpha_r;
-                psi_b[n] = dyg_b[n] + alpha_next * psi_b[n + 1];
+                psi_b[N] = 0.0;
+                psi_b[N - 1] = dyg_b[N - 1];
+                for (py::ssize_t n = static_cast<py::ssize_t>(N) - 2; n >= 0; --n) {
+                    double alpha_next = mask_b[n + 1] ? alpha_a : alpha_r;
+                    psi_b[n] = dyg_b[n] + alpha_next * psi_b[n + 1];
+                }
             }
         }
         return psi;
@@ -618,19 +627,22 @@ PYBIND11_MODULE(py_core_dsp, m) {
         double* grel_ptr = static_cast<double*>(g_rel.request().ptr);
         bool* mask_ptr = static_cast<bool*>(mask.request().ptr);
 
-        for (size_t b = 0; b < B; ++b) {
-            const double* gm_b = gm_ptr + b * N;
-            double* grel_b = grel_ptr + b * N;
-            bool* mask_b = mask_ptr + b * N;
+        {
+            py::gil_scoped_release release;
+            for (size_t b = 0; b < B; ++b) {
+                const double* gm_b = gm_ptr + b * N;
+                double* grel_b = grel_ptr + b * N;
+                bool* mask_b = mask_ptr + b * N;
 
-            double g_prev = 1.0;
-            for (size_t n = 0; n < N; ++n) {
-                double gm = gm_b[n];
-                bool is_release = gm > g_prev;
-                mask_b[n] = is_release;
-                double g_curr = is_release ? (alpha_rel * g_prev + (1.0 - alpha_rel) * gm) : gm;
-                grel_b[n] = g_curr;
-                g_prev = g_curr;
+                double g_prev = 1.0;
+                for (size_t n = 0; n < N; ++n) {
+                    double gm = gm_b[n];
+                    bool is_release = gm > g_prev;
+                    mask_b[n] = is_release;
+                    double g_curr = is_release ? (alpha_rel * g_prev + (1.0 - alpha_rel) * gm) : gm;
+                    grel_b[n] = g_curr;
+                    g_prev = g_curr;
+                }
             }
         }
         return py::make_tuple(g_rel, mask);
@@ -652,17 +664,20 @@ PYBIND11_MODULE(py_core_dsp, m) {
         const bool* mask_ptr = static_cast<const bool*>(buf_mask.ptr);
         double* dgmin_ptr = static_cast<double*>(d_gmin.request().ptr);
 
-        for (size_t b = 0; b < B; ++b) {
-            const double* dg_b = dg_ptr + b * N;
-            const bool* mask_b = mask_ptr + b * N;
-            double* dgmin_b = dgmin_ptr + b * N;
+        {
+            py::gil_scoped_release release;
+            for (size_t b = 0; b < B; ++b) {
+                const double* dg_b = dg_ptr + b * N;
+                const bool* mask_b = mask_ptr + b * N;
+                double* dgmin_b = dgmin_ptr + b * N;
 
-            double lambda_next = 0.0;
-            for (py::ssize_t n = static_cast<py::ssize_t>(N) - 1; n >= 0; --n) {
-                double lambda_curr = dg_b[n] + lambda_next;
-                bool is_rel = mask_b[n];
-                dgmin_b[n] = is_rel ? ((1.0 - alpha_rel) * lambda_curr) : lambda_curr;
-                lambda_next = is_rel ? (alpha_rel * lambda_curr) : 0.0;
+                double lambda_next = 0.0;
+                for (py::ssize_t n = static_cast<py::ssize_t>(N) - 1; n >= 0; --n) {
+                    double lambda_curr = dg_b[n] + lambda_next;
+                    bool is_rel = mask_b[n];
+                    dgmin_b[n] = is_rel ? ((1.0 - alpha_rel) * lambda_curr) : lambda_curr;
+                    lambda_next = is_rel ? (alpha_rel * lambda_curr) : 0.0;
+                }
             }
         }
         return d_gmin;

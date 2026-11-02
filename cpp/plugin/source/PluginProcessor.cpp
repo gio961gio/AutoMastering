@@ -114,6 +114,7 @@ void MasteringPluginAudioProcessor::prepareToPlay(double sampleRate, int samples
     }
 
     chain_.set_parameters_theta(current_theta_);
+    theta_update_count_++;
 }
 
 void MasteringPluginAudioProcessor::releaseResources() {
@@ -156,13 +157,15 @@ void MasteringPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
             if (smoothed_params_[i].isSmoothing()) {
                 params_changed = true;
                 current_theta_[i] = static_cast<double>(smoothed_params_[i].skip(sub_samples));
-            } else {
+            } else if (current_theta_[i] != static_cast<double>(target)) {
+                params_changed = true;
                 current_theta_[i] = static_cast<double>(target);
             }
         }
 
-        if (params_changed || samples_processed == 0) {
+        if (params_changed) {
             chain_.set_parameters_theta(current_theta_);
+            theta_update_count_++;
         }
 
         chain_.process(

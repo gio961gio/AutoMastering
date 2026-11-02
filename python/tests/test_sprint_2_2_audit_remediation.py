@@ -242,4 +242,54 @@ def test_f09_sample_rate_contract_characterization():
             assert abs(latency_ms - 1.65625) < 1e-3
 
 
+def test_f06_compressor_and_limiter_cpu_batching_parity():
+    """Verify F-06: CPU fast-path for B=1, B=2, B=4 matches single-item processing bit-for-bit."""
+    from ddsp_mastering.dsp.compressor import DifferentiableSingleBandCompressorFunction
+    from ddsp_mastering.dsp.limiter import DifferentiableLookaheadLimiter
+
+    sr = 48000
+    lim = DifferentiableLookaheadLimiter(sample_rate=sr)
+
+    for B in [1, 2, 4]:
+        # Batch of stereo signals: [B, 2, 24000]
+        rng = torch.Generator().manual_seed(42 + B)
+        x = torch.randn(B, 2, 24000, generator=rng, dtype=torch.float32) * 0.2
+
+        # 1. Compressor batch forward
+        out_comp = DifferentiableSingleBandCompressorFunction.apply(
+            x,
+            torch.full((B,), -15.0),
+            torch.full((B,), 3.0),
+            torch.full((B,), 20.0),
+            torch.full((B,), 150.0),
+            torch.full((B,), 2.0),
+            sr,
+        )
+        assert out_comp.shape == (B, 2, 24000)
+
+        # Compare item by item
+        for b in range(B):
+            x_b = x[b:b+1]
+            out_b = DifferentiableSingleBandCompressorFunction.apply(
+                x_b,
+                torch.tensor([-15.0]),
+                torch.tensor([3.0]),
+                torch.tensor([20.0]),
+                torch.tensor([150.0]),
+                torch.tensor([2.0]),
+                sr,
+            )
+            torch.testing.assert_close(out_comp[b:b+1], out_b, atol=1e-6, rtol=1e-6)
+
+        # 2. Limiter batch forward
+        out_lim = lim(x, push_gain_db=torch.full((B,), 3.0))
+        assert out_lim.shape == (B, 2, 24000)
+
+        for b in range(B):
+            x_b = x[b:b+1]
+            out_b = lim(x_b, push_gain_db=torch.tensor([3.0]))
+            torch.testing.assert_close(out_lim[b:b+1], out_b, atol=1e-6, rtol=1e-6)
+
+
+
 

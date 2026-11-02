@@ -21,7 +21,7 @@ class FastLimiterReleaseFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, g_min: torch.Tensor, alpha_rel: float) -> torch.Tensor:
         B, N = g_min.shape
-        if _HAS_PY_CORE_DSP and not g_min.is_cuda and B == 1:
+        if _HAS_PY_CORE_DSP and not g_min.is_cuda:
             gm_np = g_min.detach().cpu().numpy()
             grel_np, mask_np = py_core_dsp.fast_forward_limiter_envelope(gm_np, float(alpha_rel))
             g_rel = torch.from_numpy(grel_np).to(device=g_min.device, dtype=g_min.dtype)
@@ -48,7 +48,7 @@ class FastLimiterReleaseFunction(torch.autograd.Function):
         alpha_rel = ctx.alpha_rel
         B, N = grad_output.shape
 
-        if _HAS_PY_CORE_DSP and not grad_output.is_cuda and B == 1:
+        if _HAS_PY_CORE_DSP and not grad_output.is_cuda:
             dg_np = grad_output.detach().cpu().numpy()
             mask_np = mask_rel.detach().cpu().numpy()
             dgmin_np = py_core_dsp.fast_backward_limiter_envelope(dg_np, mask_np, float(alpha_rel))

@@ -71,7 +71,10 @@ class DifferentiableSingleBandCompressorFunction(torch.autograd.Function):
 
         # 3. Ballistics ricorsiva log-domain
         # y_g[n] = alpha[n] * y_g[n-1] + (1 - alpha[n]) * gc[n]
-        if _HAS_PY_CORE_DSP and not x_flat.is_cuda and B == 1:
+        can_use_fast_comp = _HAS_PY_CORE_DSP and not x_flat.is_cuda and (
+            B == 1 or (torch.allclose(alpha_a, alpha_a[0]) and torch.allclose(alpha_r, alpha_r[0]))
+        )
+        if can_use_fast_comp:
             gc_np = gc.detach().cpu().numpy()
             yg_np, mask_np = py_core_dsp.fast_forward_ballistics(gc_np, float(alpha_a[0]), float(alpha_r[0]))
             yg = torch.from_numpy(yg_np).to(device=x.device, dtype=torch.float64)
@@ -130,7 +133,10 @@ class DifferentiableSingleBandCompressorFunction(torch.autograd.Function):
         d_yg_direct = -d_exponent # [B, N]
 
         # 3. Scansione all'indietro per ballistics (psi[n])
-        if _HAS_PY_CORE_DSP and not x_flat.is_cuda and B == 1:
+        can_use_fast_comp = _HAS_PY_CORE_DSP and not x_flat.is_cuda and (
+            B == 1 or (torch.allclose(alpha_a, alpha_a[0]) and torch.allclose(alpha_r, alpha_r[0]))
+        )
+        if can_use_fast_comp:
             dyg_np = d_yg_direct.detach().cpu().numpy()
             mask_np = mask_attack.detach().cpu().numpy()
             psi_np = py_core_dsp.fast_backward_psi(dyg_np, mask_np, float(alpha_a[0]), float(alpha_r[0]))

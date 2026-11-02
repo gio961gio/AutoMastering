@@ -45,6 +45,7 @@ public:
     void setNormalizedParameters(std::span<const float> z);
     std::array<float, core_dsp::NUM_PARAMS> getNormalizedParameters() const;
     [[nodiscard]] std::array<double, core_dsp::NUM_PARAMS> getCurrentTheta() const noexcept { return current_theta_; }
+    [[nodiscard]] uint64_t getThetaUpdateCount() const noexcept { return theta_update_count_.load(); }
 
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts_; }
     const core_dsp::MasteringChain& getChain() const noexcept { return chain_; }
@@ -60,6 +61,7 @@ private:
     std::array<std::atomic<float>*, core_dsp::NUM_PARAMS> raw_params_{};
     std::array<juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>, core_dsp::NUM_PARAMS> smoothed_params_{};
     std::array<double, core_dsp::NUM_PARAMS> current_theta_{};
+    std::atomic<uint64_t> theta_update_count_{0};
 
     int max_block_size_ = 2048;
 
