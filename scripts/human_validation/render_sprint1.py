@@ -90,7 +90,7 @@ LEGACY_PARAM_SPECS_86AE20F0: List[Tuple[str, float, float, bool]] = [
     ("eq_band5_f0", 4000.0, 12000.0, True),
     ("eq_band5_gain_db", -12.0, 12.0, False),
     ("eq_band5_q", 0.5, 5.0, True),
-    ("eq_band6_f0", 6000.0, 15000.0, True),
+    ("eq_band6_f0", 5000.0, 18000.0, True),
     ("eq_band6_gain_db", -12.0, 12.0, False),
     ("eq_band6_q", 0.5, 5.0, True),
     # 18..19: Crossover
@@ -242,6 +242,7 @@ def run_experiment_a_sprint1(
     track_id: str = "track01",
     diagnostic_target_dbtp: float = -6.0,
     legacy_mode: str = "strict",
+    keys_dir: Optional[str] = None,
     seed: int = 2026,
     overwrite: bool = False,
 ) -> Dict[str, Any]:
@@ -253,9 +254,12 @@ def run_experiment_a_sprint1(
     os.makedirs(output_dir, exist_ok=True)
     exports_dir = os.path.join(output_dir, "exports")
     manifests_dir = os.path.join(output_dir, "manifests")
-    blind_dir = os.path.join(output_dir, "blind")
+    blind_delivery_dir = os.path.join(output_dir, "blind_delivery")
+    actual_keys_dir = keys_dir if keys_dir is not None else os.path.join(output_dir, "keys")
     os.makedirs(exports_dir, exist_ok=True)
     os.makedirs(manifests_dir, exist_ok=True)
+    os.makedirs(blind_delivery_dir, exist_ok=True)
+    os.makedirs(actual_keys_dir, exist_ok=True)
 
     # 1. Validate and load source WAV (48 kHz strictly required)
     raw_audio, input_meta = load_and_validate_wav(input_wav_path, required_sr=48000, allow_mono=True)
@@ -473,12 +477,13 @@ def run_experiment_a_sprint1(
         label: info["output_path"]
         for label, info in level_match_report["variants"].items()
     }
+    key_file_path = os.path.join(actual_keys_dir, f"{track_id}_sprint1_blind_key.json")
     blind_res = create_blind_listening_set(
         variant_files=lm_files_for_blind,
-        output_dir=blind_dir,
+        output_dir=blind_delivery_dir,
         seed=seed,
         session_id=f"{track_id}_sprint1",
-        key_output_path=os.path.join(blind_dir, f"{track_id}_blind_key.json"),
+        key_output_path=key_file_path,
         overwrite=overwrite,
     )
 
@@ -498,6 +503,8 @@ def run_experiment_a_sprint1(
         "null_test_C_vs_A": null_c_vs_a,
         "exports": exported_files_for_matching,
         "level_matching_report": os.path.abspath(os.path.join(exports_dir, "level_matching_report.json")),
+        "blind_delivery_dir": os.path.abspath(blind_delivery_dir),
+        "secret_keys_dir": os.path.abspath(actual_keys_dir),
         "blind_session": {
             k: v for k, v in blind_res.items() if k != "_internal_key"
         },
@@ -523,6 +530,12 @@ def main() -> None:
         type=str,
         required=True,
         help="Output directory for Experiment A artifacts (e.g. human_validation/private/track01).",
+    )
+    parser.add_argument(
+        "--keys-dir",
+        type=str,
+        default=None,
+        help="Dedicated private directory for the secret blind key JSON (default: <out>/keys).",
     )
     parser.add_argument(
         "--track-id",
@@ -568,6 +581,7 @@ def main() -> None:
         track_id=args.track_id,
         diagnostic_target_dbtp=args.diagnostic_target_dbtp,
         legacy_mode=args.legacy_mode,
+        keys_dir=args.keys_dir,
         seed=args.seed,
         overwrite=args.overwrite,
     )

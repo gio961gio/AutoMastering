@@ -91,36 +91,67 @@ def compute_group_level_matching_gains(
     effective_target_lufs = float(max_feasible_target)
     target_lowered_for_ceiling = bool(effective_target_lufs < initial_target_lufs - 1e-6)
 
+    # Iterative refinement loop to guarantee:
+    # 1. 100% exact matching: all variants use gain_i = effective_target_lufs - L_i, so post LUFS are equal (spread < 1e-3 LU)
+    # 2. Strict True Peak ceiling: for every variant, post True Peak <= ceiling_dbtp (within numerical margin)
+    # 3. If any variant exceeds ceiling_dbtp after rendering, lower the common target uniformly and recompute all copies
+    safety_margin_dbtp = 0.02  # Safety margin in dBTP to prevent inter-sample filter overshoot
+    max_refine_iterations = 5
     matched_signals: Dict[str, np.ndarray] = {}
     variant_reports: Dict[str, Dict[str, Any]] = {}
 
-    for label, stereo in validated_signals.items():
-        m_pre = pre_metrics[label]
-        l_pre = float(m_pre["integrated_lufs"])
-        gain_db = float(effective_target_lufs - l_pre)
-        linear_gain = float(10.0 ** (gain_db / 20.0))
+    for iteration in range(max_refine_iterations):
+        matched_signals.clear()
+        variant_reports.clear()
+        worst_overshoot_db = 0.0
 
-        matched = np.ascontiguousarray(stereo * linear_gain, dtype=np.float64)
-        m_post = measure_audio_signal(matched, sample_rate=sample_rate)
+        for label, stereo in validated_signals.items():
+            m_pre = pre_metrics[label]
+            l_pre = float(m_pre["integrated_lufs"])
+            gain_db = float(effective_target_lufs - l_pre)
+            linear_gain = float(10.0 ** (gain_db / 20.0))
 
-        # Verify if post True Peak slightly exceeds ceiling due to inter-sample filter numerical precision
-        if math.isfinite(m_post["true_peak_dbtp"]) and m_post["true_peak_dbtp"] > ceiling_dbtp + 1e-3:
-            # Fine-tune common target downward if ever needed (guarded by 1e-4 above)
-            pass
+            matched = np.ascontiguousarray(stereo * linear_gain, dtype=np.float64)
+            m_post = measure_audio_signal(matched, sample_rate=sample_rate)
 
-        matched_signals[label] = matched
-        variant_reports[label] = {
-            "pre_integrated_lufs": l_pre,
-            "pre_true_peak_dbtp": float(m_pre["true_peak_dbtp"]),
-            "pre_sample_peak_dbfs": float(m_pre["sample_peak_dbfs"]),
-            "loudness_method": m_pre["loudness_method"],
-            "applied_static_gain_db": gain_db,
-            "applied_linear_gain": linear_gain,
-            "post_integrated_lufs": float(m_post["integrated_lufs"]),
-            "post_true_peak_dbtp": float(m_post["true_peak_dbtp"]),
-            "post_sample_peak_dbfs": float(m_post["sample_peak_dbfs"]),
-            "post_rms_dbfs": float(m_post["rms_dbfs"]),
-        }
+            tp_post = float(m_post["true_peak_dbtp"])
+            if math.isfinite(tp_post) and tp_post > ceiling_dbtp:
+                overshoot = tp_post - ceiling_dbtp
+                if overshoot > worst_overshoot_db:
+                    worst_overshoot_db = overshoot
+
+            matched_signals[label] = matched
+            variant_reports[label] = {
+                "pre_integrated_lufs": l_pre,
+                "pre_true_peak_dbtp": float(m_pre["true_peak_dbtp"]),
+                "pre_sample_peak_dbfs": float(m_pre["sample_peak_dbfs"]),
+                "loudness_method": m_pre["loudness_method"],
+                "applied_static_gain_db": gain_db,
+                "applied_linear_gain": linear_gain,
+                "post_integrated_lufs": float(m_post["integrated_lufs"]),
+                "post_true_peak_dbtp": float(m_post["true_peak_dbtp"]),
+                "post_sample_peak_dbfs": float(m_post["sample_peak_dbfs"]),
+                "post_rms_dbfs": float(m_post["rms_dbfs"]),
+            }
+
+        if worst_overshoot_db <= 0.0:
+            # All variants strictly satisfy ceiling_dbtp!
+            break
+
+        # A variant overshot the ceiling: lower the common target loudness uniformly
+        # for ALL variants so relative loudness matching remains exact (0.00 LU spread)
+        effective_target_lufs -= float(worst_overshoot_db + safety_margin_dbtp)
+        target_lowered_for_ceiling = True
+
+    # Final explicit verification before declaring the group valid
+    for label, v_rep in variant_reports.items():
+        tp_post = float(v_rep["post_true_peak_dbtp"])
+        if math.isfinite(tp_post) and tp_post > ceiling_dbtp + 1e-3:
+            raise RuntimeError(
+                f"Level matching failed to satisfy True Peak ceiling ({ceiling_dbtp:.2f} dBTP) "
+                f"for variant '{label}': post True Peak is {tp_post:.4f} dBTP. "
+                f"Aborting to prevent producing an invalid level-matched set."
+            )
 
     post_lufs_list = [v["post_integrated_lufs"] for v in variant_reports.values()]
     lufs_spread = float(max(post_lufs_list) - min(post_lufs_list)) if post_lufs_list else 0.0
@@ -178,6 +209,14 @@ def create_level_matched_wavs(
 
         sf.write(out_path, matched_audio.T, 48000, subtype="FLOAT")
         post_file_metrics = measure_audio_signal(matched_audio, sample_rate=48000.0, file_path=out_path)
+
+        # Verify that the written file strictly respects the ceiling
+        if math.isfinite(post_file_metrics["true_peak_dbtp"]) and post_file_metrics["true_peak_dbtp"] > ceiling_dbtp + 1e-3:
+            raise RuntimeError(
+                f"Exported WAV '{out_path}' violates True Peak ceiling: "
+                f"{post_file_metrics['true_peak_dbtp']:.4f} dBTP > {ceiling_dbtp:.2f} dBTP."
+            )
+
         report["variants"][label]["input_file_name"] = input_meta[label]["file_name"]
         report["variants"][label]["input_sha256"] = input_meta[label]["sha256"]
         report["variants"][label]["output_file_name"] = post_file_metrics["file_name"]

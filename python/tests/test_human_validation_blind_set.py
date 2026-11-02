@@ -60,10 +60,12 @@ def test_create_blind_listening_set_writes_anonymous_wavs_and_separate_key(tmp_p
     sf.write(str(pa), sig_a.T, sr, subtype="FLOAT")
     sf.write(str(pb), sig_b.T, sr, subtype="FLOAT")
 
-    blind_dir = tmp_path / "blind_out"
+    blind_dir = tmp_path / "blind_delivery"
+    keys_dir = tmp_path / "keys"
     res = create_blind_listening_set(
         variant_files={"original_or_bypass": str(pa), "mastered": str(pb)},
         output_dir=str(blind_dir),
+        key_dir=str(keys_dir),
         seed=2026,
         session_id="test_ab",
         overwrite=False,
@@ -71,6 +73,19 @@ def test_create_blind_listening_set_writes_anonymous_wavs_and_separate_key(tmp_p
 
     assert os.path.isfile(res["listening_sheet_csv"])
     assert os.path.isfile(res["secret_key_json"])
+    # The key file must be strictly outside blind_delivery
+    assert str(keys_dir) in res["secret_key_json"]
+    assert not (blind_dir / "test_ab_blind_key.json").exists()
+
+    # Attempting to save key directly inside delivery directory without allow_co_located_key must raise ValueError
+    with pytest.raises(ValueError, match="co-located inside the listener audio delivery directory"):
+        create_blind_listening_set(
+            variant_files={"original_or_bypass": str(pa), "mastered": str(pb)},
+            output_dir=str(blind_dir),
+            key_output_path=str(blind_dir / "leaked_key.json"),
+            allow_co_located_key=False,
+            overwrite=True,
+        )
 
     # Worksheet CSV must NOT contain ground-truth names ('original_or_bypass' or 'mastered')
     csv_text = Path(res["listening_sheet_csv"]).read_text(encoding="utf-8")

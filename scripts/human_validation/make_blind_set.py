@@ -73,6 +73,8 @@ def create_blind_listening_set(
     seed: int = 2026,
     session_id: str = "session",
     key_output_path: Optional[str] = None,
+    key_dir: Optional[str] = None,
+    allow_co_located_key: bool = False,
     overwrite: bool = False,
 ) -> Dict[str, Any]:
     """Create anonymized WAV files for blind evaluation and save the secret key separately.
@@ -82,8 +84,9 @@ def create_blind_listening_set(
         output_dir: Directory where anonymous WAVs and blank worksheet are written.
         seed: Deterministic RNG seed.
         session_id: Identifier for the blind session.
-        key_output_path: Optional path for the secret key JSON. Defaults to
-                         `<output_dir>/<session_id>_blind_key.json`.
+        key_output_path: Optional explicit path for the secret key JSON.
+        key_dir: Optional dedicated directory for keys. Defaults to `<output_dir>/../keys`.
+        allow_co_located_key: Whether to allow saving the key inside output_dir (default: False).
         overwrite: Allow overwriting existing files.
 
     Returns:
@@ -94,10 +97,33 @@ def create_blind_listening_set(
 
     os.makedirs(output_dir, exist_ok=True)
     if key_output_path is None:
-        key_output_path = os.path.join(output_dir, f"{session_id}_blind_key.json")
+        if key_dir is not None:
+            key_output_path = os.path.join(key_dir, f"{session_id}_blind_key.json")
+        else:
+            parent_dir = os.path.dirname(os.path.abspath(output_dir))
+            key_output_path = os.path.join(parent_dir, "keys", f"{session_id}_blind_key.json")
 
+    abs_out_dir = os.path.abspath(output_dir)
+    abs_key_path = os.path.abspath(key_output_path)
+    abs_key_dir = os.path.dirname(abs_key_path)
+
+    # Check whether the key file is co-located inside the audio delivery output_dir
+    try:
+        rel = os.path.relpath(abs_key_path, abs_out_dir)
+        is_co_located = not rel.startswith("..") and not os.path.isabs(rel)
+    except ValueError:
+        is_co_located = False
+
+    if is_co_located and not allow_co_located_key:
+        raise ValueError(
+            f"Blind key path '{abs_key_path}' is co-located inside the listener audio delivery directory '{abs_out_dir}'. "
+            f"To prevent accidental disclosure to listeners, store keys in a dedicated private directory (e.g. 'keys/'). "
+            f"Pass allow_co_located_key=True only if you explicitly intend to bypass this safeguard."
+        )
+
+    os.makedirs(abs_key_dir, exist_ok=True)
     sheet_csv_path = os.path.join(output_dir, f"{session_id}_listening_sheet.csv")
-    check_overwrite_allowed(key_output_path, overwrite=overwrite)
+    check_overwrite_allowed(abs_key_path, overwrite=overwrite)
     check_overwrite_allowed(sheet_csv_path, overwrite=overwrite)
 
     mapping = generate_blind_mapping(list(variant_files.keys()), seed=seed, prefix="blind_")
@@ -232,7 +258,18 @@ def main() -> None:
         "--key-out",
         type=str,
         default=None,
-        help="Optional separate path for the secret key JSON.",
+        help="Optional explicit separate path for the secret key JSON.",
+    )
+    parser.add_argument(
+        "--key-dir",
+        type=str,
+        default=None,
+        help="Optional dedicated directory where the secret blind key JSON will be stored.",
+    )
+    parser.add_argument(
+        "--allow-co-located-key",
+        action="store_true",
+        help="Allow storing the secret key inside the audio delivery directory.",
     )
     parser.add_argument(
         "--overwrite",
@@ -277,6 +314,8 @@ def main() -> None:
         seed=args.seed,
         session_id=args.session_id,
         key_output_path=args.key_out,
+        key_dir=args.key_dir,
+        allow_co_located_key=args.allow_co_located_key,
         overwrite=args.overwrite,
     )
     # Print only the public summary so the terminal output does not spoil the blind test

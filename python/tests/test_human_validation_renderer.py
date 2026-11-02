@@ -227,6 +227,11 @@ def test_uniform_diagnostic_headroom_trim_and_experiment_a_manifests(tmp_path):
     assert man_a["diagnostic_headroom_trim"] == man_b["diagnostic_headroom_trim"] == man_c["diagnostic_headroom_trim"]
     assert man_b["condition_description"] == "Legacy initialization baseline replayed on frozen current engine"
 
+    # Verify key separation for Sprint 1
+    assert os.path.isdir(res_clamped["blind_delivery_dir"])
+    assert os.path.isfile(os.path.join(res_clamped["secret_keys_dir"], "track_test_sprint1_blind_key.json"))
+    assert not os.path.exists(os.path.join(res_clamped["blind_delivery_dir"], "track_test_sprint1_blind_key.json"))
+
 
 def test_legacy_baseline_reconstruction_from_86ae20f0():
     """Verify the 41-parameter historical vector from commit 86ae20f0 is complete, finite, and identifies the 5 out-of-range params."""
@@ -246,3 +251,90 @@ def test_legacy_baseline_reconstruction_from_86ae20f0():
         "comp_high_ratio",
         "saturator_drive_db",
     ]
+
+    # Check that eq_band6_f0 historical bounds from 86ae20f0 are accurately recorded as [5000.0, 18000.0]
+    band6_row = next(r for r in table if r["legacy_name_at_86ae20f0"] == "eq_band6_f0")
+    assert band6_row["legacy_bounds_86ae20f0"] == [5000.0, 18000.0]
+    assert abs(band6_row["theta_legacy_value"] - 9486.833) < 1e-2
+
+
+def test_sprint2_manifest_and_exports_integration(tmp_path):
+    """Verify Sprint 2 orchestrator creates a valid, readable manifest with all required sections and separate keys."""
+    from scripts.human_validation.render_sprint2 import run_experiment_b_sprint2
+
+    sr = 48000
+    t = np.arange(int(sr * 1.5)) / float(sr)
+    raw_sig = np.vstack([0.25 * np.sin(2 * np.pi * 300 * t), 0.25 * np.cos(2 * np.pi * 300 * t)]).astype(np.float32)
+    ref_sig = np.vstack([0.30 * np.sin(2 * np.pi * 300 * t), 0.30 * np.cos(2 * np.pi * 300 * t)]).astype(np.float32)
+
+    raw_wav = tmp_path / "mix_48k.wav"
+    ref_wav = tmp_path / "ref_48k.wav"
+    sf.write(str(raw_wav), raw_sig.T, sr, subtype="FLOAT")
+    sf.write(str(ref_wav), ref_sig.T, sr, subtype="FLOAT")
+
+    out_dir = tmp_path / "sprint2_out"
+    keys_dir = tmp_path / "private_keys"
+
+    res = run_experiment_b_sprint2(
+        raw_wav_path=str(raw_wav),
+        ref_wav_path=str(ref_wav),
+        output_dir=str(out_dir),
+        prefix="track_integration",
+        mode="same_track",
+        num_chunks=2,
+        chunk_len_sec=0.4,
+        num_steps=1,
+        section_duration_sec=0.4,
+        keys_dir=str(keys_dir),
+        overwrite=False,
+    )
+
+    manifest_path = res["manifest_json"]
+    assert os.path.isfile(manifest_path)
+    assert os.path.abspath(manifest_path) == str(out_dir / "track_integration_manifest.json")
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest_data = json.load(f)
+
+    # 1. Engine provenance
+    assert "engine_provenance" in manifest_data
+    assert manifest_data["engine_provenance"]["engine_reference_code_commit"] == "5940e81f12741e2276f7a446adfb6e12f44574fe"
+    assert manifest_data["engine_provenance"]["engine_reference_doc_commit"] == "92fe105a19312f258fefb2c70a847720cbd95525"
+
+    # 2. Reference mode & track prefix
+    assert manifest_data["reference_mode"] == "same_track"
+    assert manifest_data["track_prefix"] == "track_integration"
+
+    # 3. Optimization config
+    opt_cfg = manifest_data["optimization_config"]
+    assert opt_cfg["single_preset_per_track"] is True
+    assert opt_cfg["num_steps"] == 1
+    assert opt_cfg["num_chunks"] == 2
+
+    # 4. Preset vectors
+    preset = manifest_data["optimized_preset"]
+    assert len(preset["normalized_z_41"]) == 41
+    assert len(preset["physical_theta_41"]) == 41
+    assert len(preset["parameters"]) == 41
+
+    # 5. Full track renders & metrics references
+    renders = manifest_data["full_track_renders"]
+    assert "original_or_bypass" in renders
+    assert "mastered_full" in renders
+    assert os.path.isfile(os.path.join(str(out_dir), renders["original_or_bypass"]["file_name"]))
+    assert os.path.isfile(os.path.join(str(out_dir), renders["mastered_full"]["file_name"]))
+
+    # 6. Separate private keys vs delivery directory
+    assert os.path.isdir(res["secret_keys_dir"])
+    assert os.path.isdir(res["sections_blind_delivery_dir"])
+    assert res["secret_keys_dir"] != res["sections_blind_delivery_dir"]
+
+    # Blind delivery directory must have NO secret key files
+    for root, _, files in os.walk(res["sections_blind_delivery_dir"]):
+        for f_name in files:
+            assert not f_name.endswith("_blind_key.json")
+
+    # Private keys directory must contain the blind key files
+    key_files = os.listdir(res["secret_keys_dir"])
+    assert len(key_files) >= 2
+    assert all(k.endswith(".json") for k in key_files)

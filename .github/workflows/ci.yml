@@ -2,7 +2,7 @@ name: CI - Build & Test Suite
 
 on:
   push:
-    branches: [ master, sprint-2.2-audit-remediation ]
+    branches: [ master, sprint-2.2-audit-remediation, human-validation-package ]
   pull_request:
     branches: [ master ]
 

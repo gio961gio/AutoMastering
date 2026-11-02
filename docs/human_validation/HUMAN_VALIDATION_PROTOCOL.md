@@ -48,7 +48,7 @@ python -m scripts.human_validation.validate_inputs "human_validation/private/inp
 L'analisi della cronologia Git antecedente al Gate A ha identificato il commit iniziale `86ae20f08dc7fbebc7f67af064a15b648a492fc7`, in cui `AutoMasteringOptimizer` inizializzava `u = torch.zeros(1, 41)` producendo `z = [0.5]^41`.
 
 Con i range fisici di `86ae20f08dc7fbebc7f67af064a15b648a492fc7`, il vettore fisico `theta_legacy` a `z = 0.5` valeva:
-- **EQ 6 bande (`0..17`):** tutti i guadagni a `0.0 dB`, `Q = 1.581139` ($\sqrt{0.5 \times 5.0}$), frequenze centrali geometriche `[70.71, 223.61, 894.43, 3000.00, 6928.20, 9486.83] Hz`.
+- **EQ 6 bande (`0..17`):** tutti i guadagni a `0.0 dB`, `Q = 1.581139` ($\sqrt{0.5 \times 5.0}$), frequenze centrali geometriche `[70.71, 223.61, 894.43, 3000.00, 6928.20, 9486.83] Hz` (con bound storici dell'ultima banda pari a `5000–18000 Hz`, la cui media geometrica è esattamente `9486.833 Hz`).
 - **Crossover (`18..19`):** `f_low = 167.3320 Hz`, `f_high = 3000.0 Hz`.
 - **Compressore 3 bande (`20..34`):** `threshold = -20.0 dB`, **`ratio = 4.472136:1`** ($\sqrt{1 \times 20}$), **`attack = 7.071068 ms`** ($\sqrt{0.5 \times 100}$), `release = 100.0 ms`, **`makeup = +3.0 dB`** su tutte le 3 bande.
 - **Stereo Imager (`35..37`):** `width_low = 0.60`, `width_mid = 1.25`, `width_high = 1.25`.
@@ -83,12 +83,14 @@ In conformità alla Sezione 3 della specifica:
 python -m scripts.human_validation.render_sprint1 `
   --input "human_validation/private/input/track01_mix.wav" `
   --out "human_validation/private/sprint1_track01" `
+  --keys-dir "human_validation/private/keys" `
   --track-id track01
 
 # 2. Esportazione completa A / B / C con replay della Legacy Baseline clampata ai bound correnti
 python -m scripts.human_validation.render_sprint1 `
   --input "human_validation/private/input/track01_mix.wav" `
   --out "human_validation/private/sprint1_track01" `
+  --keys-dir "human_validation/private/keys" `
   --track-id track01 `
   --legacy-mode clamped_to_current_bounds `
   --overwrite
@@ -100,6 +102,7 @@ python -m scripts.human_validation.render_sprint1 `
 python -m scripts.human_validation.render_sprint1 \
   --input "human_validation/private/input/track01_mix.wav" \
   --out "human_validation/private/sprint1_track01" \
+  --keys-dir "human_validation/private/keys" \
   --track-id track01 \
   --legacy-mode clamped_to_current_bounds \
   --overwrite
@@ -107,13 +110,15 @@ python -m scripts.human_validation.render_sprint1 \
 
 ### 4.3 File generati da Esperimento A
 
-Nella cartella `human_validation/private/sprint1_track01/` troverai:
-- `track01_source.sha256` e `track01_metadata.json`
-- `finding_legacy_baseline.json` (tabella completa dei 41 parametri storici vs attuali)
-- `exports/track01_A_true_bypass.wav`, `track01_B_legacy_baseline.wav`, `track01_C_corrected_neutral.wav` (con trim diagnostico uniforme a `-6.0 dBTP` e compensazione esatta dei 159 campioni + tail flush)
-- `exports/*_level_matched.wav` e `exports/level_matching_report.json` (copie per l'ascolto pareggiate con solo gain statico e tetto `<= -1.0 dBTP`)
-- `manifests/track01_A_manifest.json`, `track01_B_manifest.json`, `track01_C_manifest.json`
-- `blind/blind_A.wav`, `blind/blind_B.wav`, `blind/blind_C.wav`, la scheda vuota `blind/track01_sprint1_listening_sheet.csv` e la chiave segreta `blind/track01_blind_key.json` (**non aprire prima di aver completato l'ascolto!**).
+- **Nella cartella `human_validation/private/sprint1_track01/`:**
+  - `track01_source.sha256` e `track01_metadata.json`
+  - `finding_legacy_baseline.json` (tabella completa dei 41 parametri storici vs attuali)
+  - `exports/track01_A_true_bypass.wav`, `track01_B_legacy_baseline.wav`, `track01_C_corrected_neutral.wav` (con trim diagnostico uniforme a `-6.0 dBTP` e compensazione esatta dei 159 campioni + tail flush)
+  - `exports/*_level_matched.wav` e `exports/level_matching_report.json` (copie per l'ascolto pareggiate con solo gain statico e tetto `<= -1.0 dBTP`, con correzione automatica iterativa del ceiling)
+  - `manifests/track01_A_manifest.json`, `track01_B_manifest.json`, `track01_C_manifest.json`
+  - **`blind_delivery/` (cartella da consegnare all'ascoltatore):** contiene esclusivamente `blind_A.wav`, `blind_B.wav`, `blind_C.wav` e la scheda vuota `track01_sprint1_listening_sheet.csv`. **Non contiene alcun file di chiave.**
+- **Nella cartella privata `human_validation/private/keys/` (riservata al supervisore):**
+  - `track01_sprint1_blind_key.json` (**non aprire né condividere prima di aver completato l'ascolto!**).
 
 ---
 
@@ -131,6 +136,7 @@ python -m scripts.human_validation.render_sprint2 `
   --mode same_track `
   --prefix track01 `
   --out "human_validation/private/sprint2/track01" `
+  --keys-dir "human_validation/private/keys" `
   --notes "Pop/Voce: voce presente, controllo sibilanti e punch naturale"
 
 # Brano 2 (es. Reference stilistica di un altro brano -> stylistic)
@@ -140,6 +146,7 @@ python -m scripts.human_validation.render_sprint2 `
   --mode stylistic `
   --prefix track02 `
   --out "human_validation/private/sprint2/track02" `
+  --keys-dir "human_validation/private/keys" `
   --notes "Hip-hop/Elettronica: sub-bass compatto, kick incisivo, densità alta"
 
 # Brano 3 (con sezioni d'ascolto manuali opzionali: ruolo:inizio_sec:fine_sec)
@@ -149,6 +156,7 @@ python -m scripts.human_validation.render_sprint2 `
   --mode stylistic `
   --prefix track03 `
   --out "human_validation/private/sprint2/track03" `
+  --keys-dir "human_validation/private/keys" `
   --sections "intro_strofa:12.0:26.0" "ritornello_denso:58.0:72.0" "bridge_transienti:115.0:130.0" `
   --notes "Rock/Acustico: dinamica aperta, immagine stereo naturale"
 ```
@@ -161,19 +169,26 @@ python -m scripts.human_validation.render_sprint2 \
   --ref "human_validation/private/input/track01_ref_master.wav" \
   --mode same_track \
   --prefix track01 \
-  --out "human_validation/private/sprint2/track01"
+  --out "human_validation/private/sprint2/track01" \
+  --keys-dir "human_validation/private/keys"
 ```
 
 ### 5.3 File generati per ciascun brano in Esperimento B
 
-In `human_validation/private/sprint2/trackXX/`:
-- `trackXX_original_or_bypass.wav` e `trackXX_mastered_full.wav` (durata identica al mix originale, latenza di 159 campioni compensata una sola volta, coda preservata integralmente)
-- `trackXX_preset.json` (l'unico preset ottimizzato per l'intero brano)
-- `trackXX_manifest.json` e `trackXX_metrics_pre_post.json`
-- `trackXX_sections.json` (documenta sia i chunk usati dall'ottimizzatore sia le 3 sezioni d'ascolto estratte)
-- `trackXX_sections/section01_original.wav`, `section01_mastered.wav`, ... (`section01`, `section02`, `section03` a livello di programma)
-- `trackXX_sections_level_matched/sectionXX/` (copie pareggiate con solo gain statico e tetto `<= -1.0 dBTP`)
-- `trackXX_sections_blind/sectionXX_program_level/` e `sectionXX_level_matched/` (coppie anonime `blind_A.wav` / `blind_B.wav` + scheda CSV + chiave segreta separata).
+- **In `human_validation/private/sprint2/trackXX/`:**
+  - `trackXX_original_or_bypass.wav` e `trackXX_mastered_full.wav` (durata identica al mix originale, latenza di 159 campioni compensata una sola volta, coda preservata integralmente)
+  - `trackXX_preset.json` (l'unico preset ottimizzato per l'intero brano)
+  - `trackXX_manifest.json` e `trackXX_metrics_pre_post.json`
+  - `trackXX_sections.json` (documenta sia i chunk usati dall'ottimizzatore sia le 3 sezioni d'ascolto estratte)
+  - `trackXX_sections/section01_original.wav`, `section01_mastered.wav`, ... (`section01`, `section02`, `section03` a livello di programma)
+  - `trackXX_sections_level_matched/sectionXX/` (copie pareggiate con solo gain statico e tetto `<= -1.0 dBTP`)
+  - **`trackXX_sections_blind_delivery/` (cartella da consegnare all'ascoltatore):** contiene le sottocartelle `sectionXX_program_level/` e `sectionXX_level_matched/` con i file `blind_A.wav`, `blind_B.wav` e la scheda CSV. **Non contiene alcuna chiave segreta.**
+- **Nella cartella privata `human_validation/private/keys/` (riservata al supervisore):**
+  - `trackXX_section01_program_blind_key.json`
+  - `trackXX_section01_level_matched_blind_key.json`
+  - `trackXX_section02_...`
+  - `trackXX_section03_...`
+  (Ciascun file memorizza il seed deterministico univoco impiegato per quella specifica sessione).
 
 ---
 

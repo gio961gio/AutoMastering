@@ -135,3 +135,39 @@ def test_create_level_matched_wavs_preserves_originals_and_prevents_overwrite(tm
             ceiling_dbtp=-1.0,
             overwrite=False,
         )
+
+
+def test_level_matching_iterative_refinement_and_error_handling(monkeypatch):
+    """Verify iterative refinement recalculates all copies and raises RuntimeError if ceiling is impossible."""
+    sr = 48000
+    t = np.arange(int(sr * 1.5)) / float(sr)
+    sig_1 = np.vstack([0.30 * np.sin(2 * np.pi * 440 * t), 0.30 * np.sin(2 * np.pi * 440 * t)]).astype(np.float64)
+    sig_2 = np.vstack([0.15 * np.cos(2 * np.pi * 880 * t), 0.15 * np.cos(2 * np.pi * 880 * t)]).astype(np.float64)
+
+    # 1. Normal run: ceiling is respected and LUFS spread is < 1e-3
+    matched, report = compute_group_level_matching_gains(
+        {"s1": sig_1, "s2": sig_2},
+        sample_rate=48000.0,
+        ceiling_dbtp=-1.0,
+    )
+    assert report["post_loudness_spread_lu"] < 1e-3
+    for v in report["variants"].values():
+        assert v["post_true_peak_dbtp"] <= -1.0 + 1e-3
+
+    # 2. Impossible ceiling: monkeypatch measure_audio_signal to simulate persistent overshoot
+    from scripts.human_validation import make_level_matched
+    real_measure = make_level_matched.measure_audio_signal
+
+    def mock_overshoot_measure(audio, sample_rate=48000.0, file_path=None):
+        res = real_measure(audio, sample_rate=sample_rate, file_path=file_path)
+        res["true_peak_dbtp"] = 0.5  # always exceeds -1.0 dBTP
+        return res
+
+    monkeypatch.setattr(make_level_matched, "measure_audio_signal", mock_overshoot_measure)
+
+    with pytest.raises(RuntimeError, match="failed to satisfy True Peak ceiling"):
+        compute_group_level_matching_gains(
+            {"s1": sig_1, "s2": sig_2},
+            sample_rate=48000.0,
+            ceiling_dbtp=-1.0,
+        )

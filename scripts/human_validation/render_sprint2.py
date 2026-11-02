@@ -223,6 +223,7 @@ def run_experiment_b_sprint2(
     section_duration_sec: float = 12.0,
     explicit_sections: Optional[List[Tuple[str, float, float]]] = None,
     desired_sound_notes: str = "",
+    keys_dir: Optional[str] = None,
     overwrite: bool = False,
 ) -> Dict[str, Any]:
     """Execute Experiment B (Sprint 2) for a single track and produce all required exports and sections."""
@@ -240,6 +241,8 @@ def run_experiment_b_sprint2(
 
     ref_mode = ReferenceMode(mode)
     os.makedirs(output_dir, exist_ok=True)
+    actual_keys_dir = keys_dir if keys_dir is not None else os.path.join(output_dir, "keys")
+    os.makedirs(actual_keys_dir, exist_ok=True)
 
     # Check output paths before running optimization
     orig_wav_path = os.path.join(output_dir, f"{prefix}_original_or_bypass.wav")
@@ -384,7 +387,7 @@ def run_experiment_b_sprint2(
     # 7. Extract >= 3 listening sections (without artificial fades)
     sections_dir = os.path.join(output_dir, f"{prefix}_sections")
     sections_lm_dir = os.path.join(output_dir, f"{prefix}_sections_level_matched")
-    sections_blind_dir = os.path.join(output_dir, f"{prefix}_sections_blind")
+    sections_blind_dir = os.path.join(output_dir, f"{prefix}_sections_blind_delivery")
     os.makedirs(sections_dir, exist_ok=True)
     os.makedirs(sections_lm_dir, exist_ok=True)
     os.makedirs(sections_blind_dir, exist_ok=True)
@@ -431,6 +434,9 @@ def run_experiment_b_sprint2(
         )
 
         # Blind set for this section (both program-level and level-matched)
+        # Secret keys are saved strictly in actual_keys_dir, separate from delivery audio
+        prog_seed = int(seed + (idx + 1) * 1009)
+        prog_key_file = os.path.join(actual_keys_dir, f"{prefix}_{sec_id}_program_blind_key.json")
         sec_blind_prog_dir = os.path.join(sections_blind_dir, f"{sec_id}_program_level")
         blind_prog = create_blind_listening_set(
             variant_files={
@@ -438,11 +444,14 @@ def run_experiment_b_sprint2(
                 "mastered": mast_sec_path,
             },
             output_dir=sec_blind_prog_dir,
-            seed=seed + (idx + 1) * 101,
+            seed=prog_seed,
             session_id=f"{prefix}_{sec_id}_program",
+            key_output_path=prog_key_file,
             overwrite=overwrite,
         )
 
+        lm_seed = int(seed + (idx + 1) * 2017)
+        lm_key_file = os.path.join(actual_keys_dir, f"{prefix}_{sec_id}_level_matched_blind_key.json")
         sec_blind_lm_dir = os.path.join(sections_blind_dir, f"{sec_id}_level_matched")
         blind_lm = create_blind_listening_set(
             variant_files={
@@ -450,8 +459,9 @@ def run_experiment_b_sprint2(
                 "mastered_lm": lm_report["variants"][f"{sec_id}_mastered"]["output_path"],
             },
             output_dir=sec_blind_lm_dir,
-            seed=seed + (idx + 1) * 202,
+            seed=lm_seed,
             session_id=f"{prefix}_{sec_id}_level_matched",
+            key_output_path=lm_key_file,
             overwrite=overwrite,
         )
 
@@ -468,6 +478,10 @@ def run_experiment_b_sprint2(
         }
         sec_entry["blind_level_matched"] = {
             k: v for k, v in blind_lm.items() if k != "_internal_key"
+        }
+        sec_entry["secret_keys"] = {
+            "program_level_key": os.path.abspath(prog_key_file),
+            "level_matched_key": os.path.abspath(lm_key_file),
         }
         section_artifacts.append(sec_entry)
 
@@ -531,8 +545,8 @@ def run_experiment_b_sprint2(
             "num_steps": int(num_steps),
             "learning_rate": float(lr),
             "use_hybrid_eq": True,
-            "initial_loss": float(history["total"][0]) if history["total"] else None,
-            "final_loss": float(history["total"][-1]) if history["total"] else None,
+            "initial_loss": float(history["loss"][0]) if ("loss" in history and history["loss"]) else None,
+            "final_loss": float(history["loss"][-1]) if ("loss" in history and history["loss"]) else None,
         },
         "optimized_preset": {
             "preset_json_file": os.path.basename(preset_json_path),
@@ -554,6 +568,8 @@ def run_experiment_b_sprint2(
         },
         "sections_file": os.path.basename(sections_json_path),
         "metrics_pre_post_file": os.path.basename(metrics_json_path),
+        "secret_keys_dir": os.path.abspath(actual_keys_dir),
+        "sections_blind_delivery_dir": os.path.abspath(sections_blind_dir),
         "warnings": warnings_list,
     }
     with open(manifest_json_path, "w", encoding="utf-8") as f:
@@ -568,6 +584,8 @@ def run_experiment_b_sprint2(
         "manifest_json": os.path.abspath(manifest_json_path),
         "metrics_pre_post_json": os.path.abspath(metrics_json_path),
         "sections_json": os.path.abspath(sections_json_path),
+        "secret_keys_dir": os.path.abspath(actual_keys_dir),
+        "sections_blind_delivery_dir": os.path.abspath(sections_blind_dir),
         "num_listening_sections": len(section_artifacts),
     }
 
@@ -587,6 +605,12 @@ def main() -> None:
     )
     parser.add_argument("--prefix", type=str, default="track01", help="Track identifier prefix (e.g. track01).")
     parser.add_argument("--out", type=str, required=True, help="Output directory for Experiment B artifacts.")
+    parser.add_argument(
+        "--keys-dir",
+        type=str,
+        default=None,
+        help="Dedicated private directory for secret blind keys (default: <out>/keys).",
+    )
     parser.add_argument("--chunks", type=int, default=4, help="Number of optimization chunks (default: 4).")
     parser.add_argument("--chunk-len", type=float, default=3.0, help="Optimization chunk length in seconds (default: 3.0).")
     parser.add_argument("--steps", type=int, default=30, help="Optimization steps (default: 30).")
@@ -628,6 +652,7 @@ def main() -> None:
         section_duration_sec=args.section_len,
         explicit_sections=explicit_secs,
         desired_sound_notes=args.notes,
+        keys_dir=args.keys_dir,
         overwrite=args.overwrite,
     )
     print(json.dumps(res, indent=2))
