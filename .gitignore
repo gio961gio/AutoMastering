@@ -54,6 +54,7 @@ ENV/
 scratch/*.wav
 scratch/chat_archive/
 scratch/output_mastering/*.wav
+human_validation/private/
 
 # IDE & OS
 .vscode/

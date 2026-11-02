@@ -1,0 +1,7 @@
+track_id,session_date,listener,monitoring_system,monitoring_level_note,legacy_mode,same_input_confirmed,alignment_confirmed,listening_condition,anonymous_label,tonal_balance_1_5,bass_control_1_5,vocal_clarity_1_5,transient_punch_1_5,stereo_image_1_5,dynamic_naturalness_1_5,distortion_artifacts_1_5,overall_preference_1_5,difference_audibility,preference_strength_1_5,confidence_1_5,clicks_dropouts_pumping_notes,free_notes,unblinded_ground_truth
+track01,,,,,,"","","loudness_matched",blind_A,,,,,,,,,,,,,,,
+track01,,,,,,"","","loudness_matched",blind_B,,,,,,,,,,,,,,,
+track01,,,,,,"","","loudness_matched",blind_C,,,,,,,,,,,,,,,
+track01,,,,,,"","","program_level",A_true_bypass,,,,,,,,,,,,,,,A_true_bypass
+track01,,,,,,"","","program_level",B_legacy_baseline,,,,,,,,,,,,,,,B_legacy_baseline
+track01,,,,,,"","","program_level",C_corrected_neutral,,,,,,,,,,,,,,,C_corrected_neutral
