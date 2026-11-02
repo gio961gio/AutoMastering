@@ -106,15 +106,22 @@ class MasteringBenchmarkSuite:
         window = torch.hann_window(n_fft, device=pred.device)
 
         def _get_mel_shape(sig: torch.Tensor) -> torch.Tensor:
-            mono = torch.mean(sig, dim=-2) if sig.shape[-2] == 2 else sig.squeeze(-2)
+            if sig.ndim == 2:
+                sig = sig.unsqueeze(0)  # [1, C, T]
+            B, C, T = sig.shape
+            sig_flat = sig.reshape(B * C, T)
             stft_res = torch.stft(
-                mono,
+                sig_flat,
                 n_fft=n_fft,
                 hop_length=hop_length,
                 window=window,
                 return_complex=True,
             )
-            mag_sq = torch.abs(stft_res) ** 2
+            mag_sq_all = (torch.abs(stft_res) ** 2).reshape(B, C, -1, stft_res.shape[-1])
+            if C == 2:
+                mag_sq = 0.5 * (mag_sq_all[:, 0, :, :] + mag_sq_all[:, 1, :, :])
+            else:
+                mag_sq = mag_sq_all[:, 0, :, :]
             mel_e = torch.matmul(mag_sq.transpose(-1, -2), fb)
             avg_mel = torch.mean(mel_e, dim=-2)
             log_mel = torch.log(avg_mel + 1e-7)

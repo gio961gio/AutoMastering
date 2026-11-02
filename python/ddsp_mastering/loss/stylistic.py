@@ -65,19 +65,28 @@ class AggregatePerceptualLoss(nn.Module):
         self.loudness_loss = DifferentiableLoudnessLoss(sample_rate=sample_rate)
 
     def _extract_mel_spectrum_distribution(self, audio: torch.Tensor) -> torch.Tensor:
-        """Compute long-term average log-Mel energy distribution [B, n_mels]."""
-        # audio: [B, 2, T] -> mono: [B, T]
-        mono = torch.mean(audio, dim=1)
-        B, T = mono.shape
+        """Compute long-term average log-Mel energy distribution [B, n_mels] via incoherent stereo power."""
+        # audio: [B, C, T] where C=2 (stereo) or C=1 (mono)
+        if audio.ndim == 2:
+            audio = audio.unsqueeze(1)
+        B, C, T = audio.shape
 
+        # Flatten B and C for batched STFT
+        audio_flat = audio.reshape(B * C, T)
         stft_res = torch.stft(
-            mono,
+            audio_flat,
             n_fft=self.n_fft,
             hop_length=self.hop_length,
             window=self.stft_window,
             return_complex=True,
         )
-        mag_sq = torch.abs(stft_res) ** 2  # [B, n_freqs, num_frames]
+        # Power spectrum for each channel: [B, C, n_freqs, num_frames]
+        mag_sq_all = (torch.abs(stft_res) ** 2).reshape(B, C, -1, stft_res.shape[-1])
+        # Incoherent stereo power: 0.5 * (|STFT_L|^2 + |STFT_R|^2)
+        if C == 2:
+            mag_sq = 0.5 * (mag_sq_all[:, 0, :, :] + mag_sq_all[:, 1, :, :])
+        else:
+            mag_sq = mag_sq_all[:, 0, :, :]
 
         # Project onto Mel scale: [B, num_frames, n_freqs] @ [n_freqs, n_mels] -> [B, num_frames, n_mels]
         mel_energy = torch.matmul(mag_sq.transpose(-1, -2), self.mel_fbanks)  # [B, num_frames, n_mels]

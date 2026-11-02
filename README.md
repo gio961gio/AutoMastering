@@ -42,7 +42,12 @@ Every physical parameter is mapped through smooth monotonic transfer functions (
 3. **3-Band Dynamics Compressor (15 params)**: Low, Mid, High bands $\times$ (Threshold $[-40, 0]\text{ dB}$, Ratio $[1:1, 20:1]$, Attack $[0.5, 100]\text{ ms}$, Release $[10, 1000]\text{ ms}$, Makeup Gain $[-6, +12]\text{ dB}$).
 4. **Mid/Side Blumlein Imager (3 params)**: Low band width $[0.0, 1.2]$ (mono bass centering), Mid band width $[0.5, 2.0]$, High band width $[0.5, 2.0]$.
 5. **Polyphase 2x Oversampled Saturator (2 params)**: Drive $[0, 18]\text{ dB}$, Wet/Dry Mix $[0.0, 1.0]$.
-6. **Lookahead True-Peak Brickwall Limiter (1 param)**: Push gain $[0, 12]\text{ dB}$, fixed $-0.30\text{ dBFS}$ inter-sample ceiling.
+6. **Lookahead Sample-Peak Brickwall Limiter (1 param)**: Push gain $[0, 12]\text{ dB}$, $-0.30\text{ dBFS}$ ceiling.
+
+### 🎚️ Sample Rate Contract & Core Latency Specification
+- **Reference Sampling Rate**: **48 kHz** is the primary reference and the only sample rate validated end-to-end at baseline.
+- **Deterministic Latency**: The chain latency is fixed at **159 samples** (15 samples FIR Half-Band $+ 144$ samples Limiter Lookahead). At 48 kHz, this equals **3.31 ms** ($159 / 48000$). At different sample rates, latency remains 159 samples ($159 / f_s$), and operation is characterized but not formally validated.
+- **Limiter Topology**: The core limiter operates as a **Sample-Peak Lookahead Brickwall Limiter** with smooth boxcar attack and single-pole release. True Peak oversampling ($4\times$) is measured in the objective benchmark suite per ITU-R BS.1770-5 Annex 2.
 
 ---
 

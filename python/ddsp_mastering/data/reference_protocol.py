@@ -126,9 +126,34 @@ def estimate_time_alignment(
     peak_idx = int(np.argmax(search_corr))
     best_lag = int(search_lags[peak_idx])
 
-    # Normalized Pearson-like correlation coefficient at peak
-    peak_val = search_corr[peak_idx]
-    norm_corr = float(peak_val / (norm_mix * norm_ref))
+    # F-07: Normalized Pearson correlation computed specifically on the overlapping support
+    # Positive lag: ref is delayed relative to mix -> ref[best_lag:] corresponds to mix[:T - best_lag]
+    # Negative lag: ref is advanced relative to mix -> mix[-best_lag:] corresponds to ref[:T + best_lag]
+    T_ref = len(ref_mono)
+    T_mix = len(mix_mono)
+    if best_lag >= 0:
+        ref_overlap = ref_mono[best_lag : min(T_ref, T_mix + best_lag)]
+        mix_overlap = mix_mono[0 : len(ref_overlap)]
+    else:
+        D = -best_lag
+        mix_overlap = mix_mono[D : min(T_mix, T_ref + D)]
+        ref_overlap = ref_mono[0 : len(mix_overlap)]
+
+    overlap_len = len(ref_overlap)
+    min_overlap = int(0.1 * sample_rate)  # At least 100ms overlap
+
+    if overlap_len >= min_overlap:
+        ref_ov_zero = ref_overlap - np.mean(ref_overlap)
+        mix_ov_zero = mix_overlap - np.mean(mix_overlap)
+        norm_r = np.linalg.norm(ref_ov_zero)
+        norm_m = np.linalg.norm(mix_ov_zero)
+        if norm_r > 1e-6 and norm_m > 1e-6:
+            norm_corr = float(np.dot(ref_ov_zero, mix_ov_zero) / (norm_r * norm_m))
+        else:
+            norm_corr = 0.0
+    else:
+        norm_corr = 0.0
+
     norm_corr = max(-1.0, min(1.0, norm_corr))
 
     # Sub-sample parabolic interpolation around peak

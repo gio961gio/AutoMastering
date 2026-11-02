@@ -15,13 +15,20 @@ MasteringPluginAudioProcessorEditor::MasteringPluginAudioProcessorEditor(Masteri
     subtitleLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(subtitleLabel);
 
-    latencyLabel.setText("Reported Host Latency: 159 samples (3.31 ms @ 48 kHz)", juce::dontSendNotification);
+    double sr = audioProcessor.getSampleRate();
+    if (sr > 0.0) {
+        double ms = (159.0 / sr) * 1000.0;
+        juce::String text = "Reported Host Latency: 159 samples (" + juce::String(ms, 2) + " ms @ " + juce::String(sr / 1000.0, 1) + " kHz)";
+        latencyLabel.setText(text, juce::dontSendNotification);
+    } else {
+        latencyLabel.setText("Reported Host Latency: 159 samples (3.31 ms @ 48 kHz reference)", juce::dontSendNotification);
+    }
     latencyLabel.setFont(juce::FontOptions(12.0f));
     latencyLabel.setColour(juce::Label::textColourId, juce::Colour(0xff4caf50));
     latencyLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(latencyLabel);
 
-    chainInfoLabel.setText("Active Stages: 6-Band EQ | LR4 Crossover | 3-Band Comp | M/S Imager | Saturator 2x | True-Peak Limiter (-0.3 dBFS)", juce::dontSendNotification);
+    chainInfoLabel.setText("Active Stages: 6-Band EQ | LR4 Crossover | 3-Band Comp | M/S Imager | Saturator 2x | Sample-Peak Lookahead Limiter (-0.3 dBFS)", juce::dontSendNotification);
     chainInfoLabel.setFont(juce::FontOptions(11.0f));
     chainInfoLabel.setColour(juce::Label::textColourId, juce::Colour(0xff90caf9));
     chainInfoLabel.setJustificationType(juce::Justification::centred);

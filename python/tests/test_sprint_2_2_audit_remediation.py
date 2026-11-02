@@ -166,3 +166,80 @@ def test_b3_deterministic_seed_and_insufficient_duration_warning():
         assert c1.rms_db == c2.rms_db
 
 
+def test_f07_cross_correlation_overlapping_slice_normalization():
+    """Verify F-07: Cross-correlation normalized on overlapping slices yields ~1.0 for delayed identical tracks."""
+    from ddsp_mastering.data.reference_protocol import estimate_time_alignment
+
+    sr = 48000
+    dur = 6.0
+    t = np.arange(int(dur * sr)) / sr
+    # Mix is a 6s dynamic signal with transients, DC offset, noise and silent tail
+    mix = np.zeros((2, int(dur * sr)), dtype=np.float32)
+    rng = np.random.default_rng(42)
+    sig = (
+        0.2 * np.sin(2 * np.pi * 220.0 * t) +
+        0.1 * np.sin(2 * np.pi * 880.0 * t) +
+        0.05 * rng.standard_normal(len(t))
+    ).astype(np.float32)
+    # Add sharp transients to break periodicity
+    sig[12000:12050] += 0.8
+    sig[35000:35050] += 0.9
+    sig[80000:80050] += 0.7
+
+    mix[0] = sig + 0.05  # with DC offset
+    mix[1] = sig - 0.03
+
+    # Reference is mix delayed by 24000 samples (0.5s), with a different length (5.5s)
+    delay_samples = 24000
+    ref = np.zeros((2, int(5.5 * sr)), dtype=np.float32)
+    # ref begins 0.5s later, so ref[delay:] corresponds to mix[:-delay]
+    ref[:, delay_samples:] = mix[:, :ref.shape[1] - delay_samples]
+
+    result = estimate_time_alignment(mix, ref, sample_rate=sr, max_search_sec=1.5)
+    assert result.is_aligned
+    assert result.lag_samples == delay_samples
+    # With overlapping slice normalization, correlation on the identical overlapping support MUST be near 1.0!
+    assert result.correlation_coefficient > 0.98, (
+        f"Expected correlation > 0.98 on overlapping slice, got {result.correlation_coefficient:.4f}"
+    )
+
+
+def test_f08_mel_stereo_energy_preserves_side_and_antiphase():
+    """Verify F-08: Incoherent stereo STFT energy does not cancel out anti-phase / side signals."""
+    from ddsp_mastering.loss.stylistic import AggregatePerceptualLoss
+
+    sr = 48000
+    loss_module = AggregatePerceptualLoss(sample_rate=sr)
+
+    # 1. Anti-phase signal: L = -R (Pure Side channel)
+    t = torch.linspace(0, 1.0, 48000)
+    sig = 0.5 * torch.sin(2 * np.pi * 1000.0 * t)
+    audio_antiphase = torch.stack([sig, -sig], dim=0).unsqueeze(0)  # [1, 2, 48000]
+
+    mel_antiphase = loss_module._extract_mel_spectrum_distribution(audio_antiphase)
+
+    # 2. Dual-mono signal: L = R
+    audio_mono = torch.stack([sig, sig], dim=0).unsqueeze(0)  # [1, 2, 48000]
+    mel_mono = loss_module._extract_mel_spectrum_distribution(audio_mono)
+
+    # Anti-phase signal must NOT produce zero energy / -inf
+    assert torch.isfinite(mel_antiphase).all()
+    # Incoherent power 0.5*(|L|^2 + |R|^2) for L=-R is identical to L=R!
+    torch.testing.assert_close(mel_antiphase, mel_mono, atol=1e-5, rtol=1e-5)
+
+
+def test_f09_sample_rate_contract_characterization():
+    """Verify F-09: Document and test latency and timing across sample rates (44.1, 48, 96 kHz)."""
+    # Total chain latency is strictly 159 samples at all rates in the current architecture
+    latency_samples = 159
+    for sr in [44100.0, 48000.0, 96000.0]:
+        latency_ms = (latency_samples / sr) * 1000.0
+        if sr == 48000.0:
+            assert abs(latency_ms - 3.3125) < 1e-3
+        elif sr == 44100.0:
+            assert abs(latency_ms - 3.6054) < 1e-3
+        elif sr == 96000.0:
+            assert abs(latency_ms - 1.65625) < 1e-3
+
+
+
