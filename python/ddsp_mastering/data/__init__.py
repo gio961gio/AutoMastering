@@ -8,6 +8,7 @@ from .reference_protocol import (
     verify_audio_pair,
     estimate_time_alignment,
     apply_same_track_alignment,
+    apply_fractional_delay,
     assert_stylistic_guards,
 )
 from .chunking import (
@@ -23,6 +24,7 @@ __all__ = [
     "verify_audio_pair",
     "estimate_time_alignment",
     "apply_same_track_alignment",
+    "apply_fractional_delay",
     "assert_stylistic_guards",
     "ChunkSpec",
     "MultiChunkSelector",

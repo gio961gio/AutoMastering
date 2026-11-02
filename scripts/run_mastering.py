@@ -9,6 +9,14 @@ Implements:
 
 import sys
 import os
+
+# Ensure root and python directories are in sys.path for py_core_dsp and ddsp_mastering
+_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_python_dir = os.path.join(_repo_root, "python")
+for _p in [_repo_root, _python_dir]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 import json
 import argparse
 from typing import Optional
@@ -180,23 +188,59 @@ def run_mastering_session(
 
     # 6. Quantitative Pre/Post Evaluation
     suite = MasteringBenchmarkSuite(sample_rate=48000.0)
-    raw_tensor = torch.tensor(raw_full).unsqueeze(0)
-    mastered_tensor = torch.tensor(mastered_full_np).unsqueeze(0)
 
-    # For same_track, compare full tracks; for stylistic, compare perceptual stats
-    min_eval_len = min(raw_full.shape[1], ref_full.shape[1])
-    ref_eval_tensor = torch.tensor(ref_full[:, :min_eval_len]).unsqueeze(0)
-    raw_eval_tensor = torch.tensor(raw_full[:, :min_eval_len]).unsqueeze(0)
-    mastered_eval_tensor = torch.tensor(mastered_full_np[:, :min_eval_len]).unsqueeze(0)
+    if ref_mode == ReferenceMode.SAME_TRACK:
+        # Same-track: evaluated on time-aligned signals with common support
+        min_eval_len = min(raw_aligned.shape[1], ref_aligned.shape[1])
+        ref_eval_tensor = torch.tensor(ref_aligned[:, :min_eval_len]).unsqueeze(0)
+        raw_eval_tensor = torch.tensor(raw_aligned[:, :min_eval_len]).unsqueeze(0)
+        mastered_eval_tensor = torch.tensor(mastered_full_np[:, :min_eval_len]).unsqueeze(0)
 
-    pre_metrics = suite.evaluate(raw_eval_tensor, ref_eval_tensor, align_latency=(ref_mode == ReferenceMode.SAME_TRACK))
-    post_metrics = suite.evaluate(mastered_eval_tensor, ref_eval_tensor, align_latency=(ref_mode == ReferenceMode.SAME_TRACK))
+        pre_metrics = suite.evaluate(
+            raw_eval_tensor,
+            ref_eval_tensor,
+            align_latency=True,
+            reference_mode="same_track",
+        )
+        post_metrics = suite.evaluate(
+            mastered_eval_tensor,
+            ref_eval_tensor,
+            align_latency=True,
+            reference_mode="same_track",
+        )
+    elif ref_mode == ReferenceMode.STYLISTIC:
+        # Stylistic mode: do NOT force identical duration; evaluate aggregate distribution descriptors
+        ref_eval_tensor = torch.tensor(ref_full).unsqueeze(0)
+        raw_eval_tensor = torch.tensor(raw_full).unsqueeze(0)
+        mastered_eval_tensor = torch.tensor(mastered_full_np).unsqueeze(0)
 
-    print(f"\n[BENCHMARK EVALUATION]", flush=True)
+        pre_metrics = suite.evaluate(
+            raw_eval_tensor,
+            ref_eval_tensor,
+            align_latency=False,
+            reference_mode="stylistic",
+        )
+        post_metrics = suite.evaluate(
+            mastered_eval_tensor,
+            ref_eval_tensor,
+            align_latency=False,
+            reference_mode="stylistic",
+        )
+    else:
+        raise ValueError(f"Unrecognized reference mode: {ref_mode}")
+
+    print(f"\n[BENCHMARK EVALUATION — {ref_mode.value.upper()} MODE]", flush=True)
     print(f"  - Pre  Mastering Loudness: {pre_metrics['pred_lufs']:.2f} LUFS (Reference: {pre_metrics['target_lufs']:.2f} LUFS)", flush=True)
-    print(f"  - Post Mastering Loudness: {post_metrics['pred_lufs']:.2f} LUFS", flush=True)
-    print(f"  - Post Dynamic Range (PLR): {post_metrics['delta_plr_db']:.2f} dB", flush=True)
+    print(f"  - Post Mastering Loudness: {post_metrics['pred_lufs']:.2f} LUFS (Delta: {post_metrics['delta_lufs']:.2f} LU)", flush=True)
+    print(f"  - Post Dynamic Range (PLR): {post_metrics['pred_plr_db']:.2f} dB (Reference: {post_metrics['target_plr_db']:.2f} dB, Delta: {post_metrics['delta_plr_db']:.2f} dB)", flush=True)
     print(f"  - Peak Output: {post_metrics['pred_peak_dbfs']:.2f} dBFS (Ceiling violation: {post_metrics['ceiling_violation_db']:.2f} dB)", flush=True)
+
+    if ref_mode == ReferenceMode.SAME_TRACK:
+        print(f"  - Spectral Convergence: {post_metrics['spectral_convergence']:.4f}", flush=True)
+        print(f"  - Log-Spectral Distance: {post_metrics['log_spectral_distance_db']:.2f} dB", flush=True)
+    else:
+        print(f"  - Aggregate Spectral Distance: {post_metrics['aggregate_spectral_distance']:.4f}", flush=True)
+        print(f"  - (Frame-by-frame STFT / LSD strictly omitted for stylistic reference)", flush=True)
 
     # 7. Export Outputs & Manifest
     os.makedirs(out_dir, exist_ok=True)

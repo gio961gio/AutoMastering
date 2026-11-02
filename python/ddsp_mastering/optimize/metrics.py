@@ -11,9 +11,10 @@ Computes psychoacoustic and engineering metrics:
 """
 
 import math
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 import torch
 import torch.nn.functional as F
+import torchaudio.functional as taf
 
 from ddsp_mastering.loss.loudness import DifferentiableLoudnessLoss
 from ddsp_mastering.loss.stft import MultiResolutionSTFTLoss
@@ -81,6 +82,48 @@ class MasteringBenchmarkSuite:
         ratio_db = 10.0 * math.log10((e_mid + eps) / (e_side + eps))
         return ratio_db
 
+    @staticmethod
+    def calculate_aggregate_spectral_distance(
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        sample_rate: float = 48000.0,
+        n_mels: int = 40,
+        n_fft: int = 2048,
+        hop_length: int = 512,
+    ) -> float:
+        """Compute L1 distance between normalized long-term log-Mel spectral distributions.
+
+        Used for stylistic evaluation where timelines and musical arrangements differ.
+        """
+        n_freqs = n_fft // 2 + 1
+        fb = taf.melscale_fbanks(
+            n_freqs=n_freqs,
+            f_min=20.0,
+            f_max=min(20000.0, sample_rate * 0.499),
+            n_mels=n_mels,
+            sample_rate=int(sample_rate),
+        ).to(pred.device)
+        window = torch.hann_window(n_fft, device=pred.device)
+
+        def _get_mel_shape(sig: torch.Tensor) -> torch.Tensor:
+            mono = torch.mean(sig, dim=-2) if sig.shape[-2] == 2 else sig.squeeze(-2)
+            stft_res = torch.stft(
+                mono,
+                n_fft=n_fft,
+                hop_length=hop_length,
+                window=window,
+                return_complex=True,
+            )
+            mag_sq = torch.abs(stft_res) ** 2
+            mel_e = torch.matmul(mag_sq.transpose(-1, -2), fb)
+            avg_mel = torch.mean(mel_e, dim=-2)
+            log_mel = torch.log(avg_mel + 1e-7)
+            return log_mel - torch.mean(log_mel, dim=-1, keepdim=True)
+
+        shape_p = _get_mel_shape(pred)
+        shape_t = _get_mel_shape(target)
+        return torch.mean(torch.abs(shape_p - shape_t)).item()
+
     def evaluate(
         self,
         pred_audio: torch.Tensor,
@@ -88,60 +131,56 @@ class MasteringBenchmarkSuite:
         z_pred: Optional[torch.Tensor] = None,
         z_target: Optional[torch.Tensor] = None,
         align_latency: bool = True,
-    ) -> Dict[str, float]:
-        """Compute full benchmark metric dictionary.
+        reference_mode: str = "same_track",
+    ) -> Dict[str, Union[float, str, List[str], None]]:
+        """Compute objective benchmark metric dictionary.
 
         Args:
-            pred_audio: Audio tensor (1, 2, T) or (2, T).
-            target_audio: Audio tensor (1, 2, T) or (2, T).
+            pred_audio: Audio tensor (1, 2, T_pred) or (2, T_pred).
+            target_audio: Audio tensor (1, 2, T_target) or (2, T_target).
             z_pred: Normalized parameter vector (41,) or (1, 41).
             z_target: Target parameter vector (41,) or (1, 41).
-            align_latency: Whether to slice off chain latency for spectral comparisons.
+            align_latency: Whether to slice off chain latency for same_track spectral comparisons.
+            reference_mode: "same_track" | "stylistic". Unrecognized modes raise ValueError.
 
         Returns:
-            Dictionary containing all objective benchmark metrics.
+            Dictionary containing applicable benchmark metrics. For 'stylistic', frame-by-frame
+            MR-STFT and Log-Spectral Distance are strictly omitted (set to None) and replaced
+            with aggregate spectral envelope distance.
         """
+        valid_modes = {"same_track", "stylistic"}
+        if reference_mode not in valid_modes:
+            raise ValueError(
+                f"Unrecognized reference_mode: '{reference_mode}'. "
+                f"Must be one of {sorted(list(valid_modes))}."
+            )
+
         if pred_audio.dim() == 2:
             pred_audio = pred_audio.unsqueeze(0)
         if target_audio.dim() == 2:
             target_audio = target_audio.unsqueeze(0)
 
-        # 1. Aligned audio for spectral metrics
-        if align_latency:
-            p_al, t_al = self.align_latency(pred_audio, target_audio)
-        else:
-            p_al, t_al = pred_audio, target_audio
-
-        # Spectral Metrics
-        _, stft_metrics = self.stft_loss(p_al, t_al)
-        sc = stft_metrics["stft_sc_lr"]
-        lsd = self.calculate_log_spectral_distance(p_al, t_al)
-
-        # Loudness Metrics
+        # Common Aggregate Descriptors (valid across tracks of differing lengths)
         pred_lufs = self.loudness_calc.calculate_lufs(pred_audio).item()
         target_lufs = self.loudness_calc.calculate_lufs(target_audio).item()
         delta_lufs = abs(pred_lufs - target_lufs)
 
-        # Peak & Ceiling Compliance
         pred_peak_linear = torch.max(torch.abs(pred_audio)).item()
         pred_peak_dbfs = 20.0 * math.log10(pred_peak_linear + 1e-12)
         ceiling_violation_db = max(0.0, pred_peak_dbfs - (-0.3000))
 
-        # Dynamic Range / PLR (Peak to Loudness Ratio)
         pred_plr = pred_peak_dbfs - pred_lufs
         target_peak_linear = torch.max(torch.abs(target_audio)).item()
         target_peak_dbfs = 20.0 * math.log10(target_peak_linear + 1e-12)
         target_plr = target_peak_dbfs - target_lufs
         delta_plr = abs(pred_plr - target_plr)
 
-        # Stereo Imaging: Mid-to-Side Energy Ratio
         pred_ms_ratio = self.calculate_mid_side_energy_ratio(pred_audio)
         target_ms_ratio = self.calculate_mid_side_energy_ratio(target_audio)
         delta_ms_ratio = abs(pred_ms_ratio - target_ms_ratio)
 
-        results = {
-            "spectral_convergence": sc,
-            "log_spectral_distance_db": lsd,
+        results: Dict[str, Union[float, str, List[str], None]] = {
+            "reference_mode": reference_mode,
             "pred_lufs": pred_lufs,
             "target_lufs": target_lufs,
             "delta_lufs": delta_lufs,
@@ -154,6 +193,60 @@ class MasteringBenchmarkSuite:
             "target_ms_ratio_db": target_ms_ratio,
             "delta_ms_ratio_db": delta_ms_ratio,
         }
+
+        if reference_mode == "same_track":
+            # Aligned audio for spectral metrics
+            if align_latency:
+                p_al, t_al = self.align_latency(pred_audio, target_audio)
+            else:
+                p_al, t_al = pred_audio, target_audio
+
+            min_len = min(p_al.shape[-1], t_al.shape[-1])
+            p_al = p_al[..., :min_len]
+            t_al = t_al[..., :min_len]
+
+            _, stft_metrics = self.stft_loss(p_al, t_al)
+            sc = stft_metrics["stft_sc_lr"]
+            lsd = self.calculate_log_spectral_distance(p_al, t_al)
+
+            results["spectral_convergence"] = sc
+            results["log_spectral_distance_db"] = lsd
+            results["aggregate_spectral_distance"] = None
+            results["applicable_metrics"] = [
+                "spectral_convergence",
+                "log_spectral_distance_db",
+                "delta_lufs",
+                "pred_peak_dbfs",
+                "ceiling_violation_db",
+                "delta_plr_db",
+                "delta_ms_ratio_db",
+            ]
+        else:
+            # Stylistic mode: strictly reject frame-by-frame STFT / LSD
+            agg_spec_dist = self.calculate_aggregate_spectral_distance(
+                pred_audio, target_audio, sample_rate=self.sample_rate
+            )
+            results["spectral_convergence"] = None
+            results["log_spectral_distance_db"] = None
+            results["aggregate_spectral_distance"] = agg_spec_dist
+            results["applicable_metrics"] = [
+                "delta_lufs",
+                "pred_peak_dbfs",
+                "ceiling_violation_db",
+                "delta_plr_db",
+                "delta_ms_ratio_db",
+                "aggregate_spectral_distance",
+            ]
+
+        # Parameter recovery metrics (if ground truth z is provided)
+        if z_pred is not None and z_target is not None:
+            zp = z_pred.reshape(-1)
+            zt = z_target.reshape(-1)
+            results["param_l1_error"] = torch.mean(torch.abs(zp - zt)).item()
+            results["param_l2_error"] = torch.norm(zp - zt).item()
+            results["param_max_error"] = torch.max(torch.abs(zp - zt)).item()
+
+        return results
 
         # Parameter recovery metrics (if ground truth z is provided)
         if z_pred is not None and z_target is not None:

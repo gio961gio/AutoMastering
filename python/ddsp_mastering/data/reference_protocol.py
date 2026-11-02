@@ -159,16 +159,92 @@ def estimate_time_alignment(
     )
 
 
+def apply_fractional_delay(
+    audio: np.ndarray,
+    subsample_offset: float,
+    filter_half_length: int = 32,
+) -> np.ndarray:
+    """Apply sub-sample fractional delay compensation via windowed sinc FIR filter.
+
+    Convention:
+        subsample_offset (delta): fractional sample delay of audio relative to target.
+        When delta > 0, audio is delayed by delta samples.
+        To align with target, audio must be advanced by delta samples (shifted by +delta).
+        When delta < 0, audio is advanced by -delta samples.
+        To align with target, audio must be delayed by -delta samples (shifted by delta).
+
+    Filter formulation:
+        h[k] = sinc(k + delta) * blackman(2K + 1) for k in [-K, K], normalized so sum(h) = 1.
+        Convolution with h[k] computes y[n] = sum_k h[k] x[n - k], which evaluates
+        x at t + delta, compensating the fractional delay with > 65 dB attenuation
+        of sinc truncation ripples and precision < 1e-4.
+
+    Args:
+        audio: Input audio array with shape [channels, T] or [T].
+        subsample_offset: Fractional offset delta in [-0.5, 0.5] samples.
+        filter_half_length: K = half-length of Blackman-windowed sinc kernel (default: 32).
+
+    Returns:
+        Fractional-delay compensated audio with identical shape.
+    """
+    if abs(subsample_offset) < 1e-4:
+        return np.ascontiguousarray(audio)
+
+    K = filter_half_length
+    k = np.arange(-K, K + 1, dtype=np.float64)
+    w = np.blackman(2 * K + 1)
+    # sinc(k + delta) shifts signal by +delta (evaluating at future t + delta)
+    h = np.sinc(k + subsample_offset) * w
+    h_sum = np.sum(h)
+    if abs(h_sum) > 1e-12:
+        h /= h_sum
+
+    was_1d = audio.ndim == 1
+    if was_1d:
+        audio = audio[np.newaxis, :]
+
+    out = np.zeros_like(audio)
+    for c in range(audio.shape[0]):
+        out[c] = signal.convolve(audio[c], h, mode="same")
+
+    if was_1d:
+        out = out[0]
+    return np.ascontiguousarray(out)
+
+
 def apply_same_track_alignment(
     mix: np.ndarray,
     ref: np.ndarray,
     alignment: AlignmentResult,
+    enable_subsample: bool = True,
+    filter_half_length: int = 32,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Align ref audio onto mix audio timeline using estimated lag.
 
-    Crucial: this aligns file-level delay between raw mix and master.
-    It does NOT apply chain latency compensation (159 samples), which is only
-    compensated when comparing the DDSP output with the reference.
+    Convention:
+        lag_samples > 0: ref is delayed relative to mix (ref appears later in time).
+            mix aligned: mix[:, 0 : valid_len]
+            ref aligned: ref[:, lag : lag + valid_len]
+        lag_samples < 0: ref is advanced relative to mix (ref appears earlier in time).
+            pos_lag = -lag
+            mix aligned: mix[:, pos_lag : pos_lag + valid_len]
+            ref aligned: ref[:, 0 : valid_len]
+        where valid_len is the common overlapping duration.
+
+    Sub-sample refinement:
+        If enable_subsample=True and alignment.subsample_offset != 0,
+        apply_fractional_delay is applied to ref_aligned to compensate the sub-sample delay.
+        To maintain an exact common valid temporal support without FIR boundary transients,
+        both mix and ref are trimmed by filter_half_length samples on both ends when
+        valid_len > 2 * filter_half_length + 64.
+
+    Crucial latency separation:
+        This aligns file-level delay between raw mix and master files.
+        It does NOT apply chain latency compensation (159 samples at 48kHz), which
+        is the internal DDSP latency compensated separately when evaluating DDSP output.
+
+    Raises:
+        ValueError: If signals have no valid overlapping temporal region.
     """
     lag = alignment.lag_samples
     T_mix = mix.shape[1]
@@ -176,20 +252,38 @@ def apply_same_track_alignment(
 
     if lag >= 0:
         # Ref starts 'lag' samples later than mix:
-        # Aligned region: mix[:, lag:], ref[:, :T_mix - lag]
-        valid_len = min(T_mix - lag, T_ref)
+        valid_len = min(T_mix, T_ref - lag)
         if valid_len <= 0:
-            return mix, ref
-        aligned_mix = mix[:, lag : lag + valid_len]
-        aligned_ref = ref[:, :valid_len]
+            raise ValueError(
+                f"No valid overlapping temporal region between mix (len={T_mix}) "
+                f"and ref (len={T_ref}) with lag={lag} samples"
+            )
+        aligned_mix = mix[:, :valid_len]
+        aligned_ref = ref[:, lag : lag + valid_len]
     else:
         # Ref starts '-lag' samples earlier than mix:
         pos_lag = -lag
-        valid_len = min(T_mix, T_ref - pos_lag)
+        valid_len = min(T_mix - pos_lag, T_ref)
         if valid_len <= 0:
-            return mix, ref
-        aligned_mix = mix[:, :valid_len]
-        aligned_ref = ref[:, pos_lag : pos_lag + valid_len]
+            raise ValueError(
+                f"No valid overlapping temporal region between mix (len={T_mix}) "
+                f"and ref (len={T_ref}) with lag={lag} samples"
+            )
+        aligned_mix = mix[:, pos_lag : pos_lag + valid_len]
+        aligned_ref = ref[:, :valid_len]
+
+    # Sub-sample fractional delay compensation
+    if enable_subsample and abs(alignment.subsample_offset) >= 1e-4:
+        aligned_ref = apply_fractional_delay(
+            aligned_ref,
+            subsample_offset=alignment.subsample_offset,
+            filter_half_length=filter_half_length,
+        )
+        # Symmetrically trim boundary transient to maintain exact common valid region
+        K = filter_half_length
+        if aligned_mix.shape[1] > 2 * K + 64:
+            aligned_mix = aligned_mix[:, K : -K]
+            aligned_ref = aligned_ref[:, K : -K]
 
     return np.ascontiguousarray(aligned_mix), np.ascontiguousarray(aligned_ref)
 
