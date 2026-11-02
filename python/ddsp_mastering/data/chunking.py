@@ -194,21 +194,25 @@ class MultiChunkSelector:
         num_target = min(self.num_chunks, len(candidates))
         zone_duration = T / num_target
 
+        used_starts = set()
         selected_candidates = []
         for zone_idx in range(num_target):
             zone_start = zone_idx * zone_duration
             zone_end = (zone_idx + 1) * zone_duration
 
-            # Find candidates within this temporal zone
+            # Find candidates within this temporal zone not already selected
             zone_pool = [
                 c for c in candidates
-                if zone_start <= c["start"] < zone_end
+                if zone_start <= c["start"] < zone_end and c["start"] not in used_starts
             ]
 
             if not zone_pool:
-                # Fallback to closest available candidate
+                # Fallback to closest available unused candidate
+                unused_candidates = [c for c in candidates if c["start"] not in used_starts]
+                if not unused_candidates:
+                    break
                 zone_center = 0.5 * (zone_start + zone_end)
-                zone_pool = sorted(candidates, key=lambda c: abs(c["start"] - zone_center))[:3]
+                zone_pool = sorted(unused_candidates, key=lambda c: abs(c["start"] - zone_center))[:3]
 
             # In alternate zones, prioritize either peak energy, high transient crest factor, or spectral brightness
             # Use deterministic seed-based jitter for tie-breaking candidates with near-identical scores
@@ -224,6 +228,7 @@ class MultiChunkSelector:
                 chosen = max(zone_pool, key=lambda c: abs(c["cent"] - mean_cent) + rng.uniform(-1e-6, 1e-6))
 
             selected_candidates.append(chosen)
+            used_starts.add(chosen["start"])
 
         # 3. Post-process: ensure strict non-overlap and minimum separation (min_separation_samples)
         selected_candidates.sort(key=lambda c: c["start"])
@@ -237,23 +242,35 @@ class MultiChunkSelector:
                 if c["start"] >= required_start:
                     filtered.append(c)
                 else:
-                    # Attempt displacement to next available valid position
-                    new_start = required_start
-                    if new_start + self.chunk_len <= T:
-                        # Recompute features on displaced audio slice!
-                        new_chunk = audio[:, new_start : new_start + self.chunk_len]
-                        rms_db, cf_db, cent = self._compute_chunk_features(new_chunk)
-                        filtered.append({
-                            "start": new_start,
-                            "rms_db": rms_db,
-                            "cf_db": cf_db,
-                            "cent": cent,
-                        })
+                    # Search among available pre-filtered candidates (which already satisfy rms_db >= min_rms_db)
+                    already_selected = {f["start"] for f in filtered}
+                    available = [
+                        cand for cand in candidates
+                        if cand["start"] >= required_start and cand["start"] not in already_selected
+                    ]
+                    if available:
+                        # Pick the earliest candidate satisfying required_start to preserve temporal ordering
+                        best_cand = min(available, key=lambda cand: cand["start"])
+                        filtered.append(best_cand)
+                    else:
+                        # Attempt displacement to next available valid position
+                        new_start = required_start
+                        if new_start + self.chunk_len <= T:
+                            new_chunk = audio[:, new_start : new_start + self.chunk_len]
+                            rms_db, cf_db, cent = self._compute_chunk_features(new_chunk)
+                            # B3 / F-04: Strict gate verification after displacement!
+                            if rms_db >= self.min_rms_db:
+                                filtered.append({
+                                    "start": new_start,
+                                    "rms_db": rms_db,
+                                    "cf_db": cf_db,
+                                    "cent": cent,
+                                })
 
         if len(filtered) < self.num_chunks:
             warn_msg = (
-                f"Audio duration ({T / self.sample_rate:.2f}s) insufficient to accommodate "
-                f"{self.num_chunks} chunks with min_separation={self.min_separation_sec:.1f}s. "
+                f"Audio duration or energy insufficient to accommodate "
+                f"{self.num_chunks} chunks with min_separation={self.min_separation_sec:.1f}s and min_rms_db={self.min_rms_db} dBFS. "
                 f"Selected {len(filtered)} chunks."
             )
             warnings.warn(warn_msg)
