@@ -54,11 +54,17 @@ def calculate_true_peak_dbtp(
     sample_rate: float = 48000.0,
     oversampling_factor: int = 4,
 ) -> float:
-    """Compute standard-compliant True Peak level in dBTP conforming to ITU-R BS.1770-5 Annex 2.
+    """Compute True Peak level in dBTP using 4x polyphase Kaiser-windowed sinc FIR interpolation.
 
-    Uses 4x oversampling interpolation with a windowed sinc FIR filter
-    (Kaiser-windowed sinc interpolation with >= 60 dB stopband attenuation) to detect
-    inter-sample peaks. Returns the maximum True Peak level across all channels.
+    Follows the 4x oversampled True Peak measurement topology of ITU-R BS.1770-5 Annex 2.
+    Uses a 64-zero-crossing Kaiser-windowed sinc interpolator (beta=14.77, rolloff=1.0)
+    with explicit zero-padding boundary conditions (`mode="constant", value=0.0`) of 64
+    samples on both ends so that:
+    1. All original samples x[0 .. T-1] coincide with polyphase sub-phase 0 (TP >= SP);
+    2. True peaks at the first sample (n=0), last sample (n=T-1), near boundaries, or on
+       very short buffers are never clipped or discarded by filter-transient trimming;
+    3. Inter-sample peaks occurring in the zero-padded reconstruction tails at the signal
+       boundaries are fully captured.
 
     Args:
         audio: Audio signal as torch.Tensor or numpy.ndarray.
@@ -76,11 +82,14 @@ def calculate_true_peak_dbtp(
     else:
         raise TypeError(f"audio must be torch.Tensor or np.ndarray, got {type(audio)}")
 
-    # Standardize shape to (C, T)
+    if x.numel() == 0:
+        return -float("inf")
+
+    # Standardize shape to (C, T) without transposing short stereo (2, 1) or (2, 2) buffers
     if x.dim() == 1:
         x = x.unsqueeze(0)
     elif x.dim() == 2:
-        if x.shape[0] > x.shape[1] and x.shape[1] in (1, 2):
+        if x.shape[0] > 2 and x.shape[1] in (1, 2):
             x = x.transpose(0, 1)
     elif x.dim() == 3:
         if x.shape[0] == 1:
@@ -88,41 +97,38 @@ def calculate_true_peak_dbtp(
         else:
             raise ValueError(f"Batch dimension > 1 not supported in calculate_true_peak_dbtp: {x.shape}")
 
-    x = x.to(torch.float32)
+    x = x.to(torch.float64)
+    sample_peak_linear = torch.max(torch.abs(x)).item()
+    if sample_peak_linear <= 1e-12:
+        return -float("inf")
 
-    # 4x oversampling per ITU-R BS.1770-5 Annex 2
-    orig_freq = int(round(sample_rate))
-    new_freq = orig_freq * oversampling_factor
+    # Explicit zero-padding boundary condition (64 samples each side) so boundary peaks
+    # at index 0 and T-1 and their filter reconstruction tails are completely preserved.
+    filter_width = 64
+    x_padded = F.pad(x, (filter_width, filter_width), mode="constant", value=0.0)
 
     try:
-        x_4x = taf.resample(
-            x,
-            orig_freq=orig_freq,
-            new_freq=new_freq,
-            lowpass_filter_width=64,
-            rolloff=0.9475,
+        x_oversampled = taf.resample(
+            x_padded,
+            orig_freq=1,
+            new_freq=int(oversampling_factor),
+            lowpass_filter_width=filter_width,
+            rolloff=1.0,
             resampling_method="sinc_interp_kaiser",
             beta=14.769656459379492,
         )
     except (ValueError, TypeError):
-        x_4x = taf.resample(
-            x,
-            orig_freq=orig_freq,
-            new_freq=new_freq,
-            lowpass_filter_width=64,
-            rolloff=0.9475,
+        x_oversampled = taf.resample(
+            x_padded,
+            orig_freq=1,
+            new_freq=int(oversampling_factor),
+            lowpass_filter_width=filter_width,
+            rolloff=1.0,
             resampling_method="kaiser_window",
             beta=14.769656459379492,
         )
 
-    # Discard boundary filter transient (filter half-length in 4x domain)
-    margin = 64 * oversampling_factor // 2
-    if x_4x.shape[-1] > 2 * margin:
-        x_valid = x_4x[..., margin:-margin]
-    else:
-        x_valid = x_4x
-
-    max_peak_linear = torch.max(torch.abs(x_valid)).item()
+    max_peak_linear = max(sample_peak_linear, torch.max(torch.abs(x_oversampled)).item())
     if max_peak_linear <= 1e-12:
         return -float("inf")
 
@@ -286,17 +292,37 @@ class MasteringBenchmarkSuite:
             target_audio = target_audio.unsqueeze(0)
 
         # Common Aggregate Descriptors (valid across tracks of differing lengths)
-        # Standard-compliant ITU-R BS.1770-5 Integrated Loudness
+        # Standard-compliant ITU-R BS.1770-5 Integrated Loudness (when duration >= 400ms),
+        # with explicit per-signal method tracking if short-audio proxy fallback is triggered.
         try:
             pred_lufs = calculate_integrated_loudness_bs1770(pred_audio, sample_rate=self.sample_rate)
+            pred_loudness_method = "itu_bs1770_5_integrated"
         except ValueError:
             # Fallback to ungated proxy only if audio is shorter than a 400ms gating block
             pred_lufs = self.loudness_calc.calculate_ungated_k_weighted_loudness(pred_audio).mean().item()
+            pred_loudness_method = "ungated_k_weighted_proxy_short_audio"
 
         try:
             target_lufs = calculate_integrated_loudness_bs1770(target_audio, sample_rate=self.sample_rate)
+            target_loudness_method = "itu_bs1770_5_integrated"
         except ValueError:
             target_lufs = self.loudness_calc.calculate_ungated_k_weighted_loudness(target_audio).mean().item()
+            target_loudness_method = "ungated_k_weighted_proxy_short_audio"
+
+        if (
+            pred_loudness_method == "itu_bs1770_5_integrated"
+            and target_loudness_method == "itu_bs1770_5_integrated"
+        ):
+            loudness_standard = "ITU-R BS.1770-5 (11/2023) Integrated"
+        elif (
+            pred_loudness_method == "ungated_k_weighted_proxy_short_audio"
+            and target_loudness_method == "ungated_k_weighted_proxy_short_audio"
+        ):
+            loudness_standard = "Ungated K-Weighted Proxy (Short Audio < 400ms Fallback)"
+        else:
+            loudness_standard = (
+                f"Mixed (pred: {pred_loudness_method}, target: {target_loudness_method})"
+            )
 
         delta_lufs = abs(pred_lufs - target_lufs) if (math.isfinite(pred_lufs) and math.isfinite(target_lufs)) else float("inf")
 
@@ -319,7 +345,11 @@ class MasteringBenchmarkSuite:
 
         results: Dict[str, Union[float, str, List[str], None]] = {
             "reference_mode": reference_mode,
-            "loudness_standard": "ITU-R BS.1770-5 (11/2023) Integrated",
+            "loudness_standard": loudness_standard,
+            "pred_loudness_method": pred_loudness_method,
+            "target_loudness_method": target_loudness_method,
+            # Legacy keys pred_lufs and target_lufs reflect the measurement method reported
+            # in pred_loudness_method and target_loudness_method respectively.
             "pred_lufs": pred_lufs,
             "target_lufs": target_lufs,
             "delta_lufs": delta_lufs,

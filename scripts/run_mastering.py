@@ -241,10 +241,28 @@ def run_mastering_session(
         raise ValueError(f"Unrecognized reference mode: {ref_mode}")
 
     print(f"\n[BENCHMARK EVALUATION — {ref_mode.value.upper()} MODE]", flush=True)
-    print(f"  - Pre  Mastering Loudness: {pre_metrics['pred_lufs']:.2f} LUFS (Reference: {pre_metrics['target_lufs']:.2f} LUFS)", flush=True)
-    print(f"  - Post Mastering Loudness: {post_metrics['pred_lufs']:.2f} LUFS (Delta: {post_metrics['delta_lufs']:.2f} LU)", flush=True)
+    print(f"  - Loudness Standard:       {post_metrics['loudness_standard']}", flush=True)
+    print(
+        f"  - Pre  Mastering Loudness: {pre_metrics['pred_lufs']:.2f} LUFS [{pre_metrics['pred_loudness_method']}] "
+        f"(Reference: {pre_metrics['target_lufs']:.2f} LUFS [{pre_metrics['target_loudness_method']}])",
+        flush=True,
+    )
+    print(
+        f"  - Post Mastering Loudness: {post_metrics['pred_lufs']:.2f} LUFS [{post_metrics['pred_loudness_method']}] "
+        f"(Delta: {post_metrics['delta_lufs']:.2f} LU)",
+        flush=True,
+    )
     print(f"  - Post Dynamic Range (PLR): {post_metrics['pred_plr_db']:.2f} dB (Reference: {post_metrics['target_plr_db']:.2f} dB, Delta: {post_metrics['delta_plr_db']:.2f} dB)", flush=True)
-    print(f"  - Peak Output: {post_metrics['pred_peak_dbfs']:.2f} dBFS (Ceiling violation: {post_metrics['ceiling_violation_db']:.2f} dB)", flush=True)
+    print(
+        f"  - Sample Peak Output: {post_metrics['pred_sample_peak_dbfs']:.2f} dBFS "
+        f"(Sample Ceiling violation: {post_metrics['sample_peak_ceiling_violation_db']:.2f} dB)",
+        flush=True,
+    )
+    print(
+        f"  - True Peak Output:   {post_metrics['pred_true_peak_dbtp']:.2f} dBTP "
+        f"(True Peak Ceiling violation: {post_metrics['true_peak_ceiling_violation_db']:.2f} dB)",
+        flush=True,
+    )
 
     if ref_mode == ReferenceMode.SAME_TRACK:
         print(f"  - Spectral Convergence: {post_metrics['spectral_convergence']:.4f}", flush=True)
