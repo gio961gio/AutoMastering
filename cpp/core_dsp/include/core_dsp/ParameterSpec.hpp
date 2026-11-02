@@ -106,31 +106,65 @@ inline constexpr std::array<ParamDescriptor, NUM_PARAMS> PARAM_SPECS = {{
     {"limiter_push_gain_db", 0.0, 8.0, ScaleType::Linear, "dB"}
 }};
 
+// Vettore canonico dei parametri fisici neutri (corrisponde a THETA_NEUTRAL in Python)
+inline constexpr std::array<double, NUM_PARAMS> THETA_NEUTRAL = {{
+    // EQ 1..6 (f0, gain_db, q)
+    60.0, 0.0, 0.707,
+    250.0, 0.0, 0.707,
+    1000.0, 0.0, 0.707,
+    3000.0, 0.0, 0.707,
+    8000.0, 0.0, 0.707,
+    12000.0, 0.0, 0.707,
+    // Crossover (low, high)
+    160.0, 3200.0,
+    // Multiband comp 1..3: thresh, ratio, attack, release, makeup (ratio 1.0 = identity)
+    -12.0, 1.0, 40.0, 120.0, 0.0,
+    -12.0, 1.0, 25.0, 100.0, 0.0,
+    -12.0, 1.0, 15.0, 80.0, 0.0,
+    // Imager (low, mid, high)
+    1.0, 1.0, 1.0,
+    // Saturator (drive, mix)
+    0.0, 0.0,
+    // Limiter push gain
+    0.0
+}};
+
 // Struttura C++ tipizzata e chiara per uso nel motore C++ e nel plugin
 struct MasteringParameters {
     struct BandEQ {
         double f0 = 1000.0;
         double gain_db = 0.0;
-        double q = 0.7071;
+        double q = 0.707;
     };
 
     struct BandComp {
-        double threshold_db = -20.0;
-        double ratio = 2.0;
-        double attack_ms = 10.0;
+        double threshold_db = -12.0;
+        double ratio = 1.0;
+        double attack_ms = 25.0;
         double release_ms = 100.0;
         double makeup_db = 0.0;
     };
 
     // 1. EQ
-    std::array<BandEQ, 6> eq{};
+    std::array<BandEQ, 6> eq = {{
+        {60.0, 0.0, 0.707},
+        {250.0, 0.0, 0.707},
+        {1000.0, 0.0, 0.707},
+        {3000.0, 0.0, 0.707},
+        {8000.0, 0.0, 0.707},
+        {12000.0, 0.0, 0.707}
+    }};
 
     // 2. Crossover
-    double crossover_f_low = 150.0;
-    double crossover_f_high = 3000.0;
+    double crossover_f_low = 160.0;
+    double crossover_f_high = 3200.0;
 
     // 3. Compressore
-    std::array<BandComp, 3> comp{};
+    std::array<BandComp, 3> comp = {{
+        {-12.0, 1.0, 40.0, 120.0, 0.0},
+        {-12.0, 1.0, 25.0, 100.0, 0.0},
+        {-12.0, 1.0, 15.0, 80.0, 0.0}
+    }};
 
     // 4. Imager
     double imager_width_low = 1.0;
@@ -194,6 +228,32 @@ struct MasteringParameters {
     p.limiter_push_gain_db = theta[40];
 
     return p;
+}
+
+// Conversione da struttura tipizzata MasteringParameters ad array piatto theta
+[[nodiscard]] inline std::array<double, NUM_PARAMS> pack_theta(const MasteringParameters& p) noexcept {
+    std::array<double, NUM_PARAMS> theta{};
+    for (size_t b = 0; b < 6; ++b) {
+        theta[b * 3 + 0] = p.eq[b].f0;
+        theta[b * 3 + 1] = p.eq[b].gain_db;
+        theta[b * 3 + 2] = p.eq[b].q;
+    }
+    theta[18] = p.crossover_f_low;
+    theta[19] = p.crossover_f_high;
+    for (size_t b = 0; b < 3; ++b) {
+        theta[20 + b * 5 + 0] = p.comp[b].threshold_db;
+        theta[20 + b * 5 + 1] = p.comp[b].ratio;
+        theta[20 + b * 5 + 2] = p.comp[b].attack_ms;
+        theta[20 + b * 5 + 3] = p.comp[b].release_ms;
+        theta[20 + b * 5 + 4] = p.comp[b].makeup_db;
+    }
+    theta[35] = p.imager_width_low;
+    theta[36] = p.imager_width_mid;
+    theta[37] = p.imager_width_high;
+    theta[38] = p.saturator_drive_db;
+    theta[39] = p.saturator_mix;
+    theta[40] = p.limiter_push_gain_db;
+    return theta;
 }
 
 } // namespace core_dsp

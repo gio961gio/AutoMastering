@@ -247,13 +247,3 @@ class MasteringBenchmarkSuite:
             results["param_max_error"] = torch.max(torch.abs(zp - zt)).item()
 
         return results
-
-        # Parameter recovery metrics (if ground truth z is provided)
-        if z_pred is not None and z_target is not None:
-            zp = z_pred.reshape(-1)
-            zt = z_target.reshape(-1)
-            results["param_l1_error"] = torch.mean(torch.abs(zp - zt)).item()
-            results["param_l2_error"] = torch.norm(zp - zt).item()
-            results["param_max_error"] = torch.max(torch.abs(zp - zt)).item()
-
-        return results

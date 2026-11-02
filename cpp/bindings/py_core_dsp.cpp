@@ -54,6 +54,15 @@ py::list py_get_param_specs() {
     return specs;
 }
 
+std::vector<double> py_get_theta_neutral() {
+    return std::vector<double>(THETA_NEUTRAL.begin(), THETA_NEUTRAL.end());
+}
+
+std::vector<double> py_get_default_mastering_parameters_theta() {
+    auto theta = pack_theta(MasteringParameters{});
+    return std::vector<double>(theta.begin(), theta.end());
+}
+
 std::vector<double> py_get_fir_halfband_coeffs() {
     return std::vector<double>(FIR_HALFBAND_COEFFS.begin(), FIR_HALFBAND_COEFFS.end());
 }
@@ -460,6 +469,8 @@ PYBIND11_MODULE(py_core_dsp, m) {
     m.def("map_theta_to_z", &py_map_theta_to_z, "Converte theta nello spazio normalizzato z");
     m.def("get_param_specs", &py_get_param_specs, "Restituisce le specifiche dei 41 parametri");
     m.def("get_fir_halfband_coeffs", &py_get_fir_halfband_coeffs, "Restituisce i 31 coefficienti FIR Half-Band");
+    m.def("get_theta_neutral", &py_get_theta_neutral, "Restituisce il vettore THETA_NEUTRAL C++");
+    m.def("get_default_mastering_parameters_theta", &py_get_default_mastering_parameters_theta, "Restituisce theta generato da MasteringParameters default");
 
     py::class_<PyBiquadCascade6Band>(m, "BiquadCascade6Band")
         .def(py::init<>())
