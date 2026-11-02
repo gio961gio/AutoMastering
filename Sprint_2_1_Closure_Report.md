@@ -2,7 +2,7 @@
 
 **Politecnico di Milano — Dipartimento di Elettronica, Informazione e Bioingegneria (DEIB)**  
 **Master's Thesis in Sound and Music Engineering**  
-**Student:** Giovanni Colantonio  
+**Student:** Giovanni Antonecchia  
 **Target Milestone:** Sprint 2.1 Remediation Gate Closure & Transition to Sprint 3  
 **Status:** **FORMALLY CLOSED & VERIFIED (ALL 92/92 TESTS PASSING)**  
 

@@ -28,6 +28,7 @@ from ddsp_mastering.data import (
     estimate_time_alignment,
     apply_same_track_alignment,
     apply_fractional_delay,
+    get_same_track_slice_indices,
     assert_stylistic_guards,
     ChunkSpec,
     MultiChunkSelector,
@@ -552,3 +553,128 @@ def test_manifest_roundtrip_and_reproducibility(tmp_path):
     assert len(reloaded.normalized_z) == NUM_PARAMS
     assert reloaded.parameters["comp_low_ratio"] == 1.0
     assert reloaded.metrics_post["pred_lufs"] == -14.0
+
+
+# 11. S2.1-FINAL: Verifica end-to-end dell'indicizzazione temporale del benchmark full-track
+@pytest.mark.parametrize(
+    "case_name, file_lag, sub_offset",
+    [
+        ("positive_lag", 120, 0.0),
+        ("negative_lag", -120, 0.0),
+        ("zero_lag", 0, 0.0),
+        ("fractional_positive", 48, 0.35),
+        ("fractional_negative", -48, -0.30),
+    ],
+)
+def test_full_track_benchmark_temporal_indexing_end_to_end(tmp_path, case_name, file_lag, sub_offset):
+    """Verify S2.1-FINAL temporal indexing across full-track pipeline:
+      - Pre-mastering evaluation without PDC (align_latency=False)
+      - Post-mastering evaluation matching raw_aligned temporal support with exactly one PDC (align_latency=True)
+      - Exact temporal correspondence of reference
+      - Strict absence of double compensation
+      - Valid finite metrics across all delay configurations
+    """
+    fs = 48000
+    duration_sec = 10.0
+    total_samples = int(duration_sec * fs)
+    t = np.arange(total_samples) / fs
+
+    # Synthesize rich bandlimited musical content with sharp transient impulse at 2.0s
+    bass = 0.4 * np.sin(2 * np.pi * 100.0 * t)
+    mid = 0.3 * np.sin(2 * np.pi * 1000.0 * t)
+    high = 0.15 * np.sin(2 * np.pi * 4000.0 * t)
+    mono_source = (bass + mid + high).astype(np.float64)
+    # Distinct transient impulse at sample 96000 (t = 2.0s)
+    click_sample = int(2.0 * fs)
+    mono_source[click_sample : click_sample + 5] += 0.8
+
+    # Mix is base audio
+    mix = np.stack([mono_source, mono_source * 0.9], axis=0).astype(np.float32)
+
+    # Reference is delayed/advanced by file_lag + sub_offset
+    total_delay = float(file_lag + sub_offset)
+    if abs(sub_offset) >= 1e-4:
+        t_ref = t - total_delay / fs
+        ref_mono = (
+            0.4 * np.sin(2 * np.pi * 100.0 * t_ref)
+            + 0.3 * np.sin(2 * np.pi * 1000.0 * t_ref)
+            + 0.15 * np.sin(2 * np.pi * 4000.0 * t_ref)
+        )
+        # Shift click accurately
+        ref_click = int(round(click_sample + total_delay))
+        ref_mono[ref_click : ref_click + 5] += 0.8
+    else:
+        int_delay = int(file_lag)
+        if int_delay >= 0:
+            ref_mono = np.pad(mono_source, (int_delay, 0))[:total_samples]
+        else:
+            ref_mono = np.pad(mono_source[-int_delay:], (0, -int_delay))
+
+    ref = np.stack([ref_mono, ref_mono * 0.9], axis=0).astype(np.float32)
+
+    raw_path = str(tmp_path / f"mix_{case_name}.wav")
+    ref_path = str(tmp_path / f"ref_{case_name}.wav")
+    sf.write(raw_path, mix.T, fs)
+    sf.write(ref_path, ref.T, fs)
+
+    from scripts.run_mastering import run_mastering_session
+    manifest = run_mastering_session(
+        raw_path=raw_path,
+        ref_path=ref_path,
+        out_prefix=f"test_{case_name}",
+        mode="same_track",
+        num_chunks=2,
+        chunk_len_sec=2.0,
+        num_steps=3,
+        lr=0.03,
+        duration_sec=duration_sec,
+        out_dir=str(tmp_path),
+    )
+
+    # 1. Verify manifest existence and metrics presence
+    assert manifest is not None
+    pre = manifest.metrics_pre
+    post = manifest.metrics_post
+
+    assert pre is not None and post is not None
+
+    # 2. Pre-mastering verification: NO latency compensation applied (align_latency=False)
+    # Spectral convergence and LSD must reflect original unmastered vs reference distance
+    assert "spectral_convergence" in pre and "log_spectral_distance_db" in pre
+    assert not np.isnan(pre["spectral_convergence"])
+    assert not np.isnan(pre["log_spectral_distance_db"])
+    assert pre["spectral_convergence"] < 0.8  # In phase, well aligned
+
+    # 3. Post-mastering verification: DDSP latency compensated ONCE (align_latency=True)
+    assert "spectral_convergence" in post and "log_spectral_distance_db" in post
+    assert not np.isnan(post["spectral_convergence"])
+    assert not np.isnan(post["log_spectral_distance_db"])
+    assert post["pred_lufs"] > -30.0 and post["pred_lufs"] < 0.0
+    assert post["ceiling_violation_db"] == 0.0  # Limiter ceiling respected!
+
+    # 4. Temporal correspondence of reference & no double compensation:
+    # Check directly using get_same_track_slice_indices
+    align = estimate_time_alignment(mix, ref, sample_rate=fs)
+    mix_start, ref_start, eval_len = get_same_track_slice_indices(
+        align, mix.shape[1], ref.shape[1], enable_subsample=True
+    )
+    raw_al, ref_al = apply_same_track_alignment(mix, ref, align, enable_subsample=True)
+
+    assert raw_al.shape[1] == eval_len
+    assert ref_al.shape[1] == eval_len
+
+    # Expected mix_start conforms to rule:
+    expected_mix_start = 0 if file_lag >= 0 else -file_lag
+    if abs(sub_offset) >= 1e-4:
+        expected_mix_start += 32  # K = filter_half_length
+
+    assert abs(mix_start - expected_mix_start) <= 1, (
+        f"mix_start {mix_start} did not match expected {expected_mix_start}"
+    )
+
+    # Read the full mastered WAV output from disk (WAV duration must match input without truncation)
+    out_wav_path = str(tmp_path / f"test_{case_name}_mastered.wav")
+    assert os.path.exists(out_wav_path)
+    out_audio, out_sr = sf.read(out_wav_path)
+    assert out_sr == fs
+    assert out_audio.shape[0] == total_samples, "Full-track WAV output duration must not be truncated!"

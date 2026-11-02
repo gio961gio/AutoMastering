@@ -212,6 +212,58 @@ def apply_fractional_delay(
     return np.ascontiguousarray(out)
 
 
+def get_same_track_slice_indices(
+    alignment: AlignmentResult,
+    mix_len: int,
+    ref_len: int,
+    enable_subsample: bool = True,
+    filter_half_length: int = 32,
+) -> Tuple[int, int, int]:
+    """Compute (mix_start, ref_start, valid_length) for same-track alignment.
+
+    Args:
+        alignment: AlignmentResult with estimated lag and sub-sample offset.
+        mix_len: Number of samples in unmastered mix [T_mix].
+        ref_len: Number of samples in reference master [T_ref].
+        enable_subsample: Whether sub-sample fractional compensation is enabled.
+        filter_half_length: Half-length K of windowed sinc FIR filter.
+
+    Returns:
+        mix_start: Starting sample index in raw mix audio.
+        ref_start: Starting sample index in reference audio.
+        valid_length: Common overlapping length in samples.
+    """
+    lag = alignment.lag_samples
+    if lag >= 0:
+        valid_len = min(mix_len, ref_len - lag)
+        if valid_len <= 0:
+            raise ValueError(
+                f"No valid overlapping temporal region between mix (len={mix_len}) "
+                f"and ref (len={ref_len}) with lag={lag} samples"
+            )
+        mix_start = 0
+        ref_start = lag
+    else:
+        pos_lag = -lag
+        valid_len = min(mix_len - pos_lag, ref_len)
+        if valid_len <= 0:
+            raise ValueError(
+                f"No valid overlapping temporal region between mix (len={mix_len}) "
+                f"and ref (len={ref_len}) with lag={lag} samples"
+            )
+        mix_start = pos_lag
+        ref_start = 0
+
+    if enable_subsample and abs(alignment.subsample_offset) >= 1e-4:
+        K = filter_half_length
+        if valid_len > 2 * K + 64:
+            mix_start += K
+            ref_start += K
+            valid_len -= 2 * K
+
+    return mix_start, ref_start, valid_len
+
+
 def apply_same_track_alignment(
     mix: np.ndarray,
     ref: np.ndarray,
@@ -246,31 +298,19 @@ def apply_same_track_alignment(
     Raises:
         ValueError: If signals have no valid overlapping temporal region.
     """
-    lag = alignment.lag_samples
     T_mix = mix.shape[1]
     T_ref = ref.shape[1]
 
-    if lag >= 0:
-        # Ref starts 'lag' samples later than mix:
-        valid_len = min(T_mix, T_ref - lag)
-        if valid_len <= 0:
-            raise ValueError(
-                f"No valid overlapping temporal region between mix (len={T_mix}) "
-                f"and ref (len={T_ref}) with lag={lag} samples"
-            )
-        aligned_mix = mix[:, :valid_len]
-        aligned_ref = ref[:, lag : lag + valid_len]
-    else:
-        # Ref starts '-lag' samples earlier than mix:
-        pos_lag = -lag
-        valid_len = min(T_mix - pos_lag, T_ref)
-        if valid_len <= 0:
-            raise ValueError(
-                f"No valid overlapping temporal region between mix (len={T_mix}) "
-                f"and ref (len={T_ref}) with lag={lag} samples"
-            )
-        aligned_mix = mix[:, pos_lag : pos_lag + valid_len]
-        aligned_ref = ref[:, :valid_len]
+    mix_start, ref_start, valid_len = get_same_track_slice_indices(
+        alignment,
+        mix_len=T_mix,
+        ref_len=T_ref,
+        enable_subsample=False,  # slice integer bounds first
+        filter_half_length=filter_half_length,
+    )
+
+    aligned_mix = mix[:, mix_start : mix_start + valid_len]
+    aligned_ref = ref[:, ref_start : ref_start + valid_len]
 
     # Sub-sample fractional delay compensation
     if enable_subsample and abs(alignment.subsample_offset) >= 1e-4:

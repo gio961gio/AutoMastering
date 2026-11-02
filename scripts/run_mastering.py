@@ -30,6 +30,7 @@ from ddsp_mastering.data import (
     AlignmentResult,
     estimate_time_alignment,
     apply_same_track_alignment,
+    get_same_track_slice_indices,
     MultiChunkSelector,
     ChunkSpec,
 )
@@ -190,18 +191,28 @@ def run_mastering_session(
     suite = MasteringBenchmarkSuite(sample_rate=48000.0)
 
     if ref_mode == ReferenceMode.SAME_TRACK:
-        # Same-track: evaluated on time-aligned signals with common support
-        min_eval_len = min(raw_aligned.shape[1], ref_aligned.shape[1])
-        ref_eval_tensor = torch.tensor(ref_aligned[:, :min_eval_len]).unsqueeze(0)
-        raw_eval_tensor = torch.tensor(raw_aligned[:, :min_eval_len]).unsqueeze(0)
-        mastered_eval_tensor = torch.tensor(mastered_full_np[:, :min_eval_len]).unsqueeze(0)
+        # Same-track: evaluated on time-aligned signals with exact common temporal support
+        mix_start, ref_start, eval_len = get_same_track_slice_indices(
+            alignment,
+            mix_len=raw_full.shape[1],
+            ref_len=ref_full.shape[1],
+            enable_subsample=True,
+        )
+        raw_eval_tensor = torch.tensor(raw_aligned).unsqueeze(0)
+        ref_eval_tensor = torch.tensor(ref_aligned).unsqueeze(0)
 
+        # S2.1-FINAL: Extract mastered segment precisely matching raw_aligned temporal support
+        mastered_eval_segment = mastered_full_np[:, mix_start : mix_start + eval_len]
+        mastered_eval_tensor = torch.tensor(mastered_eval_segment).unsqueeze(0)
+
+        # S2.1-FINAL Problema 1: Pre-mastering raw mix has NO DDSP chain latency -> align_latency=False!
         pre_metrics = suite.evaluate(
             raw_eval_tensor,
             ref_eval_tensor,
-            align_latency=True,
+            align_latency=False,
             reference_mode="same_track",
         )
+        # S2.1-FINAL Problema 2: Post-mastering DDSP output has 159 smp latency -> align_latency=True!
         post_metrics = suite.evaluate(
             mastered_eval_tensor,
             ref_eval_tensor,

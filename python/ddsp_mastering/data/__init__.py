@@ -9,6 +9,7 @@ from .reference_protocol import (
     estimate_time_alignment,
     apply_same_track_alignment,
     apply_fractional_delay,
+    get_same_track_slice_indices,
     assert_stylistic_guards,
 )
 from .chunking import (
@@ -25,6 +26,7 @@ __all__ = [
     "estimate_time_alignment",
     "apply_same_track_alignment",
     "apply_fractional_delay",
+    "get_same_track_slice_indices",
     "assert_stylistic_guards",
     "ChunkSpec",
     "MultiChunkSelector",
