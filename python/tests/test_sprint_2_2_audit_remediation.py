@@ -572,9 +572,13 @@ def test_b4_f03_juce_plugin_headless_binary_execution():
     import subprocess
     import os
 
-    exe_path = os.path.join("build_juce", "plugin_headless_tests.exe")
-    if not os.path.exists(exe_path):
-        pytest.skip(f"Binary {exe_path} not found. Run CMake build first.")
+    exe_candidates = [
+        os.path.join("build_juce", "plugin_headless_tests.exe"),
+        os.path.join("build_juce", "Release", "plugin_headless_tests.exe"),
+    ]
+    exe_path = next((p for p in exe_candidates if os.path.exists(p)), None)
+    if not exe_path:
+        pytest.skip("Binary plugin_headless_tests.exe not found. Run CMake build first.")
 
     res = subprocess.run([exe_path], capture_output=True, text=True)
     assert res.returncode == 0, f"Headless JUCE test suite failed with code {res.returncode}:\n{res.stdout}\n{res.stderr}"

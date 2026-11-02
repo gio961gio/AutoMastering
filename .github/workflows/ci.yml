@@ -2,7 +2,7 @@ name: CI - Build & Test Suite
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, sprint-2.2-audit-remediation ]
   pull_request:
     branches: [ master ]
 
@@ -28,6 +28,20 @@ jobs:
       - name: Build C++ pybind11 extension inplace
         run: |
           python setup.py build_ext --inplace
+
+      - name: Fetch JUCE 8 for C++ Plugin Headless Build
+        run: |
+          git clone --depth 1 --branch 8.0.6 https://github.com/juce-framework/JUCE.git C:/JUCE
+
+      - name: Configure and Build JUCE plugin headless tests
+        run: |
+          cmake -B build_juce -DJUCE_DIR=C:/JUCE -DCMAKE_BUILD_TYPE=Release
+          cmake --build build_juce --target plugin_headless_tests --config Release
+
+      - name: Run JUCE C++ Headless Test Suite
+        run: |
+          $exe = if (Test-Path "build_juce/Release/plugin_headless_tests.exe") { "build_juce/Release/plugin_headless_tests.exe" } else { "build_juce/plugin_headless_tests.exe" }
+          & $exe
 
       - name: Verify package imports
         env:
