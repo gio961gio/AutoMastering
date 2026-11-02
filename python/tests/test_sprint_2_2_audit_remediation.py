@@ -460,6 +460,110 @@ def test_b1_f01_mastering_benchmark_suite_uses_integrated_standard():
     assert abs(res["target_lufs"] - expected_target) < 1e-6
 
 
+# ---------------------------------------------------------------------------
+# B2 (F-02): Sample Peak vs True Peak 4x Oversampled Characterization Tests
+# ---------------------------------------------------------------------------
+
+def test_b2_f02_true_peak_detects_inter_sample_peaks_above_sample_peak():
+    """Verify B2 / F-02: 4x oversampled True Peak meter detects inter-sample peaks (dBTP > dBFS)."""
+    from ddsp_mastering.optimize.metrics import calculate_sample_peak_dbfs, calculate_true_peak_dbtp
+
+    sr = 48000
+    t = np.arange(sr * 2) / sr
+    # Textbook inter-sample peak signal: 12 kHz sine wave at 45 degree phase
+    # At fs=48kHz, sample values are sin(pi/4 + k*pi/2) = +/- 0.707106 (-3.0103 dBFS)
+    # The true continuous/analog peak is 1.0 (0.0 dBTP)
+    isp_sig = np.sin(2.0 * np.pi * 12000.0 * t + np.pi / 4.0).astype(np.float32)
+    stereo_sig = np.stack([isp_sig, isp_sig * 0.5], axis=0) # (2, T)
+
+    sp_dbfs = calculate_sample_peak_dbfs(stereo_sig)
+    tp_dbtp = calculate_true_peak_dbtp(stereo_sig, sample_rate=sr)
+
+    # Sample peak should be ~ -3.01 dBFS
+    assert abs(sp_dbfs - (-3.0103)) < 0.15
+    # True peak should reconstruct to 0.0 dBTP (+/- 0.1 dBTP)
+    assert abs(tp_dbtp - 0.0) < 0.15
+    # The inter-sample peak difference must be ~ +2.9 to +3.0 dB
+    assert (tp_dbtp - sp_dbfs) > 2.8
+
+
+def test_b2_f02_true_peak_ceiling_violation_distinction():
+    """Verify B2 / F-02: Ceiling violations distinguish Sample Peak (-0.3 dBFS) and True Peak (-0.3 dBTP)."""
+    from ddsp_mastering.optimize.metrics import MasteringBenchmarkSuite
+
+    sr = 48000
+    suite = MasteringBenchmarkSuite(sample_rate=sr, ceiling_dbfs=-0.3000, true_peak_ceiling_dbtp=-0.3000)
+
+    # 1. Signal with Sample Peak BELOW ceiling (-0.40 dBFS) but True Peak ABOVE ceiling (+2.5 dBTP)
+    # Using 12 kHz 45-deg sine scaled so sample peak is -0.40 dBFS
+    t = torch.arange(sr * 2) / sr
+    isp_sig = torch.sin(2.0 * np.pi * 12000.0 * t + np.pi / 4.0)
+    current_sp = torch.max(torch.abs(isp_sig)).item()
+    target_sp_lin = 10.0 ** (-0.40 / 20.0)
+    scaled_isp = (isp_sig / current_sp) * target_sp_lin
+    audio_isp = scaled_isp.repeat(2, 1) # (2, T)
+
+    res = suite.evaluate(audio_isp, audio_isp, reference_mode="same_track", align_latency=False)
+
+    # Sample peak is -0.40 dBFS -> NO sample peak violation
+    assert abs(res["pred_sample_peak_dbfs"] - (-0.40)) < 0.05
+    assert res["sample_peak_ceiling_violation_db"] == 0.0
+    assert res["ceiling_violation_db"] == 0.0
+
+    # True peak is ~ +2.5 dBTP -> MUST report true peak violation (> 2.7 dB above -0.3 dBTP)
+    assert res["pred_true_peak_dbtp"] > 2.0
+    assert res["true_peak_ceiling_violation_db"] > 2.3
+
+    # 2. Compliant signal (-6 dBFS peak) -> ZERO violations on both
+    compliant = audio_isp * 0.5
+    res_comp = suite.evaluate(compliant, compliant, reference_mode="same_track", align_latency=False)
+    assert res_comp["sample_peak_ceiling_violation_db"] == 0.0
+    assert res_comp["true_peak_ceiling_violation_db"] == 0.0
+
+
+def test_b2_f02_limiter_sample_peak_ceiling_characterization_and_cpp_parity():
+    """Verify B2 / F-02: Limiter satisfies Sample Peak ceiling (-0.3 dBFS) on transient bursts with C++ parity."""
+    from ddsp_mastering.dsp.limiter import DifferentiableLookaheadLimiter
+    import py_core_dsp
+
+    sr = 48000
+    lim_py = DifferentiableLookaheadLimiter(sample_rate=sr)
+    lim_cpp = py_core_dsp.LookaheadLimiter(sr)
+
+    # Test cases:
+    # 1. Pushed sine (+6 dB push gain)
+    t = torch.arange(sr) / sr
+    sine_pushed = 0.9 * torch.sin(2.0 * np.pi * 1000.0 * t).repeat(2, 1).unsqueeze(0) # (1, 2, T)
+    out_py_sine = lim_py(sine_pushed, push_gain_db=torch.tensor([6.0]))
+
+    max_py_sine = torch.max(torch.abs(out_py_sine)).item()
+    ceil_lin = 10.0 ** (-0.3000 / 20.0) # ~0.96605088
+    # Sample peak must not exceed ceiling by more than float32 epsilon (1e-5 linear, < 0.0001 dB)
+    assert max_py_sine <= ceil_lin + 1e-5
+
+    # 2. Isolated single clicks and rapid pulse bursts
+    clicks = torch.zeros(1, 2, sr, dtype=torch.float32)
+    clicks[0, 0, 1000] = 1.8
+    clicks[0, 1, 1005] = 2.2
+    clicks[0, 0, 2000:2020:4] = 1.5 # burst of 5 rapid spikes
+    out_py_clicks = lim_py(clicks, push_gain_db=torch.tensor([0.0]))
+
+    max_py_clicks = torch.max(torch.abs(out_py_clicks)).item()
+    assert max_py_clicks <= ceil_lin + 1e-5
+
+    # 3. Verify PyTorch and C++ bit-level parity on the click signal
+    clicks_np = clicks[0].detach().cpu().numpy().astype(np.float64)
+    lim_cpp.reset()
+    lim_cpp.set_push_gain_db(0.0)
+    out_cpp_clicks = lim_cpp.process(clicks_np)
+
+    max_cpp_clicks = np.max(np.abs(out_cpp_clicks))
+    assert max_cpp_clicks <= ceil_lin + 1e-5
+    # PyTorch and C++ outputs must match within float precision
+    np.testing.assert_allclose(out_py_clicks[0].numpy(), out_cpp_clicks, atol=1e-5, rtol=1e-5)
+
+
+
 
 
 

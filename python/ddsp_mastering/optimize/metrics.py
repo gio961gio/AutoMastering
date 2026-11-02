@@ -12,6 +12,7 @@ Computes psychoacoustic and engineering metrics:
 
 import math
 from typing import Dict, List, Optional, Tuple, Union
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torchaudio.functional as taf
@@ -23,12 +24,126 @@ from ddsp_mastering.loss.loudness import (
 from ddsp_mastering.loss.stft import MultiResolutionSTFTLoss
 
 
+def calculate_sample_peak_dbfs(
+    audio: Union[torch.Tensor, np.ndarray],
+) -> float:
+    """Compute maximum absolute sample peak across all channels in dBFS.
+
+    Args:
+        audio: Audio signal as torch.Tensor or numpy.ndarray.
+               Expected shapes: (C, T), (1, C, T), (T, C), or (T,) mono.
+
+    Returns:
+        Sample peak level in dBFS (float). Returns -inf if audio is silence.
+    """
+    if isinstance(audio, np.ndarray):
+        x = torch.from_numpy(audio)
+    elif isinstance(audio, torch.Tensor):
+        x = audio.detach().cpu()
+    else:
+        raise TypeError(f"audio must be torch.Tensor or np.ndarray, got {type(audio)}")
+
+    max_peak_linear = torch.max(torch.abs(x)).item()
+    if max_peak_linear <= 1e-12:
+        return -float("inf")
+    return float(20.0 * math.log10(max_peak_linear))
+
+
+def calculate_true_peak_dbtp(
+    audio: Union[torch.Tensor, np.ndarray],
+    sample_rate: float = 48000.0,
+    oversampling_factor: int = 4,
+) -> float:
+    """Compute standard-compliant True Peak level in dBTP conforming to ITU-R BS.1770-5 Annex 2.
+
+    Uses 4x oversampling interpolation with a windowed sinc FIR filter
+    (Kaiser-windowed sinc interpolation with >= 60 dB stopband attenuation) to detect
+    inter-sample peaks. Returns the maximum True Peak level across all channels.
+
+    Args:
+        audio: Audio signal as torch.Tensor or numpy.ndarray.
+               Expected shapes: (C, T), (1, C, T), (T, C) or (T,) mono.
+        sample_rate: Sampling frequency in Hz (default: 48000.0).
+        oversampling_factor: Oversampling ratio (default: 4 per BS.1770-5 Annex 2).
+
+    Returns:
+        Maximum True Peak level in dBTP across channels (float).
+    """
+    if isinstance(audio, np.ndarray):
+        x = torch.from_numpy(audio)
+    elif isinstance(audio, torch.Tensor):
+        x = audio.detach().cpu()
+    else:
+        raise TypeError(f"audio must be torch.Tensor or np.ndarray, got {type(audio)}")
+
+    # Standardize shape to (C, T)
+    if x.dim() == 1:
+        x = x.unsqueeze(0)
+    elif x.dim() == 2:
+        if x.shape[0] > x.shape[1] and x.shape[1] in (1, 2):
+            x = x.transpose(0, 1)
+    elif x.dim() == 3:
+        if x.shape[0] == 1:
+            x = x.squeeze(0)
+        else:
+            raise ValueError(f"Batch dimension > 1 not supported in calculate_true_peak_dbtp: {x.shape}")
+
+    x = x.to(torch.float32)
+
+    # 4x oversampling per ITU-R BS.1770-5 Annex 2
+    orig_freq = int(round(sample_rate))
+    new_freq = orig_freq * oversampling_factor
+
+    try:
+        x_4x = taf.resample(
+            x,
+            orig_freq=orig_freq,
+            new_freq=new_freq,
+            lowpass_filter_width=64,
+            rolloff=0.9475,
+            resampling_method="sinc_interp_kaiser",
+            beta=14.769656459379492,
+        )
+    except (ValueError, TypeError):
+        x_4x = taf.resample(
+            x,
+            orig_freq=orig_freq,
+            new_freq=new_freq,
+            lowpass_filter_width=64,
+            rolloff=0.9475,
+            resampling_method="kaiser_window",
+            beta=14.769656459379492,
+        )
+
+    # Discard boundary filter transient (filter half-length in 4x domain)
+    margin = 64 * oversampling_factor // 2
+    if x_4x.shape[-1] > 2 * margin:
+        x_valid = x_4x[..., margin:-margin]
+    else:
+        x_valid = x_4x
+
+    max_peak_linear = torch.max(torch.abs(x_valid)).item()
+    if max_peak_linear <= 1e-12:
+        return -float("inf")
+
+    true_peak_dbtp = 20.0 * math.log10(max_peak_linear)
+    return float(true_peak_dbtp)
+
+
 class MasteringBenchmarkSuite:
     """Evaluates mastered audio outputs against targets and acoustic standards."""
 
-    def __init__(self, sample_rate: float = 48000.0, latency_samples: int = 159):
+    def __init__(
+        self,
+        sample_rate: float = 48000.0,
+        latency_samples: int = 159,
+        ceiling_dbfs: float = -0.3000,
+        true_peak_ceiling_dbtp: float = -0.3000,
+    ):
         self.sample_rate = sample_rate
         self.latency_samples = latency_samples
+        self.ceiling_dbfs = ceiling_dbfs
+        self.true_peak_ceiling_dbtp = true_peak_ceiling_dbtp
         self.loudness_calc = DifferentiableLoudnessLoss(sample_rate=sample_rate)
         self.stft_loss = MultiResolutionSTFTLoss()
 
@@ -185,14 +300,17 @@ class MasteringBenchmarkSuite:
 
         delta_lufs = abs(pred_lufs - target_lufs) if (math.isfinite(pred_lufs) and math.isfinite(target_lufs)) else float("inf")
 
-        pred_peak_linear = torch.max(torch.abs(pred_audio)).item()
-        pred_peak_dbfs = 20.0 * math.log10(pred_peak_linear + 1e-12)
-        ceiling_violation_db = max(0.0, pred_peak_dbfs - (-0.3000))
+        # Sample Peak & True Peak calculations
+        pred_sample_peak_dbfs = calculate_sample_peak_dbfs(pred_audio)
+        target_sample_peak_dbfs = calculate_sample_peak_dbfs(target_audio)
+        pred_true_peak_dbtp = calculate_true_peak_dbtp(pred_audio, sample_rate=self.sample_rate)
+        target_true_peak_dbtp = calculate_true_peak_dbtp(target_audio, sample_rate=self.sample_rate)
 
-        pred_plr = (pred_peak_dbfs - pred_lufs) if math.isfinite(pred_lufs) else float("nan")
-        target_peak_linear = torch.max(torch.abs(target_audio)).item()
-        target_peak_dbfs = 20.0 * math.log10(target_peak_linear + 1e-12)
-        target_plr = (target_peak_dbfs - target_lufs) if math.isfinite(target_lufs) else float("nan")
+        sample_peak_ceiling_violation_db = max(0.0, pred_sample_peak_dbfs - self.ceiling_dbfs)
+        true_peak_ceiling_violation_db = max(0.0, pred_true_peak_dbtp - self.true_peak_ceiling_dbtp)
+
+        pred_plr = (pred_sample_peak_dbfs - pred_lufs) if math.isfinite(pred_lufs) else float("nan")
+        target_plr = (target_sample_peak_dbfs - target_lufs) if math.isfinite(target_lufs) else float("nan")
         delta_plr = abs(pred_plr - target_plr) if (math.isfinite(pred_plr) and math.isfinite(target_plr)) else float("nan")
 
         pred_ms_ratio = self.calculate_mid_side_energy_ratio(pred_audio)
@@ -205,8 +323,19 @@ class MasteringBenchmarkSuite:
             "pred_lufs": pred_lufs,
             "target_lufs": target_lufs,
             "delta_lufs": delta_lufs,
-            "pred_peak_dbfs": pred_peak_dbfs,
-            "ceiling_violation_db": ceiling_violation_db,
+            # Sample Peak & True Peak
+            "pred_sample_peak_dbfs": pred_sample_peak_dbfs,
+            "target_sample_peak_dbfs": target_sample_peak_dbfs,
+            "pred_true_peak_dbtp": pred_true_peak_dbtp,
+            "target_true_peak_dbtp": target_true_peak_dbtp,
+            "ceiling_dbfs": self.ceiling_dbfs,
+            "true_peak_ceiling_dbtp": self.true_peak_ceiling_dbtp,
+            "sample_peak_ceiling_violation_db": sample_peak_ceiling_violation_db,
+            "true_peak_ceiling_violation_db": true_peak_ceiling_violation_db,
+            # Deprecated backwards compatibility aliases
+            "pred_peak_dbfs": pred_sample_peak_dbfs,
+            "ceiling_violation_db": sample_peak_ceiling_violation_db,
+            # PLR and stereo metrics
             "pred_plr_db": pred_plr,
             "target_plr_db": target_plr,
             "delta_plr_db": delta_plr,
@@ -237,8 +366,10 @@ class MasteringBenchmarkSuite:
                 "spectral_convergence",
                 "log_spectral_distance_db",
                 "delta_lufs",
-                "pred_peak_dbfs",
+                "pred_sample_peak_dbfs",
+                "pred_true_peak_dbtp",
                 "ceiling_violation_db",
+                "true_peak_ceiling_violation_db",
                 "delta_plr_db",
                 "delta_ms_ratio_db",
             ]
@@ -252,8 +383,10 @@ class MasteringBenchmarkSuite:
             results["aggregate_spectral_distance"] = agg_spec_dist
             results["applicable_metrics"] = [
                 "delta_lufs",
-                "pred_peak_dbfs",
+                "pred_sample_peak_dbfs",
+                "pred_true_peak_dbtp",
                 "ceiling_violation_db",
+                "true_peak_ceiling_violation_db",
                 "delta_plr_db",
                 "delta_ms_ratio_db",
                 "aggregate_spectral_distance",
