@@ -297,7 +297,7 @@ def test_f06_compressor_and_limiter_cpu_batching_parity():
 
 def test_b1_f01_integrated_loudness_matches_reference_pyloudnorm_within_tolerance():
     """Verify B1 / F-01: Integrated loudness matches pyloudnorm within 0.05 LU on complex signals."""
-    import pyloudnorm as pyln
+    pyln = pytest.importorskip("pyloudnorm")
     from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
 
     sr = 48000
@@ -331,7 +331,7 @@ def test_b1_f01_integrated_loudness_matches_reference_pyloudnorm_within_toleranc
 
 def test_b1_f01_gating_absolute_and_relative_mechanisms():
     """Verify B1 / F-01: Absolute (-70 LKFS) and relative (-10 LU) gating correctly exclude quiet blocks."""
-    import pyloudnorm as pyln
+    pyln = pytest.importorskip("pyloudnorm")
     from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
 
     sr = 48000
