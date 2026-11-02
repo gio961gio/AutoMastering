@@ -594,6 +594,7 @@ def test_b4_f03_juce_plugin_headless_binary_execution():
     assert "Host Bypass verificato con successo in processBlock!" in res.stdout
     assert "Stato APVTS serializzato e ripristinato con successo!" in res.stdout
     assert "Schema JSON AutoMastering_Preset_v1 validato al 100%!" in res.stdout
+    assert "Fixture Python -> JUCE (Mode A/B, 41/41 parametri, schema version 1.0 e atomicita) verificata al 100%!" in res.stdout
 
 
 def test_b4_f03_python_preset_schema_and_juce_interoperability():
@@ -631,8 +632,227 @@ def test_b4_f03_python_preset_schema_and_juce_interoperability():
         assert details["unit"] == spec.unit
 
 
+# ---------------------------------------------------------------------------
+# Sprint 2.2 Final Gate Remediation Tests (G2, G3, G4)
+# ---------------------------------------------------------------------------
+
+def test_g2_python_exported_fixture_provenance_and_cpp_parity():
+    """Verify G2: Authentic Python fixture matches AutoMasteringOptimizer.export_preset_json and C++ mapping."""
+    import json
+    import os
+    import py_core_dsp
+    from ddsp_mastering.optimize.optimizer import AutoMasteringOptimizer
+    from ddsp_mastering.param_space import PARAM_SPECS
+
+    fixture_path = os.path.join("python", "tests", "fixtures", "python_exported_preset_v1.json")
+    assert os.path.exists(fixture_path), f"Expected fixture at {fixture_path}"
+
+    with open(fixture_path, "r", encoding="utf-8") as f:
+        disk_json_str = f.read()
+
+    # Re-generate deterministically from the canonical formula
+    z = torch.tensor(
+        [round(0.13 + 0.75 * ((i * 17 + 5) % 41) / 40.0, 6) for i in range(41)],
+        dtype=torch.float32,
+    )
+    opt = AutoMasteringOptimizer(sample_rate=48000.0)
+    fresh_json_str = opt.export_preset_json(z)
+
+    # Provenance proof: fixture on disk matches fresh export_preset_json output
+    assert disk_json_str == fresh_json_str
+
+    parsed = json.loads(disk_json_str)
+    assert parsed["format"] == "AutoMastering_Preset_v1"
+    assert parsed["version"] == "1.0"
+    z_list = parsed["normalized_z"]
+    assert len(z_list) == 41
+    assert len(set(z_list)) == 41, "All 41 z values in fixture must be distinct"
+    assert all(0.05 < v < 0.95 and abs(v - 0.5) > 1e-3 for v in z_list)
+
+    cpp_thetas = py_core_dsp.map_z_to_theta(z_list)
+    for i, spec in enumerate(PARAM_SPECS):
+        py_theta = parsed["parameters"][spec.name]
+        assert abs(py_theta - cpp_thetas[i]) <= 1e-4 * max(1.0, abs(cpp_thetas[i]))
 
 
+def _independent_true_peak_reference_64x_dbtp(audio_np: np.ndarray) -> float:
+    """Independent 64x polyphase FIR True Peak reference using scipy.signal.upfirdn.
 
+    Does not share torchaudio.functional.resample implementation.
+    Uses an 8193-tap (64 zero-crossings per side at 1x rate, L=64) Kaiser-windowed
+    sinc filter (beta=14.769656459379492) with zero-padded boundary conditions.
+    """
+    from scipy import signal
+
+    x = np.asarray(audio_np, dtype=np.float64)
+    if x.ndim == 1:
+        x = x[np.newaxis, :]
+    max_sample = np.max(np.abs(x))
+    if max_sample <= 1e-12:
+        return -float("inf")
+
+    L = 64
+    half_len = 64 * L
+    n = np.arange(-half_len, half_len + 1, dtype=np.float64)
+    h = np.sinc(n / L) * np.kaiser(len(n), beta=14.769656459379492)
+    y_64x = signal.upfirdn(h, x, up=L, down=1, axis=-1)
+    peak = max(max_sample, float(np.max(np.abs(y_64x))))
+    return float(20.0 * np.log10(peak))
+
+
+@pytest.mark.parametrize(
+    "freq_hz",
+    [100.0, 440.0, 1000.0, 3500.0, 6000.0, 12000.0, 16000.0, 20000.0],
+)
+def test_g3_true_peak_frequency_and_phase_sweep_vs_independent_64x_reference(freq_hz: float):
+    """Verify G3.1 & G3.2: True Peak across 8 frequencies x 16 phases vs independent 64x sinc reference."""
+    from scipy import signal
+    from ddsp_mastering.optimize.metrics import calculate_sample_peak_dbfs, calculate_true_peak_dbtp
+
+    sr = 48000.0
+    num_samples = 2400  # 50 ms
+    t = np.arange(num_samples, dtype=np.float64) / sr
+    # Smooth cosine taper at buffer boundaries so we measure the sinusoid's inter-sample peak
+    # rather than rectangular window truncation step-response ringing.
+    window = signal.windows.tukey(num_samples, alpha=0.1)
+    amplitude = 0.70794578  # -3.0000 dBFS continuous peak
+
+    # Theoretical worst-case 4x grid cosine droop relative to continuous peak (ITU-R BS.1770-5 Annex 2):
+    # Delta_droop(f) = -20 * log10(cos(pi * f / (4 * fs)))
+    theoretical_4x_droop_db = -20.0 * np.log10(np.cos(np.pi * freq_hz / (4.0 * sr)))
+    tolerance_db = theoretical_4x_droop_db + 0.025
+
+    for p_idx in range(16):
+        phi = 2.0 * np.pi * p_idx / 16.0
+        sig = (amplitude * np.sin(2.0 * np.pi * freq_hz * t + phi) * window).astype(np.float32)
+
+        sp_dbfs = calculate_sample_peak_dbfs(sig)
+        tp_4x_dbtp = calculate_true_peak_dbtp(sig, sample_rate=sr)
+        tp_64x_ref = _independent_true_peak_reference_64x_dbtp(sig)
+
+        # 1. True Peak must never be smaller than Sample Peak
+        assert tp_4x_dbtp >= sp_dbfs - 1e-6, (
+            f"TP ({tp_4x_dbtp:.4f}) < SP ({sp_dbfs:.4f}) at f={freq_hz} Hz, phi_idx={p_idx}"
+        )
+        # 2. 64x reference must reconstruct the continuous -3.0 dBFS peak within 0.015 dB
+        assert abs(tp_64x_ref - (-3.0)) < 0.015, (
+            f"64x reference deviated from -3.0 dBTP: got {tp_64x_ref:.4f} at f={freq_hz} Hz"
+        )
+        # 3. 4x True Peak meter must match the independent 64x reference within the theoretical 4x bound
+        err_vs_ref = abs(tp_4x_dbtp - tp_64x_ref)
+        assert err_vs_ref <= tolerance_db, (
+            f"4x vs 64x error {err_vs_ref:.4f} dB > {tolerance_db:.4f} dB at f={freq_hz} Hz, phi_idx={p_idx}"
+        )
+
+
+def test_g3_true_peak_boundary_samples_impulses_and_short_buffers():
+    """Verify G3.3: Boundary peaks (first/last sample), near-edge transients, short buffers, and stereo."""
+    from ddsp_mastering.optimize.metrics import calculate_sample_peak_dbfs, calculate_true_peak_dbtp
+
+    sr = 48000.0
+    expected_single_db = 20.0 * np.log10(0.85)  # -1.41162 dB
+
+    # 1. Peak at first sample (n=0), last sample (n=T-1), and near boundaries (n=1, 2, 5, T-2, T-6)
+    for length in [1, 4, 8, 16, 32, 64, 256]:
+        for pos in [0, length - 1, min(1, length - 1), max(0, length - 2), min(5, length - 1)]:
+            buf = np.zeros((2, length), dtype=np.float32)
+            buf[0, pos] = 0.85
+            sp = calculate_sample_peak_dbfs(buf)
+            tp = calculate_true_peak_dbtp(buf, sample_rate=sr)
+            ref64 = _independent_true_peak_reference_64x_dbtp(buf)
+
+            assert abs(sp - expected_single_db) < 1e-4, f"SP failed for length={length}, pos={pos}"
+            assert abs(tp - expected_single_db) < 1e-3, (
+                f"Boundary peak lost! length={length}, pos={pos}: got {tp:.4f}, expected {expected_single_db:.4f}"
+            )
+            assert abs(tp - ref64) < 1e-3
+
+    # 2. Adjacent same-polarity pair [0.7, 0.7] at the very start (n=0,1) and very end (n=T-2,T-1)
+    # Produces a genuine inter-sample peak > 20*log10(0.7) = -3.098 dBFS right at the edge!
+    for start_idx in [0, 30]:
+        buf = np.zeros((1, 32), dtype=np.float32)
+        buf[0, start_idx] = 0.70
+        buf[0, start_idx + 1] = 0.70
+        sp = calculate_sample_peak_dbfs(buf)
+        tp = calculate_true_peak_dbtp(buf, sample_rate=sr)
+        ref64 = _independent_true_peak_reference_64x_dbtp(buf)
+        assert tp > sp + 1.5, f"Edge inter-sample overshoot not detected at start_idx={start_idx}"
+        assert abs(tp - ref64) < 0.05
+
+    # 3. Burst of impulses and asymmetric stereo channels
+    stereo = np.zeros((2, 48), dtype=np.float32)
+    stereo[0, 0] = 0.50  # Left channel peak at sample 0 (-6.02 dBFS)
+    stereo[1, -2] = 0.75  # Right channel inter-sample pair at the very end
+    stereo[1, -1] = 0.75
+    tp_stereo = calculate_true_peak_dbtp(stereo, sample_rate=sr)
+    tp_right_only = calculate_true_peak_dbtp(stereo[1:2, :], sample_rate=sr)
+    assert abs(tp_stereo - tp_right_only) < 1e-5
+    assert tp_stereo > calculate_sample_peak_dbfs(stereo) + 1.5
+
+
+def test_g4_loudness_fallback_method_labeling_and_400ms_boundaries():
+    """Verify G4.1, G4.2 & G4.3: Explicit loudness method tracking across 400ms boundary conditions."""
+    import json
+    from ddsp_mastering.optimize.metrics import MasteringBenchmarkSuite
+    from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
+
+    sr = 48000
+    suite = MasteringBenchmarkSuite(sample_rate=sr)
+
+    def make_tone(num_samples: int, amp: float = 0.1) -> torch.Tensor:
+        t = torch.arange(num_samples, dtype=torch.float32) / sr
+        return (amp * torch.sin(2.0 * np.pi * 1000.0 * t)).unsqueeze(0).repeat(2, 1)
+
+    # 400 ms at 48 kHz = 19,200 samples
+    sig_399ms = make_tone(19199, 0.1)
+    sig_400ms = make_tone(19200, 0.1)
+    sig_401ms = make_tone(19201, 0.1)
+    sig_200ms = make_tone(9600, 0.05)
+    sig_1000ms = make_tone(48000, 0.05)
+
+    # Case 1: Both < 400 ms (399.98 ms and 200 ms) -> fallback proxy for both
+    res_both_short = suite.evaluate(sig_399ms, sig_200ms, reference_mode="stylistic", align_latency=False)
+    assert res_both_short["pred_loudness_method"] == "ungated_k_weighted_proxy_short_audio"
+    assert res_both_short["target_loudness_method"] == "ungated_k_weighted_proxy_short_audio"
+    assert res_both_short["loudness_standard"] == "Ungated K-Weighted Proxy (Short Audio < 400ms Fallback)"
+    assert "ITU-R BS.1770-5" not in res_both_short["loudness_standard"]
+
+    # Verify numerical value matches the ungated proxy
+    expected_proxy = suite.loudness_calc.calculate_ungated_k_weighted_loudness(sig_399ms.unsqueeze(0)).mean().item()
+    assert abs(res_both_short["pred_lufs"] - expected_proxy) < 1e-5
+
+    # Case 2: Exactly 400 ms (19,200 samples) -> standard BS.1770-5 Integrated
+    res_exact_400 = suite.evaluate(sig_400ms, sig_400ms, reference_mode="same_track", align_latency=False)
+    assert res_exact_400["pred_loudness_method"] == "itu_bs1770_5_integrated"
+    assert res_exact_400["target_loudness_method"] == "itu_bs1770_5_integrated"
+    assert res_exact_400["loudness_standard"] == "ITU-R BS.1770-5 (11/2023) Integrated"
+    expected_bs1770 = calculate_integrated_loudness_bs1770(sig_400ms, sample_rate=sr)
+    assert abs(res_exact_400["pred_lufs"] - expected_bs1770) < 1e-6
+
+    # Case 3: Just above 400 ms (19,201 samples) -> standard BS.1770-5 Integrated
+    res_401 = suite.evaluate(sig_401ms, sig_401ms, reference_mode="same_track", align_latency=False)
+    assert res_401["pred_loudness_method"] == "itu_bs1770_5_integrated"
+    assert res_401["target_loudness_method"] == "itu_bs1770_5_integrated"
+    assert res_401["loudness_standard"] == "ITU-R BS.1770-5 (11/2023) Integrated"
+
+    # Case 4: Pred short (< 400 ms) and Target long (>= 400 ms)
+    res_pred_short = suite.evaluate(sig_200ms, sig_1000ms, reference_mode="stylistic", align_latency=False)
+    assert res_pred_short["pred_loudness_method"] == "ungated_k_weighted_proxy_short_audio"
+    assert res_pred_short["target_loudness_method"] == "itu_bs1770_5_integrated"
+    assert res_pred_short["loudness_standard"].startswith("Mixed (")
+    assert res_pred_short["loudness_standard"] != "ITU-R BS.1770-5 (11/2023) Integrated"
+
+    # Case 5: Pred long (>= 400 ms) and Target short (< 400 ms)
+    res_target_short = suite.evaluate(sig_1000ms, sig_200ms, reference_mode="stylistic", align_latency=False)
+    assert res_target_short["pred_loudness_method"] == "itu_bs1770_5_integrated"
+    assert res_target_short["target_loudness_method"] == "ungated_k_weighted_proxy_short_audio"
+    assert res_target_short["loudness_standard"].startswith("Mixed (")
+    assert res_target_short["loudness_standard"] != "ITU-R BS.1770-5 (11/2023) Integrated"
+
+    # Case 6: Verify JSON serializability for manifest
+    serialized = json.dumps(res_pred_short)
+    deserialized = json.loads(serialized)
+    assert deserialized["pred_loudness_method"] == "ungated_k_weighted_proxy_short_audio"
+    assert deserialized["target_loudness_method"] == "itu_bs1770_5_integrated"
 
 
