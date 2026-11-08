@@ -1,12 +1,12 @@
 {
   "artifact_type": "AutoMastering_Sprint2_V0_Public_Reproducibility_Manifest",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sanitized public reproducibility manifest for the 6 Sprint 2 (V0 baseline) optimization sessions. Contains all seeds, SHA-256 hashes, chunk coordinates, 41 optimized parameters, and composite loss breakdowns evaluated identically in IIR mode on the same 4 chunks. Zero private paths or blind listening keys included.",
   "sessions": [
     {
       "track_prefix": "track01",
       "reference_mode": "same_track",
-      "seed": 5405783196615117109,
+      "seed": "5405783196615117109",
       "engine_provenance": {
         "engine_reference_code_commit": "5940e81f12741e2276f7a446adfb6e12f44574fe",
         "engine_reference_doc_commit": "92fe105a19312f258fefb2c70a847720cbd95525",
@@ -52,7 +52,7 @@
         "single_preset_per_track": true,
         "num_chunks": 4,
         "chunk_duration_sec": 3.0,
-        "seed": 5405783196615117109,
+        "seed": "5405783196615117109",
         "num_steps": 30,
         "learning_rate": 0.04,
         "use_hybrid_eq": true,
@@ -412,7 +412,7 @@
     {
       "track_prefix": "track02",
       "reference_mode": "same_track",
-      "seed": 3048363069421082382,
+      "seed": "3048363069421082382",
       "engine_provenance": {
         "engine_reference_code_commit": "5940e81f12741e2276f7a446adfb6e12f44574fe",
         "engine_reference_doc_commit": "92fe105a19312f258fefb2c70a847720cbd95525",
@@ -458,7 +458,7 @@
         "single_preset_per_track": true,
         "num_chunks": 4,
         "chunk_duration_sec": 3.0,
-        "seed": 3048363069421082382,
+        "seed": "3048363069421082382",
         "num_steps": 30,
         "learning_rate": 0.04,
         "use_hybrid_eq": true,
@@ -818,7 +818,7 @@
     {
       "track_prefix": "track03",
       "reference_mode": "same_track",
-      "seed": 12990700764526553868,
+      "seed": "12990700764526553868",
       "engine_provenance": {
         "engine_reference_code_commit": "5940e81f12741e2276f7a446adfb6e12f44574fe",
         "engine_reference_doc_commit": "92fe105a19312f258fefb2c70a847720cbd95525",
@@ -864,7 +864,7 @@
         "single_preset_per_track": true,
         "num_chunks": 4,
         "chunk_duration_sec": 3.0,
-        "seed": 12990700764526553868,
+        "seed": "12990700764526553868",
         "num_steps": 30,
         "learning_rate": 0.04,
         "use_hybrid_eq": true,
@@ -1224,7 +1224,7 @@
     {
       "track_prefix": "track01_style",
       "reference_mode": "stylistic",
-      "seed": 14887125631601849244,
+      "seed": "14887125631601849244",
       "engine_provenance": {
         "engine_reference_code_commit": "5940e81f12741e2276f7a446adfb6e12f44574fe",
         "engine_reference_doc_commit": "92fe105a19312f258fefb2c70a847720cbd95525",
@@ -1260,7 +1260,7 @@
         "single_preset_per_track": true,
         "num_chunks": 4,
         "chunk_duration_sec": 3.0,
-        "seed": 14887125631601849244,
+        "seed": "14887125631601849244",
         "num_steps": 30,
         "learning_rate": 0.04,
         "use_hybrid_eq": true,
@@ -1578,7 +1578,7 @@
     {
       "track_prefix": "track02_style",
       "reference_mode": "stylistic",
-      "seed": 3606996967096283602,
+      "seed": "3606996967096283602",
       "engine_provenance": {
         "engine_reference_code_commit": "5940e81f12741e2276f7a446adfb6e12f44574fe",
         "engine_reference_doc_commit": "92fe105a19312f258fefb2c70a847720cbd95525",
@@ -1614,7 +1614,7 @@
         "single_preset_per_track": true,
         "num_chunks": 4,
         "chunk_duration_sec": 3.0,
-        "seed": 3606996967096283602,
+        "seed": "3606996967096283602",
         "num_steps": 30,
         "learning_rate": 0.04,
         "use_hybrid_eq": true,
@@ -1932,7 +1932,7 @@
     {
       "track_prefix": "track03_style",
       "reference_mode": "stylistic",
-      "seed": 15136152743686100324,
+      "seed": "15136152743686100324",
       "engine_provenance": {
         "engine_reference_code_commit": "5940e81f12741e2276f7a446adfb6e12f44574fe",
         "engine_reference_doc_commit": "92fe105a19312f258fefb2c70a847720cbd95525",
@@ -1968,7 +1968,7 @@
         "single_preset_per_track": true,
         "num_chunks": 4,
         "chunk_duration_sec": 3.0,
-        "seed": 15136152743686100324,
+        "seed": "15136152743686100324",
         "num_steps": 30,
         "learning_rate": 0.04,
         "use_hybrid_eq": true,
@@ -2283,5 +2283,6 @@
         }
       }
     }
-  ]
+  ],
+  "seed_serialization_note": "All 64-bit unsigned integer seeds (uint64) in seed and optimization_config.seed are serialized as decimal strings to prevent IEEE-754 double-precision rounding in JavaScript/RFC-8259 parsers (where Number.MAX_SAFE_INTEGER = 2^53 - 1). Consumers must convert them back to 64-bit integers via int(seed_str) in Python, BigInt(seed_str) in JavaScript, or std::stoull(seed_str) in C++ before seeding the RNG."
 }
