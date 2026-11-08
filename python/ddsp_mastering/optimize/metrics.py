@@ -22,6 +22,7 @@ from ddsp_mastering.loss.loudness import (
     calculate_integrated_loudness_bs1770,
 )
 from ddsp_mastering.loss.stft import MultiResolutionSTFTLoss
+from ddsp_mastering.loss.erb import ERBSpectralLoss
 
 
 def calculate_sample_peak_dbfs(
@@ -152,6 +153,7 @@ class MasteringBenchmarkSuite:
         self.true_peak_ceiling_dbtp = true_peak_ceiling_dbtp
         self.loudness_calc = DifferentiableLoudnessLoss(sample_rate=sample_rate)
         self.stft_loss = MultiResolutionSTFTLoss()
+        self.erb_loss = ERBSpectralLoss(sample_rate=sample_rate)
 
     def align_latency(
         self, pred: torch.Tensor, target: torch.Tensor
@@ -388,10 +390,13 @@ class MasteringBenchmarkSuite:
             _, stft_metrics = self.stft_loss(p_al, t_al)
             sc = stft_metrics["stft_sc_lr"]
             lsd = self.calculate_log_spectral_distance(p_al, t_al)
+            with torch.no_grad():
+                _, erb_metrics = self.erb_loss.forward_same_track(p_al, t_al)
 
             results["spectral_convergence"] = sc
             results["log_spectral_distance_db"] = lsd
             results["aggregate_spectral_distance"] = None
+            results.update(erb_metrics)
             results["applicable_metrics"] = [
                 "spectral_convergence",
                 "log_spectral_distance_db",
@@ -408,9 +413,12 @@ class MasteringBenchmarkSuite:
             agg_spec_dist = self.calculate_aggregate_spectral_distance(
                 pred_audio, target_audio, sample_rate=self.sample_rate
             )
+            with torch.no_grad():
+                _, erb_metrics = self.erb_loss.forward_stylistic(pred_audio, target_audio)
             results["spectral_convergence"] = None
             results["log_spectral_distance_db"] = None
             results["aggregate_spectral_distance"] = agg_spec_dist
+            results.update(erb_metrics)
             results["applicable_metrics"] = [
                 "delta_lufs",
                 "pred_sample_peak_dbfs",

@@ -10,6 +10,7 @@ import torch.nn as nn
 
 from ddsp_mastering.loss.stft import MultiResolutionSTFTLoss
 from ddsp_mastering.loss.loudness import DifferentiableLoudnessLoss
+from ddsp_mastering.loss.erb import ERBSpectralLoss
 from ddsp_mastering.param_space import Z_NEUTRAL
 
 
@@ -19,8 +20,10 @@ class MasteringPerceptualLoss(nn.Module):
     Handles:
       1. Fixed latency alignment compensation (159 samples at 48 kHz).
       2. Multi-Resolution Spectral Convergence and Log-Magnitude Loss (L/R and M/S).
-      3. Differentiable ITU-R BS.1770-4 Integrated LUFS and Crest Factor (PLR) Loss.
-      4. Parameter Regularization prior (preventing extreme parameter values).
+      3. Optional ERB-48 perceptual spectral loss alongside MR-STFT (Sprint 3 V1)
+         and optional asymmetric relative de-harshness penalty (Sprint 3 V1b).
+      4. Differentiable ITU-R BS.1770-4 Integrated LUFS and Crest Factor (PLR) Loss.
+      5. Parameter Regularization prior (preventing extreme parameter values).
     """
 
     def __init__(
@@ -31,6 +34,8 @@ class MasteringPerceptualLoss(nn.Module):
         weight_stft: float = 1.0,
         weight_loudness: float = 0.5,
         weight_param_reg: float = 0.01,
+        weight_erb: float = 0.0,
+        weight_de_harsh: float = 0.0,
         fft_sizes: Tuple[int, ...] = (512, 2048, 8192),
         hop_sizes: Tuple[int, ...] = (128, 512, 2048),
         win_lengths: Tuple[int, ...] = (512, 2048, 8192),
@@ -43,6 +48,8 @@ class MasteringPerceptualLoss(nn.Module):
         self.weight_stft = weight_stft
         self.weight_loudness = weight_loudness
         self.weight_param_reg = weight_param_reg
+        self.weight_erb = weight_erb
+        self.weight_de_harsh = weight_de_harsh
 
         self.stft_loss = MultiResolutionSTFTLoss(
             fft_sizes=fft_sizes,
@@ -50,6 +57,12 @@ class MasteringPerceptualLoss(nn.Module):
             win_lengths=win_lengths,
             use_mid_side=use_mid_side,
             mid_side_weight=mid_side_weight,
+        )
+
+        eff_dh_ratio = (weight_de_harsh / weight_erb) if weight_erb > 0.0 else weight_de_harsh
+        self.erb_loss = ERBSpectralLoss(
+            sample_rate=sample_rate,
+            weight_de_harsh=eff_dh_ratio,
         )
 
         self.loudness_loss = DifferentiableLoudnessLoss(
@@ -108,6 +121,12 @@ class MasteringPerceptualLoss(nn.Module):
             stft_val, stft_metrics = self.stft_loss(p_aligned, t_aligned)
             metrics.update(stft_metrics)
             total_loss = total_loss + self.weight_stft * stft_val
+
+            if self.weight_erb > 0.0 or self.weight_de_harsh > 0.0:
+                erb_val, erb_metrics = self.erb_loss.forward_same_track(p_aligned, t_aligned)
+                metrics.update(erb_metrics)
+                scale = self.weight_erb if self.weight_erb > 0.0 else 1.0
+                total_loss = total_loss + scale * erb_val
 
         # 2. Differentiable Loudness and Dynamic Range Loss
         loudness_val, loudness_metrics = self.loudness_loss(

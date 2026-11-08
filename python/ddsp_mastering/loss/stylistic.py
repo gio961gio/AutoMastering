@@ -12,6 +12,7 @@ import torch.nn as nn
 import torchaudio.functional as taf
 
 from ddsp_mastering.loss.loudness import DifferentiableLoudnessLoss
+from ddsp_mastering.loss.erb import ERBSpectralLoss
 from ddsp_mastering.param_space import Z_NEUTRAL
 
 
@@ -19,7 +20,7 @@ class AggregatePerceptualLoss(nn.Module):
     """Aggregate statistical and perceptual distance loss for stylistic mastering.
 
     Compares long-term distributional descriptors between two distinct musical works:
-      1. Mel-scale / ERB spectral envelope distribution (tonal balance / tilt).
+      1. Mel-scale (`mel40`, V0/V0p) or ERB-48 multi-statistic (`erb48`, V1) spectral envelope distribution.
       2. Integrated & short-term ITU-R BS.1770-4 Loudness (LUFS).
       3. Dynamic Range & Crest Factor (Peak-to-Loudness Ratio / PLR).
       4. Mid/Side Stereo energy distribution & width.
@@ -37,12 +38,18 @@ class AggregatePerceptualLoss(nn.Module):
         weight_dynamics: float = 0.5,
         weight_stereo: float = 0.3,
         weight_param_reg: float = 0.02,
+        spectral_mode: str = "mel40",
+        weight_de_harsh: float = 0.0,
     ):
         super().__init__()
+        if spectral_mode not in ("mel40", "erb48"):
+            raise ValueError(f"Unsupported spectral_mode '{spectral_mode}'. Expected 'mel40' or 'erb48'.")
         self.sample_rate = sample_rate
         self.n_mels = n_mels
         self.n_fft = n_fft
         self.hop_length = hop_length
+        self.spectral_mode = spectral_mode
+        self.weight_de_harsh = weight_de_harsh
 
         self.weight_spectral = weight_spectral
         self.weight_loudness = weight_loudness
@@ -62,6 +69,11 @@ class AggregatePerceptualLoss(nn.Module):
         self.register_buffer("mel_fbanks", fb)  # [n_freqs, n_mels]
         self.register_buffer("stft_window", torch.hann_window(n_fft))
 
+        eff_dh_ratio = (weight_de_harsh / weight_spectral) if weight_spectral > 0.0 else weight_de_harsh
+        self.erb_loss = ERBSpectralLoss(
+            sample_rate=sample_rate,
+            weight_de_harsh=eff_dh_ratio,
+        )
         self.loudness_loss = DifferentiableLoudnessLoss(sample_rate=sample_rate)
 
     def _extract_mel_spectrum_distribution(self, audio: torch.Tensor) -> torch.Tensor:
@@ -105,6 +117,7 @@ class AggregatePerceptualLoss(nn.Module):
         ref_audio: torch.Tensor,
         normalized_params: Optional[torch.Tensor] = None,
         target_lufs: Optional[float] = None,
+        mix_anchor_audio: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """Compute multi-feature aggregate distance for stylistic reference mastering.
 
@@ -113,6 +126,8 @@ class AggregatePerceptualLoss(nn.Module):
             ref_audio: Target reference song audio [B, 2, T_ref] (lengths may differ!).
             normalized_params: Latent controls z in [0, 1]^41 for regularization.
             target_lufs: Optional explicit target LUFS (overrides reference LUFS).
+            mix_anchor_audio: Optional unoptimized mix chunk `x_mix` used to anchor
+                              active-frame selection (`no_grad`) in `erb48` mode.
 
         Returns:
             Tuple of (total_loss, metrics_dict).
@@ -120,14 +135,25 @@ class AggregatePerceptualLoss(nn.Module):
         metrics: Dict[str, float] = {}
         total_loss = torch.tensor(0.0, device=pred_audio.device, dtype=pred_audio.dtype)
 
-        # 1. Tonal Balance: Aggregate Mel-Scale Spectral Shape Loss
-        mel_pred = self._extract_mel_spectrum_distribution(pred_audio)
-        with torch.no_grad():
-            mel_ref = self._extract_mel_spectrum_distribution(ref_audio)
+        # 1. Tonal Balance: Mel-40 (V0/V0p) or ERB-48 Multi-Statistic (V1/V1b)
+        if self.spectral_mode == "erb48":
+            erb_total, erb_metrics = self.erb_loss.forward_stylistic(
+                pred_audio=pred_audio,
+                ref_audio=ref_audio,
+                mix_anchor_audio=mix_anchor_audio,
+            )
+            metrics.update(erb_metrics)
+            metrics["stylistic_spectral_loss"] = erb_metrics["erb_stylistic_total_loss"]
+            scale = self.weight_spectral if self.weight_spectral > 0.0 else 1.0
+            total_loss = total_loss + scale * erb_total
+        else:
+            mel_pred = self._extract_mel_spectrum_distribution(pred_audio)
+            with torch.no_grad():
+                mel_ref = self._extract_mel_spectrum_distribution(ref_audio)
 
-        spectral_diff = torch.mean(torch.abs(mel_pred - mel_ref))
-        metrics["stylistic_spectral_loss"] = spectral_diff.item()
-        total_loss = total_loss + self.weight_spectral * spectral_diff
+            spectral_diff = torch.mean(torch.abs(mel_pred - mel_ref))
+            metrics["stylistic_spectral_loss"] = spectral_diff.item()
+            total_loss = total_loss + self.weight_spectral * spectral_diff
 
         # 2. Loudness Matching Loss (ITU-R BS.1770-4)
         pred_lufs = self.loudness_loss.calculate_lufs(pred_audio)

@@ -11,6 +11,12 @@ from .stft import (
 )
 from .combined import MasteringPerceptualLoss
 from .stylistic import AggregatePerceptualLoss
+from .erb import (
+    ERBSpectralLoss,
+    build_erb_filterbank,
+    compute_active_frame_weights_and_mask,
+    compute_active_sample_mask,
+)
 
 __all__ = [
     "DifferentiableKWeighting",
@@ -20,4 +26,8 @@ __all__ = [
     "MultiResolutionSTFTLoss",
     "MasteringPerceptualLoss",
     "AggregatePerceptualLoss",
+    "ERBSpectralLoss",
+    "build_erb_filterbank",
+    "compute_active_frame_weights_and_mask",
+    "compute_active_sample_mask",
 ]

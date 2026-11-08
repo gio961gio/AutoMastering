@@ -64,3 +64,6 @@ human_validation/private/
 *~
 .DS_Store
 Thumbs.db
+
+docs/sprint3/.cache_v0p_v1/
+

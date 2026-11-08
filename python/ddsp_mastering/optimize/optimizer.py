@@ -41,12 +41,18 @@ class AutoMasteringOptimizer:
         weight_loudness: float = 0.8,
         weight_param_reg: float = 0.02,
         use_hybrid_eq: bool = True,
+        weight_erb: float = 0.0,
+        stylistic_spectral_mode: str = "mel40",
+        weight_de_harsh: float = 0.0,
     ):
         self.sample_rate = sample_rate
         self.lr = lr
         self.num_steps = num_steps
         self.target_lufs = target_lufs
         self.use_hybrid_eq = use_hybrid_eq
+        self.weight_erb = weight_erb
+        self.stylistic_spectral_mode = stylistic_spectral_mode
+        self.weight_de_harsh = weight_de_harsh
 
         self.chain = DifferentiableMasteringChain(sample_rate=sample_rate)
         default_lufs = target_lufs if target_lufs is not None else -14.0
@@ -56,12 +62,16 @@ class AutoMasteringOptimizer:
             weight_stft=weight_stft,
             weight_loudness=weight_loudness,
             weight_param_reg=weight_param_reg,
+            weight_erb=weight_erb,
+            weight_de_harsh=weight_de_harsh,
         )
         self.stylistic_loss_fn = AggregatePerceptualLoss(
             sample_rate=sample_rate,
             weight_spectral=weight_stft,
             weight_loudness=weight_loudness,
             weight_param_reg=weight_param_reg,
+            spectral_mode=stylistic_spectral_mode,
+            weight_de_harsh=weight_de_harsh,
         )
         self.benchmark = MasteringBenchmarkSuite(sample_rate=sample_rate)
 
@@ -179,6 +189,7 @@ class AutoMasteringOptimizer:
                 n_pre_k = preroll_counts[k]
                 pred_ext_k = self.chain(mix_k, z=z, eq_mode=eq_mode)
                 pred_k = pred_ext_k[..., n_pre_k:] if n_pre_k > 0 else pred_ext_k
+                mix_eval_k = mix_k[..., n_pre_k:] if n_pre_k > 0 else mix_k
 
                 if reference_mode == "stylistic":
                     ref_k = ref_chunks[k % len(ref_chunks)] if ref_chunks else None
@@ -189,6 +200,7 @@ class AutoMasteringOptimizer:
                         ref_audio=ref_k,
                         normalized_params=z,
                         target_lufs=effective_target_lufs,
+                        mix_anchor_audio=mix_eval_k,
                     )
                     step_stft += weights[k] * chunk_metrics.get("stylistic_spectral_loss", 0.0)
                 else:
