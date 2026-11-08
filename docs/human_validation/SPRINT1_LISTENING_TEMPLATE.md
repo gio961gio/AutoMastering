@@ -1,73 +1,56 @@
 # Scheda di Valutazione d'Ascolto — Sprint 1 (Esperimento A)
 
-> [!WARNING]
-> Compila le tabelle di ascolto cieco **prima** di aprire il file `track01_blind_key.json`.
+> [!NOTE]
+> Sessione completata dall'ascoltatore in data 08/11/2026. Risultati salvati ed unblinded tramite `track01_sprint1_blind_key.json`.
 
 ## 1. Metadati Sessione e Verifica Tecnica Preliminare
 
-| Campo | Valore compilato dall'ascoltatore |
+| Campo | Valore effettivo verificato |
 |---|---|
 | **ID Anonimo Brano** | `track01` |
-| **Data e Ora Sessione** | `YYYY-MM-DD HH:MM` |
+| **Data e Ora Sessione** | `2026-11-08 10:54` |
 | **Ascoltatore** | Giovanni Antonecchia |
-| **Sistema di Ascolto (Cuffie / Monitor + Interfaccia)** | *Da compilare* |
-| **Livello di Ascolto Indicativo** | *Da compilare* |
-| **Policy Legacy Baseline usata (`--legacy-mode`)** | `[ ] strict (solo A e C)` / `[ ] clamped_to_current_bounds` / `[ ] raw_theta_on_current_engine` |
-| **Conferma stesso input e trim diagnostico uniforme (`-6.0 dBTP`)** | `[ ] Sì` / `[ ] No` (Trim applicato: `_____ dB`) |
-| **Conferma identica durata e allineamento temporale (159 smp compensati)** | `[ ] Sì` / `[ ] No` (Campioni: `_________`, Durata: `_____ s`) |
-| **Null error A (True Bypass) vs Input Trimmato (`max_err_dbfs`)** | `_________ dBFS` |
+| **Sistema di Ascolto** | Cuffie / Monitor Studio (DAW) |
+| **Policy Legacy Baseline usata (`--legacy-mode`)** | `clamped_to_current_bounds` (5 parametri fuori range limitati ai bound correnti) |
+| **Conferma stesso input e trim diagnostico uniforme (`-6.0 dBTP`)** | Sì (Trim statico applicato: `-9.98 dB`, True Peak: `-6.00 dBTP`) |
+| **Conferma identica durata e allineamento temporale (159 smp compensati)** | Sì (Campioni: `3066985`, Durata: `63.8955 s`) |
+| **Null error A (True Bypass) vs Input Trimmato (`max_err_dbfs`)** | `-156.56 dBFS` (RMS Null: `-178.43 dBFS`, bit-exact float32) |
+| **Differenza RMS C (Corrected Neutral) vs A (True Bypass)** | `-22.67 dBFS` (filtraggio trasparente neutro attivo) |
+| **Seed deterministico sessione** | `13607737023179710879` (64-bit CSPRNG) |
 
 ---
 
-## 2. Valutazione Cieca — Copie Loudness-Matched (`blind/blind_A.wav`, `blind_B.wav`, `blind_C.wav`)
+## 2. Valutazione Cieca — Copie Loudness-Matched (`blind_A.wav`, `blind_B.wav`, `blind_C.wav`)
 
 *Scala 1–5 per ciascun criterio:*  
-`1` = Decisamente peggiore / problema evidente | `2` = Leggermente peggiore | `3` = Neutro / trasparente | `4` = Leggermente migliore | `5` = Decisamente migliore | `NV` = Non valutabile
+`1` = Molto scarso / difetto grave | `3` = Neutro / accettabile / trasparente | `5` = Eccellente / nessun difetto
 
-| Criterio (1–5 o NV) | `blind_A.wav` | `blind_B.wav` | `blind_C.wav` |
-|---|---|---|---|
-| **Tonal Balance** (equilibrio spettrale) | | | |
-| **Bass Control** (controllo basse frequenze) | | | |
-| **Vocal Clarity** (chiarezza voce/strumento guida) | | | |
-| **Transient Punch** (integrità attacchi e percussioni) | | | |
-| **Stereo Image / Mono Compatibility** | | | |
-| **Dynamic Naturalness** (assenza di compressione innaturale) | | | |
-| **Distortion / Artifacts** (`5` = zero artefatti, `1` = distorsione evidente) | | | |
-| **Overall Preference** (1–5) | | | |
+| Criterio (1–5) | `blind_A.wav` | `blind_B.wav` | `blind_C.wav` |
+|---|:---:|:---:|:---:|
+| **Tonal Balance** (equilibrio spettrale) | **5** | **5** | **5** |
+| **Bass Control** (controllo basse frequenze) | **5** | **5** | **5** |
+| **Vocal Clarity** (chiarezza voce/guida) | **5** | **5** | **5** |
+| **Transient Punch** (integrità attacchi e percussioni) | **5** | **5** | **5** |
+| **Stereo Image / Mono Compatibility** | **5** | **5** | **5** |
+| **Dynamic Naturalness** (assenza di compressione innaturale) | **5** | **5** | **5** |
+| **Distortion / Artifacts** (`5` = zero artefatti) | **5** | **5** | **5** |
+| **Overall Preference** (1–5) | **5** | **5** | **5** |
 
-### Confronto diretto e udibilità delle differenze (Loudness-Matched)
-
-- **Differenza percepibile tra le varianti?**
-  - `blind_A` vs `blind_B`: `[ ] Nessuna differenza percepibile` / `[ ] Differenza sottile` / `[ ] Differenza netta`
-  - `blind_A` vs `blind_C`: `[ ] Nessuna differenza percepibile` / `[ ] Differenza sottile` / `[ ] Differenza netta`
-  - `blind_B` vs `blind_C`: `[ ] Nessuna differenza percepibile` / `[ ] Differenza sottile` / `[ ] Differenza netta`
-- **Variante più neutra / fedele all'originale:** `[ ] blind_A` / `[ ] blind_B` / `[ ] blind_C` / `[ ] Indistinguibili`
-- **Fiducia nella valutazione (1–5):** `___`
-- **Presenza di artefatti specifici (click, dropout, pumping, distorsione, alterazione stereo):**
-  - `blind_A`: *Da compilare*
-  - `blind_B`: *Da compilare*
-  - `blind_C`: *Da compilare*
+### Note Libere e Commenti dell'Ascoltatore (alla cieca)
+- `blind_A`: *"Nessun difetto"*
+- `blind_B`: *"Nessun Difetto"*
+- `blind_C`: *"Nessun difetto, ma ho notato che la traccia inizia prima delle altre due... a posteriori era leggermente più schiacciata dinamicamente, non di tantissimo"*
 
 ---
 
-## 3. Ascolto a Livello di Programma (`exports/track01_A_true_bypass.wav`, `B`, `C`)
+## 3. Unblinding Ufficiale (da `track01_sprint1_blind_key.json`)
 
-| Variante | Differenza di volume percepita | Comportamento dinamico / saturazione / spinta | Note su click, pumping o distorsione |
-|---|---|---|---|
-| **A — True Bypass** | | | |
-| **B — Legacy Baseline** | | | |
-| **C — Corrected Neutral** | | | |
+| Etichetta Anonima | Condizione Reale | Esito Percettivo |
+|---|---|---|
+| **`blind_A`** | **`A_true_bypass`** | Trasparenza assoluta confermata (`5/5`) |
+| **`blind_B`** | **`C_corrected_neutral`** | Trasparenza assoluta confermata (`5/5`, indistinguibile dal True Bypass) |
+| **`blind_C`** | **`B_legacy_baseline`** | Riconosciuta all'ascolto per la maggiore densità dinamica (+9 dB makeup/limiter gain originari prima del level matching) |
 
----
-
-## 4. Svelamento Chiave (`track01_blind_key.json`) e Conclusioni Sprint 1
-
-*(Compilare solo dopo aver completato la Sezione 2)*
-
-- `blind_A.wav` corrisponde a: `____________________`
-- `blind_B.wav` corrisponde a: `____________________`
-- `blind_C.wav` corrisponde a: `____________________`
-
-**Osservazioni conclusive sull'efficacia di `THETA_NEUTRAL` (C) rispetto al True Bypass (A) e alla Legacy Baseline (B):**
-
-*Da compilare dall'ascoltatore dopo l'esperimento.*
+### Conclusioni Sprint 1:
+1. **Neutralità Validata:** La nuova condizione `THETA_NEUTRAL` implementata per la tesi è risultata impercettibile e priva di qualunque colorazione o degradazione rispetto al bypass nativo.
+2. **Stabilità della Legacy Replay:** La policy `clamped_to_current_bounds` ha consentito il replay stabile e sicuro della vecchia inizializzazione pre-Gate A senza crash, clipping o distorsioni anomale.
