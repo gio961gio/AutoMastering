@@ -254,6 +254,72 @@ def calculate_integrated_loudness_bs1770(
     return float(integrated_lufs)
 
 
+def boltzmann_soft_peak_dbfs(
+    x: torch.Tensor,
+    sample_rate: float = 48000.0,
+    block_duration_sec: float = 0.010,
+    p: int = 8,
+    beta: float = 2.0,
+    eps: float = 1e-12,
+) -> torch.Tensor:
+    """Compute Boltzmann-weighted soft-peak mean / softmax-weighted peak proxy in dBFS (§2.C.2).
+
+    Formula:
+      p_m(x) = 10 * log10( (1 / (C * N_b) * sum_{c=1}^C sum_{n in m} |x_c[n]|^(2p))^(1/p) + eps )
+      p_max(x) = max_m' p_m'(x)
+      Peak_soft(x) = sum_m p_m(x) * exp(beta * (p_m(x) - p_max(x))) / sum_m exp(beta * (p_m(x) - p_max(x)))
+
+    Invariance & Numerical Stability Properties:
+      - Rigorously invariant between mono (C=1) and dual-mono (C=2) signals (delta < 1e-12).
+      - Free of duration bias (exact equality on repeated periodic blocks).
+      - Evaluated with float64 internal accumulators to eliminate subnormal underflow / overflow.
+      - Detached p_max for numerical stability and exact analytical softmax gradient.
+
+    Args:
+        x: Audio tensor (B, C, T), (C, T), or (T,).
+        sample_rate: Sampling frequency in Hz (default: 48000.0).
+        block_duration_sec: Duration of local peak blocks (default: 0.010 s / 10 ms).
+        p: Lp norm exponent (default: 8, corresponding to 2p = 16).
+        beta: Boltzmann thermal sensitivity parameter in dB^-1 (default: 2.0).
+        eps: Numerical floor (default: 1e-12).
+
+    Returns:
+        Tensor of shape (B,) in dBFS.
+    """
+    if x.dim() == 1:
+        x_in = x.unsqueeze(0).unsqueeze(0)
+    elif x.dim() == 2:
+        x_in = x.unsqueeze(0)
+    else:
+        x_in = x
+
+    B, C, T = x_in.shape
+    device = x_in.device
+    orig_dtype = x_in.dtype
+
+    N_b = int(round(block_duration_sec * sample_rate))
+    M = T // N_b
+    if M <= 0:
+        M = 1
+        N_b = T
+
+    x_trimmed = x_in[:, :, : M * N_b]
+    x_blocks = x_trimmed.reshape(B, C, M, N_b)
+
+    # Accumulate in float64 for absolute precision over |x|^(2p)
+    x64 = x_blocks.to(torch.float64)
+    mean_p = torch.mean(torch.abs(x64 + 1e-18) ** (2 * p), dim=(1, 3))  # (B, M)
+
+    p_m = (10.0 / float(p)) * torch.log10(mean_p.clamp(min=eps))  # (B, M)
+    p_max = torch.max(p_m, dim=-1, keepdim=True).values.detach()  # (B, 1)
+
+    weights = torch.exp(beta * (p_m - p_max))  # (B, M), in (0, 1]
+    w_sum = torch.sum(weights, dim=-1, keepdim=True).clamp(min=eps)
+
+    peak_soft = torch.sum(p_m * weights, dim=-1) / w_sum.squeeze(-1)  # (B,)
+    return peak_soft.to(dtype=orig_dtype)
+
+
 class DifferentiableLoudnessLoss(nn.Module):
     """Computes differentiable K-weighted Loudness proxy and Perceptual Loudness Loss."""
 
@@ -266,6 +332,7 @@ class DifferentiableLoudnessLoss(nn.Module):
         target_plr: Optional[float] = 10.0,
         plr_min: float = 8.0,
         plr_max: float = 14.0,
+        plr_mode: str = "box",
         eps: float = 1e-12,
     ):
         super().__init__()
@@ -276,6 +343,7 @@ class DifferentiableLoudnessLoss(nn.Module):
         self.target_plr = target_plr
         self.plr_min = plr_min
         self.plr_max = plr_max
+        self.plr_mode = plr_mode
         self.eps = eps
 
         self.k_filter = DifferentiableKWeighting(sample_rate=sample_rate)
@@ -320,26 +388,97 @@ class DifferentiableLoudnessLoss(nn.Module):
         return peak_dbfs
 
     def calculate_plr(self, x: torch.Tensor) -> torch.Tensor:
-        """Compute differentiable Peak-to-Loudness Ratio (PLR / Crest Factor) in dB."""
+        """Compute differentiable Peak-to-Loudness Ratio (PLR / Crest Factor) in dB (V0 box proxy)."""
         peak_dbfs = self.calculate_peak_dbfs(x)
         lufs = self.calculate_ungated_k_weighted_loudness(x)
         return peak_dbfs - lufs
+
+    def calculate_plr_proxy(self, x: torch.Tensor) -> torch.Tensor:
+        """Compute reference-aware PLR proxy using Boltzmann soft-peak mean in dB (§2.C.2)."""
+        peak_soft = boltzmann_soft_peak_dbfs(x, sample_rate=self.sample_rate, eps=self.eps)
+        lufs = self.calculate_ungated_k_weighted_loudness(x)
+        return peak_soft - lufs
+
+    def compute_reference_aware_plr_loss(
+        self,
+        pred: torch.Tensor,
+        ref: torch.Tensor,
+        mode: str = "same_track",
+        d_style: float = 1.0,
+        gamma_floor: float = 1.0,
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """Compute reference-aware PLR loss using Boltzmann soft-peak proxy (§2.C.2).
+
+        Args:
+            pred: Processed audio tensor (B, 2, T).
+            ref: Reference target audio tensor (B, 2, T_ref).
+            mode: 'same_track' (direct Huber_1.0 matching) or 'stylistic' (dead-zone + floor).
+            d_style: Dead-zone tolerance width in dB (default: 1.0 dB).
+            gamma_floor: Dynamic floor violation penalty weight (default: 1.0).
+
+        Returns:
+            Tuple of (plr_loss, metrics_dict).
+        """
+        pred_plr = self.calculate_plr_proxy(pred)
+        with torch.no_grad():
+            ref_plr = self.calculate_plr_proxy(ref)
+
+        if mode == "same_track":
+            plr_diff = pred_plr - ref_plr
+            plr_loss = F.huber_loss(pred_plr, ref_plr, reduction="mean", delta=1.0)
+            metrics = {
+                "pred_plr_proxy": pred_plr.mean().item(),
+                "ref_plr_proxy": ref_plr.mean().item(),
+                "plr_proxy_diff_db": plr_diff.abs().mean().item(),
+                "plr_loss": plr_loss.item(),
+            }
+            return plr_loss, metrics
+        elif mode == "stylistic":
+            delta_plr = pred_plr - ref_plr
+            excess = F.relu(torch.abs(delta_plr) - d_style)
+            deadzone_loss = F.huber_loss(excess, torch.zeros_like(excess), reduction="mean", delta=1.0)
+
+            plr_floor = torch.minimum(
+                torch.tensor(8.0, device=pred.device, dtype=pred.dtype),
+                ref_plr - 1.5,
+            )
+            floor_violation = F.relu(plr_floor - pred_plr)
+            floor_loss = torch.mean(floor_violation ** 2)
+
+            plr_loss = deadzone_loss + gamma_floor * floor_loss
+            metrics = {
+                "pred_plr_proxy": pred_plr.mean().item(),
+                "ref_plr_proxy": ref_plr.mean().item(),
+                "plr_proxy_diff_db": delta_plr.abs().mean().item(),
+                "plr_floor_db": plr_floor.mean().item(),
+                "plr_deadzone_loss": deadzone_loss.item(),
+                "plr_floor_loss": floor_loss.item(),
+                "plr_loss": plr_loss.item(),
+            }
+            return plr_loss, metrics
+        else:
+            raise ValueError(f"Unsupported mode '{mode}'. Expected 'same_track' or 'stylistic'.")
 
     def forward(
         self,
         pred: torch.Tensor,
         target_lufs: Optional[float] = None,
+        ref_audio: Optional[torch.Tensor] = None,
+        plr_mode: Optional[str] = None,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """Compute loudness and dynamic range loss.
 
         Args:
             pred: Processed audio tensor of shape (B, 2, T).
             target_lufs: Optional override of target LUFS.
+            ref_audio: Optional reference audio for reference-aware PLR loss (§2.C.2).
+            plr_mode: Mode override ('box', 'reference_aware_same', 'reference_aware_style').
 
         Returns:
             Tuple of (total_loudness_loss, metrics_dict).
         """
         tgt = target_lufs if target_lufs is not None else self.target_lufs
+        eff_mode = plr_mode if plr_mode is not None else self.plr_mode
 
         # 1. Ungated K-weighted loudness proxy calculation
         pred_lufs = self.calculate_ungated_k_weighted_loudness(pred)  # (B,)
@@ -348,33 +487,51 @@ class DifferentiableLoudnessLoss(nn.Module):
         lufs_diff = pred_lufs - tgt
         lufs_loss = F.smooth_l1_loss(pred_lufs, torch.full_like(pred_lufs, tgt), beta=1.0)
 
-        # 2. Dynamic Range / Crest Factor / PLR (Peak to Loudness Ratio)
-        peak_dbfs = self.calculate_peak_dbfs(pred)  # (B,)
-        plr = peak_dbfs - pred_lufs  # (B,)
+        metrics: Dict[str, float] = {}
 
-        # Penalize over-compression (PLR < plr_min) and under-compression (PLR > plr_max)
-        plr_under_penalty = F.relu(self.plr_min - plr) ** 2
-        plr_over_penalty = F.relu(plr - self.plr_max) ** 2
-        plr_loss = torch.mean(plr_under_penalty + plr_over_penalty)
+        # 2. Dynamic Range / Crest Factor / PLR (Peak to Loudness Ratio)
+        if eff_mode in ("reference_aware_same", "reference_aware") and ref_audio is not None:
+            plr_loss, plr_metrics = self.compute_reference_aware_plr_loss(
+                pred=pred, ref=ref_audio, mode="same_track"
+            )
+            metrics.update(plr_metrics)
+            peak_dbfs = boltzmann_soft_peak_dbfs(pred, sample_rate=self.sample_rate)
+            plr = peak_dbfs - pred_lufs
+        elif eff_mode == "reference_aware_style" and ref_audio is not None:
+            plr_loss, plr_metrics = self.compute_reference_aware_plr_loss(
+                pred=pred, ref=ref_audio, mode="stylistic"
+            )
+            metrics.update(plr_metrics)
+            peak_dbfs = boltzmann_soft_peak_dbfs(pred, sample_rate=self.sample_rate)
+            plr = peak_dbfs - pred_lufs
+        else:
+            # V0 / V0p historical box mode
+            peak_dbfs = self.calculate_peak_dbfs(pred)  # (B,)
+            plr = peak_dbfs - pred_lufs  # (B,)
+            plr_under_penalty = F.relu(self.plr_min - plr) ** 2
+            plr_over_penalty = F.relu(plr - self.plr_max) ** 2
+            plr_loss = torch.mean(plr_under_penalty + plr_over_penalty)
+            metrics["plr_loss"] = plr_loss.item()
 
         total_loss = (
             self.lufs_loss_weight * lufs_loss
             + self.plr_loss_weight * plr_loss
         )
 
-        metrics = {
+        metrics.update({
             "loudness_proxy_pred": pred_lufs.mean().item(),
             "loudness_proxy_target": float(tgt),
             "loudness_proxy_error_db": lufs_diff.abs().mean().item(),
             "lufs_loss": lufs_loss.item(),
             "peak_dbfs": peak_dbfs.mean().item(),
             "plr_db": plr.mean().item(),
-            "plr_loss": plr_loss.item(),
             "loudness_loss_total": total_loss.item(),
             # Backwards compatibility keys
             "lufs_pred": pred_lufs.mean().item(),
             "lufs_target": float(tgt),
             "lufs_error_db": lufs_diff.abs().mean().item(),
-        }
+        })
+
+        return total_loss, metrics
 
         return total_loss, metrics

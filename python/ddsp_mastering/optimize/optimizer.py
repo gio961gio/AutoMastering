@@ -44,6 +44,8 @@ class AutoMasteringOptimizer:
         weight_erb: float = 0.0,
         stylistic_spectral_mode: str = "mel40",
         weight_de_harsh: float = 0.0,
+        weight_trans: float = 0.0,
+        plr_mode: str = "box",
     ):
         self.sample_rate = sample_rate
         self.lr = lr
@@ -53,9 +55,15 @@ class AutoMasteringOptimizer:
         self.weight_erb = weight_erb
         self.stylistic_spectral_mode = stylistic_spectral_mode
         self.weight_de_harsh = weight_de_harsh
+        self.weight_trans = weight_trans
+        self.plr_mode = plr_mode
 
         self.chain = DifferentiableMasteringChain(sample_rate=sample_rate)
         default_lufs = target_lufs if target_lufs is not None else -14.0
+
+        same_plr_mode = "reference_aware_same" if plr_mode in ("reference_aware", "reference_aware_same") else "box"
+        style_plr_mode = "reference_aware" if plr_mode in ("reference_aware", "reference_aware_style") else "mse"
+
         self.loss_fn = MasteringPerceptualLoss(
             sample_rate=sample_rate,
             target_lufs=default_lufs,
@@ -64,6 +72,8 @@ class AutoMasteringOptimizer:
             weight_param_reg=weight_param_reg,
             weight_erb=weight_erb,
             weight_de_harsh=weight_de_harsh,
+            weight_trans=weight_trans,
+            plr_mode=same_plr_mode,
         )
         self.stylistic_loss_fn = AggregatePerceptualLoss(
             sample_rate=sample_rate,
@@ -72,6 +82,8 @@ class AutoMasteringOptimizer:
             weight_param_reg=weight_param_reg,
             spectral_mode=stylistic_spectral_mode,
             weight_de_harsh=weight_de_harsh,
+            weight_trans=weight_trans,
+            plr_mode=style_plr_mode,
         )
         self.benchmark = MasteringBenchmarkSuite(sample_rate=sample_rate)
 

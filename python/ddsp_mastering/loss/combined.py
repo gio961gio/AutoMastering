@@ -11,6 +11,7 @@ import torch.nn as nn
 from ddsp_mastering.loss.stft import MultiResolutionSTFTLoss
 from ddsp_mastering.loss.loudness import DifferentiableLoudnessLoss
 from ddsp_mastering.loss.erb import ERBSpectralLoss
+from ddsp_mastering.loss.transient import TransientEnvelopeLoss
 from ddsp_mastering.param_space import Z_NEUTRAL
 
 
@@ -22,8 +23,10 @@ class MasteringPerceptualLoss(nn.Module):
       2. Multi-Resolution Spectral Convergence and Log-Magnitude Loss (L/R and M/S).
       3. Optional ERB-48 perceptual spectral loss alongside MR-STFT (Sprint 3 V1)
          and optional asymmetric relative de-harshness penalty (Sprint 3 V1b).
-      4. Differentiable ITU-R BS.1770-4 Integrated LUFS and Crest Factor (PLR) Loss.
-      5. Parameter Regularization prior (preventing extreme parameter values).
+      4. Multi-band Transient/Envelope Loss (Sprint 3 V2).
+      5. Differentiable ITU-R BS.1770-4 Integrated LUFS and Crest Factor (PLR) Loss
+         (box mode for V0/V0p/V1, reference-aware Boltzmann soft-peak for V2).
+      6. Parameter Regularization prior (preventing extreme parameter values).
     """
 
     def __init__(
@@ -36,6 +39,8 @@ class MasteringPerceptualLoss(nn.Module):
         weight_param_reg: float = 0.01,
         weight_erb: float = 0.0,
         weight_de_harsh: float = 0.0,
+        weight_trans: float = 0.0,
+        plr_mode: str = "box",
         fft_sizes: Tuple[int, ...] = (512, 2048, 8192),
         hop_sizes: Tuple[int, ...] = (128, 512, 2048),
         win_lengths: Tuple[int, ...] = (512, 2048, 8192),
@@ -50,6 +55,8 @@ class MasteringPerceptualLoss(nn.Module):
         self.weight_param_reg = weight_param_reg
         self.weight_erb = weight_erb
         self.weight_de_harsh = weight_de_harsh
+        self.weight_trans = weight_trans
+        self.plr_mode = plr_mode
 
         self.stft_loss = MultiResolutionSTFTLoss(
             fft_sizes=fft_sizes,
@@ -65,9 +72,14 @@ class MasteringPerceptualLoss(nn.Module):
             weight_de_harsh=eff_dh_ratio,
         )
 
+        self.transient_loss = TransientEnvelopeLoss(
+            sample_rate=sample_rate,
+        )
+
         self.loudness_loss = DifferentiableLoudnessLoss(
             sample_rate=sample_rate,
             target_lufs=target_lufs,
+            plr_mode=plr_mode,
         )
 
     def align_latency(
@@ -128,9 +140,18 @@ class MasteringPerceptualLoss(nn.Module):
                 scale = self.weight_erb if self.weight_erb > 0.0 else 1.0
                 total_loss = total_loss + scale * erb_val
 
+            if self.weight_trans > 0.0:
+                trans_val, trans_metrics = self.transient_loss.forward_same_track(p_aligned, t_aligned)
+                metrics.update(trans_metrics)
+                total_loss = total_loss + self.weight_trans * trans_val
+
         # 2. Differentiable Loudness and Dynamic Range Loss
+        ref_for_plr = t_aligned if (target_audio is not None and self.plr_mode != "box") else None
         loudness_val, loudness_metrics = self.loudness_loss(
-            pred_audio, target_lufs=target_lufs
+            pred_audio,
+            target_lufs=target_lufs,
+            ref_audio=ref_for_plr,
+            plr_mode=self.plr_mode,
         )
         metrics.update(loudness_metrics)
         total_loss = total_loss + self.weight_loudness * loudness_val

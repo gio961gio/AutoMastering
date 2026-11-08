@@ -13,6 +13,7 @@ import torchaudio.functional as taf
 
 from ddsp_mastering.loss.loudness import DifferentiableLoudnessLoss
 from ddsp_mastering.loss.erb import ERBSpectralLoss
+from ddsp_mastering.loss.transient import TransientEnvelopeLoss
 from ddsp_mastering.param_space import Z_NEUTRAL
 
 
@@ -23,8 +24,9 @@ class AggregatePerceptualLoss(nn.Module):
       1. Mel-scale (`mel40`, V0/V0p) or ERB-48 multi-statistic (`erb48`, V1) spectral envelope distribution.
       2. Integrated & short-term ITU-R BS.1770-4 Loudness (LUFS).
       3. Dynamic Range & Crest Factor (Peak-to-Loudness Ratio / PLR).
-      4. Mid/Side Stereo energy distribution & width.
-      5. Parameter regularization prior towards conservative neutral preset.
+      4. Multi-band Transient/Envelope distributional distance (Sprint 3 V2).
+      5. Mid/Side Stereo energy distribution & width.
+      6. Parameter regularization prior towards conservative neutral preset.
     """
 
     def __init__(
@@ -40,6 +42,8 @@ class AggregatePerceptualLoss(nn.Module):
         weight_param_reg: float = 0.02,
         spectral_mode: str = "mel40",
         weight_de_harsh: float = 0.0,
+        weight_trans: float = 0.0,
+        plr_mode: str = "mse",
     ):
         super().__init__()
         if spectral_mode not in ("mel40", "erb48"):
@@ -50,6 +54,8 @@ class AggregatePerceptualLoss(nn.Module):
         self.hop_length = hop_length
         self.spectral_mode = spectral_mode
         self.weight_de_harsh = weight_de_harsh
+        self.weight_trans = weight_trans
+        self.plr_mode = plr_mode
 
         self.weight_spectral = weight_spectral
         self.weight_loudness = weight_loudness
@@ -73,6 +79,9 @@ class AggregatePerceptualLoss(nn.Module):
         self.erb_loss = ERBSpectralLoss(
             sample_rate=sample_rate,
             weight_de_harsh=eff_dh_ratio,
+        )
+        self.transient_loss = TransientEnvelopeLoss(
+            sample_rate=sample_rate,
         )
         self.loudness_loss = DifferentiableLoudnessLoss(sample_rate=sample_rate)
 
@@ -170,15 +179,33 @@ class AggregatePerceptualLoss(nn.Module):
         total_loss = total_loss + self.weight_loudness * lufs_loss
 
         # 3. Dynamic Profile / Crest Factor (PLR) Matching
-        pred_plr = self.loudness_loss.calculate_plr(pred_audio)
-        with torch.no_grad():
-            ref_plr = self.loudness_loss.calculate_plr(ref_audio)
+        if self.plr_mode == "reference_aware":
+            plr_loss, plr_metrics = self.loudness_loss.compute_reference_aware_plr_loss(
+                pred=pred_audio, ref=ref_audio, mode="stylistic"
+            )
+            metrics.update(plr_metrics)
+            metrics["stylistic_plr_loss"] = plr_loss.item()
+            total_loss = total_loss + self.weight_dynamics * plr_loss
+        else:
+            pred_plr = self.loudness_loss.calculate_plr(pred_audio)
+            with torch.no_grad():
+                ref_plr = self.loudness_loss.calculate_plr(ref_audio)
 
-        plr_loss = torch.mean((pred_plr - ref_plr) ** 2)
-        metrics["stylistic_plr_loss"] = plr_loss.item()
-        metrics["pred_plr"] = pred_plr.mean().item()
-        metrics["ref_plr"] = ref_plr.mean().item()
-        total_loss = total_loss + self.weight_dynamics * plr_loss
+            plr_loss = torch.mean((pred_plr - ref_plr) ** 2)
+            metrics["stylistic_plr_loss"] = plr_loss.item()
+            metrics["pred_plr"] = pred_plr.mean().item()
+            metrics["ref_plr"] = ref_plr.mean().item()
+            total_loss = total_loss + self.weight_dynamics * plr_loss
+
+        # 3b. Multi-band Transient / Envelope Distributional Loss (Sprint 3 V2)
+        if self.weight_trans > 0.0:
+            trans_total, trans_metrics = self.transient_loss.forward_stylistic(
+                pred_audio=pred_audio,
+                ref_audio=ref_audio,
+                mix_anchor_audio=mix_anchor_audio,
+            )
+            metrics.update(trans_metrics)
+            total_loss = total_loss + self.weight_trans * trans_total
 
         # 4. Stereo Width & Mid-Side Energy Balance Matching
         # pred
