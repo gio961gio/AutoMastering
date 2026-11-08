@@ -1,0 +1,4 @@
+session_id,anonymous_label,unblinded_condition,tonal_balance_1_5,bass_control_1_5,vocal_clarity_1_5,transient_punch_1_5,stereo_image_1_5,dynamic_naturalness_1_5,distortion_artifacts_1_5,overall_preference_1_5,mean_8_criteria,free_notes
+track01_sprint1,blind_A,A_true_bypass,5,5,5,5,5,5,5,5,5.000,Nessun difetto
+track01_sprint1,blind_B,C_corrected_neutral,5,5,5,5,5,5,5,5,5.000,Nessun Difetto
+track01_sprint1,blind_C,B_legacy_baseline,5,5,5,5,5,5,5,5,5.000,"Nessun difetto, ma ho notato che la traccia inizia prima delle altre due (probabilmente nelle altre due è presente un pò di latenza)"

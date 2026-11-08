@@ -1,0 +1,37 @@
+track_id,section_id,role,listening_mode,anonymous_label,unblinded_condition,tonal_balance_1_5,bass_control_1_5,vocal_clarity_1_5,transient_punch_1_5,stereo_image_1_5,dynamic_naturalness_1_5,distortion_artifacts_1_5,overall_preference_1_5,valid_criteria_count,mean_8_criteria,free_notes
+track01,section01,Bridge / Transienti,level_matched,blind_A,original_or_bypass,5,5,5,5,5,5,5,5,8,5.0000,
+track01,section01,Bridge / Transienti,level_matched,blind_B,mastered,2,3,5,4,5,3,5,3,8,3.7500,"- Le basse le senso poco presenti e quindi molta presenza delle alte (presence alta, quindi forse questo è il motivo dell poche basse, non so se però è per l'eccessiva compressione o per equalizzazione spinta sulle alte)."
+track01,section01,Bridge / Transienti,program_level,blind_A,mastered,3,4,5,5,5,3,5,3,8,4.1250,"- Si sentono molto le alte frequenze (specie zona presence, quindi affatica l'ascolto un pò).  - Molto aperta stereofonicamente (forse percezione dovuta alle alte frequenze presenti massivamente nello stereo)."
+track01,section01,Bridge / Transienti,program_level,blind_B,original_or_bypass,5,5,5,3,5,4,5,4,8,4.5000,"-  Traccia un pò spenta, però bilanciata. - Manca punch.  -"
+track01,section02,Intro / Strofa Tranquilla,level_matched,blind_A,mastered,5,4,5,5,5,4,5,4,8,4.6250,- Bassi poco controllati
+track01,section02,Intro / Strofa Tranquilla,level_matched,blind_B,original_or_bypass,5,5,5,5,5,5,5,5,8,5.0000,
+track01,section02,Intro / Strofa Tranquilla,program_level,blind_A,original_or_bypass,5,5,5,5,5,5,5,5,8,5.0000,
+track01,section02,Intro / Strofa Tranquilla,program_level,blind_B,mastered,3,5,5,5,4,3,5,3,8,4.1250,"In generale è molto compresso, troppa enfasi sulla zona della presence e quindi risulta essere harsh. Anche lo stereo sembra un pò troppo aperto."
+track01,section03,Ritornello / Drop Denso,level_matched,blind_A,mastered,4,4,5,5,4,3,5,3,8,4.1250,"- Un pò sbilanciato sulle alte frequenze, quindi i bassi li senti poco. -Un pò troppo aperto lo stereo. -Dinamicamente è un pò troppo schiacciato, anche se mantiene il punch nei transienti ad alta frequenza, meno per quelli alle basse."
+track01,section03,Ritornello / Drop Denso,level_matched,blind_B,original_or_bypass,4,3,5,3,5,5,5,4,8,4.2500,- Un pò di mudness.  - Poco punch
+track01,section03,Ritornello / Drop Denso,program_level,blind_A,mastered,3,5,5,5,3,3,5,3,8,4.0000,- Harsh.  -Molto aperto stereofonicamente
+track01,section03,Ritornello / Drop Denso,program_level,blind_B,original_or_bypass,,3,4,3,5,4,5,3,7,3.8571,- Un pò impastato sulle medie
+track02,section01,Ritornello / Drop Denso,level_matched,blind_A,original_or_bypass,5,5,5,5,5,5,5,5,8,5.0000,
+track02,section01,Ritornello / Drop Denso,level_matched,blind_B,mastered,4,5,5,3,5,4,5,4,8,4.3750,- Bassi abbastanza compressi e poco dinamici.
+track02,section01,Ritornello / Drop Denso,program_level,blind_A,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track02,section01,Ritornello / Drop Denso,program_level,blind_B,original_or_bypass,4,5,5,3,5,4,5,4,8,4.3750,- Risulta un pò spento perchè manca punch.
+track02,section02,Bridge / Transienti,level_matched,blind_A,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track02,section02,Bridge / Transienti,level_matched,blind_B,original_or_bypass,5,5,5,4,5,4,5,4,8,4.6250,"Manca il punch, specie kick e snare"
+track02,section02,Bridge / Transienti,program_level,blind_A,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track02,section02,Bridge / Transienti,program_level,blind_B,original_or_bypass,5,5,5,4,5,4,5,4,8,4.6250,"Manca il punch, specie kick e snare"
+track02,section03,Intro / Strofa Tranquilla,level_matched,blind_A,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track02,section03,Intro / Strofa Tranquilla,level_matched,blind_B,original_or_bypass,5,5,5,4,5,4,5,4,8,4.6250,
+track02,section03,Intro / Strofa Tranquilla,program_level,blind_A,original_or_bypass,5,5,5,4,5,5,5,5,8,4.8750,Manca un pò di punch
+track02,section03,Intro / Strofa Tranquilla,program_level,blind_B,mastered,4,5,5,5,5,4,5,4,8,4.6250,Un pò harsh
+track03,section01,Intro / Strofa Tranquilla,level_matched,blind_A,original_or_bypass,4,5,5,5,5,5,5,5,8,4.8750,- Le basse sono un pò sotto.
+track03,section01,Intro / Strofa Tranquilla,level_matched,blind_B,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track03,section01,Intro / Strofa Tranquilla,program_level,blind_A,original_or_bypass,5,5,5,5,5,,5,5,7,5.0000,
+track03,section01,Intro / Strofa Tranquilla,program_level,blind_B,mastered,5,5,5,5,5,3,5,3,8,4.5000,"- Troppo compresso, risulta anche un pò harsh"
+track03,section02,Ritornello / Drop Denso,level_matched,blind_A,original_or_bypass,5,5,5,5,5,5,5,5,8,5.0000,
+track03,section02,Ritornello / Drop Denso,level_matched,blind_B,mastered,5,5,5,5,5,4,5,4,8,4.7500,Un pò troppo compresso
+track03,section02,Ritornello / Drop Denso,program_level,blind_A,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track03,section02,Ritornello / Drop Denso,program_level,blind_B,original_or_bypass,4,5,5,4,5,3,5,5,8,4.5000,"Abbsatanza complesso,quindi risulta meno brillante e si sente poco il punch"
+track03,section03,Bridge / Transienti,level_matched,blind_A,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track03,section03,Bridge / Transienti,level_matched,blind_B,original_or_bypass,5,5,5,4,5,5,5,5,8,4.8750,Poco punch dovuto probabilmente ad un pò di compressione in piu
+track03,section03,Bridge / Transienti,program_level,blind_A,mastered,3,5,5,5,4,3,5,3,8,4.1250,- Un pò troppo harsh.  -Un pò troppo aperto lo stereo.  - Risulta overcompresso e quindi schiacciato
+track03,section03,Bridge / Transienti,program_level,blind_B,original_or_bypass,5,5,5,5,5,5,,5,7,5.0000,

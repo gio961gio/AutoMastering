@@ -1,0 +1,13 @@
+track_id,section_id,role,listening_mode,anonymous_label,unblinded_condition,tonal_balance_1_5,bass_control_1_5,vocal_clarity_1_5,transient_punch_1_5,stereo_image_1_5,dynamic_naturalness_1_5,distortion_artifacts_1_5,overall_preference_1_5,valid_criteria_count,mean_8_criteria,free_notes
+track01_style,section01,Ritornello / Drop Denso,level_matched,blind_A,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track01_style,section01,Ritornello / Drop Denso,level_matched,blind_B,original_or_bypass,5,5,5,5,5,5,5,5,8,5.0000,
+track01_style,section01,Ritornello / Drop Denso,program_level,blind_A,original_or_bypass,4,4,5,5,5,3,5,3,8,4.2500,Harsh e un pò troppo compresso
+track01_style,section01,Ritornello / Drop Denso,program_level,blind_B,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track02_style,section01,Ritornello / Drop Denso,level_matched,blind_A,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track02_style,section01,Ritornello / Drop Denso,level_matched,blind_B,original_or_bypass,5,5,5,5,5,5,5,5,8,5.0000,
+track02_style,section01,Ritornello / Drop Denso,program_level,blind_A,original_or_bypass,5,5,5,5,5,5,5,5,8,5.0000,
+track02_style,section01,Ritornello / Drop Denso,program_level,blind_B,mastered,3,5,5,5,5,5,5,4,8,4.6250,- Si sentono molto le alte rispetto alle basse
+track03_style,section01,Ritornello / Drop Denso,level_matched,blind_A,mastered,5,5,5,5,5,5,5,5,8,5.0000,
+track03_style,section01,Ritornello / Drop Denso,level_matched,blind_B,original_or_bypass,5,5,5,5,5,5,5,5,8,5.0000,
+track03_style,section01,Ritornello / Drop Denso,program_level,blind_A,original_or_bypass,5,5,5,5,5,5,5,5,8,5.0000,
+track03_style,section01,Ritornello / Drop Denso,program_level,blind_B,mastered,3,5,5,5,5,3,5,3,8,4.2500,- Percepisco una loudness molto forte.  -Harsh
