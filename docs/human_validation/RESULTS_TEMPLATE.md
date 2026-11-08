@@ -55,14 +55,16 @@ L'Esperimento B ha valutato il mastering automatico DDSP su 3 brani musicali dif
 
 ### 2.1 Tabella Sintetica Misure Oggettive Pre / Post Mastering
 
-| Track ID | Modalità | Seed (64-bit) | Pre LUFS | Post LUFS | Δ LUFS | Pre TP (`dBTP`) | Post TP (`dBTP`) | Pre PLR (`dB`) | Post PLR (`dB`) | Loss Iniziale -> Finale (STFT + Loudness) | Riduzione Loss |
+| Track ID | Modalità | Seed (64-bit) | Pre LUFS | Post LUFS | Δ LUFS | Pre TP (`dBTP`) | Post TP (`dBTP`) | Pre PLR (`dB`) | Post PLR (`dB`) | Loss Composita Totale*: Iniziale (`z_0`) -> `step 29` -> Finale su `z_opt` (`IIR`) | Riduzione Loss (`z_0` -> `z_opt`) |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **`track01`** | `same_track` | `5405783196615117109` | `-14.22` | **`-10.51`** | `+3.71` | `+3.98` | `+0.28` | `18.12` | `10.21` | `6.67` -> **`3.10`** | **`-53.5%`** |
-| **`track02`** | `same_track` | `3048363069421082382` | `-22.03` | **`-18.04`** | `+3.99` | `-4.03` | `-0.07` | `18.01` | `17.74` | `14.28` -> **`10.43`** | **`-27.0%`** |
-| **`track03`** | `same_track` | `12990700764526553868` | `-17.86` | **`-13.50`** | `+4.36` | `-3.38` | `+0.02` | `14.45` | `13.20` | `10.45` -> **`6.47`** | **`-38.1%`** |
-| **`track01_style`** | `stylistic` | `14887125631601849244` | `-14.22` | **`-17.84`** | `-3.62` | `+3.98` | `-2.38` | `18.12` | `15.46` | `28.09` -> **`8.59`** | **`-69.4%`** |
-| **`track02_style`** | `stylistic` | `3606996967096283602` | `-22.03` | **`-18.05`** | `+3.98` | `-4.03` | `-0.07` | `18.01` | `17.75` | `159.91` -> **`83.00`** | **`-48.1%`** |
-| **`track03_style`** | `stylistic` | `15136152743686100324` | `-17.86` | **`-13.52`** | `+4.34` | `-3.38` | `+0.05` | `14.45` | `13.22` | `110.60` -> **`46.78`** | **`-57.7%`** |
+| **`track01`** | `same_track` | `5405783196615117109` | `-14.22` | **`-10.51`** | `+3.71` | `+3.98` | `+0.28` | `18.12` | `10.21` | `6.6669` -> `3.0966` -> **`3.0841`** | **`-53.7%`** |
+| **`track02`** | `same_track` | `3048363069421082382` | `-22.03` | **`-18.04`** | `+3.99` | `-4.03` | `-0.07` | `18.01` | `17.74` | `14.2843` -> `10.4312` -> **`10.4173`** | **`-27.1%`** |
+| **`track03`** | `same_track` | `12990700764526553868` | `-17.86` | **`-13.50`** | `+4.36` | `-3.38` | `+0.02` | `14.45` | `13.20` | `10.4493` -> `6.4696` -> **`6.4545`** | **`-38.2%`** |
+| **`track01_style`** | `stylistic` | `14887125631601849244` | `-14.22` | **`-17.84`** | `-3.62` | `+3.98` | `-2.38` | `18.12` | `15.46` | `28.0920` -> `8.5858` -> **`8.5529`** | **`-69.6%`** |
+| **`track02_style`** | `stylistic` | `3606996967096283602` | `-22.03` | **`-18.05`** | `+3.98` | `-4.03` | `-0.07` | `18.01` | `17.75` | `159.9057` -> `82.9988` -> **`82.7613`** | **`-48.2%`** |
+| **`track03_style`** | `stylistic` | `15136152743686100324` | `-17.86` | **`-13.52`** | `+4.34` | `-3.38` | `+0.05` | `14.45` | `13.22` | `110.5956` -> `46.7759` -> **`46.5655`** | **`-57.9%`** |
+
+*\*Nota sulla Loss Composita Totale (`num_steps = 30`, `lr = 0.04`, `4 chunk x 3.0 s`):* La metrica registrata è la **loss composita completa** dell'ottimizzatore (in `same_track`: `1.0 * MR-STFT + 0.8 * Loudness/PLR + 0.01 * ParamReg`; in `stylistic`: `1.0 * MelSpectral + 0.8 * Loudness + 0.5 * PLR + 0.3 * Stereo + 0.01 * ParamReg`), e non la sola somma STFT + Loudness. Nella tabella sono riportati il valore iniziale a `z_0 = Z_NEUTRAL` (`step 0`), il valore registrato in `history["loss"][-1]` all'ultimo passo di ciclo (`step 29`, pre-update finale) e il valore finale esatto ricalcolato sul vettore restituito `z_opt` (`step 30`, con `eq_mode="iir"`).
 
 ---
 
