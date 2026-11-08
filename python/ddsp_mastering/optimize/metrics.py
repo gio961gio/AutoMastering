@@ -105,31 +105,46 @@ def calculate_true_peak_dbtp(
 
     # Explicit zero-padding boundary condition (64 samples each side) so boundary peaks
     # at index 0 and T-1 and their filter reconstruction tails are completely preserved.
+    # Uses streaming chunking (chunk_size = 480000 = 10s at 48 kHz) to prevent multi-gigabyte
+    # memory allocations and page thrashing on long audio files while guaranteeing exact numerical identity.
     filter_width = 64
-    x_padded = F.pad(x, (filter_width, filter_width), mode="constant", value=0.0)
+    chunk_size = 480000
+    total_len = x.shape[-1]
+    max_oversampled_linear = 0.0
 
-    try:
-        x_oversampled = taf.resample(
-            x_padded,
-            orig_freq=1,
-            new_freq=int(oversampling_factor),
-            lowpass_filter_width=filter_width,
-            rolloff=1.0,
-            resampling_method="sinc_interp_kaiser",
-            beta=14.769656459379492,
-        )
-    except (ValueError, TypeError):
-        x_oversampled = taf.resample(
-            x_padded,
-            orig_freq=1,
-            new_freq=int(oversampling_factor),
-            lowpass_filter_width=filter_width,
-            rolloff=1.0,
-            resampling_method="kaiser_window",
-            beta=14.769656459379492,
+    for s_idx in range(0, total_len, chunk_size):
+        e_idx = min(total_len, s_idx + chunk_size)
+        pl = min(s_idx, filter_width)
+        pr = min(total_len - e_idx, filter_width)
+        ctx_seg = x[:, s_idx - pl : e_idx + pr]
+        seg_padded = F.pad(ctx_seg, (filter_width - pl, filter_width - pr), mode="constant", value=0.0)
+
+        try:
+            seg_oversampled = taf.resample(
+                seg_padded,
+                orig_freq=1,
+                new_freq=int(oversampling_factor),
+                lowpass_filter_width=filter_width,
+                rolloff=1.0,
+                resampling_method="sinc_interp_kaiser",
+                beta=14.769656459379492,
+            )
+        except (ValueError, TypeError):
+            seg_oversampled = taf.resample(
+                seg_padded,
+                orig_freq=1,
+                new_freq=int(oversampling_factor),
+                lowpass_filter_width=filter_width,
+                rolloff=1.0,
+                resampling_method="kaiser_window",
+                beta=14.769656459379492,
+            )
+
+        max_oversampled_linear = max(
+            max_oversampled_linear, torch.max(torch.abs(seg_oversampled)).item()
         )
 
-    max_peak_linear = max(sample_peak_linear, torch.max(torch.abs(x_oversampled)).item())
+    max_peak_linear = max(sample_peak_linear, max_oversampled_linear)
     if max_peak_linear <= 1e-12:
         return -float("inf")
 
