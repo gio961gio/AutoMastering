@@ -74,17 +74,25 @@ class AutoMasteringOptimizer:
         initial_z: Optional[torch.Tensor] = None,
         verbose: bool = False,
         align_latency: bool = True,
+        mix_preroll_samples: Optional[List[int]] = None,
     ) -> Tuple[torch.Tensor, List[torch.Tensor], Dict[str, List[float]]]:
         """Run optimization loop across multiple representative audio chunks.
 
         Args:
-            mix_chunks: List of unmastered chunk tensors [(1, 2, T_k), ...]
+            mix_chunks: List of unmastered chunk tensors [(1, 2, T_k), ...].
+                        If `mix_preroll_samples` is provided, each `mix_chunks[k]`
+                        includes `mix_preroll_samples[k]` causal warm-up samples
+                        prior to the evaluation window `[s_k, e_k]`.
             ref_chunks: List of reference chunk tensors [(1, 2, T_k), ...], if available.
             reference_mode: "same_track" (point-to-point) or "stylistic" (aggregate features).
             chunk_weights: Optional weights per chunk. Normalized automatically to sum to 1.0.
             initial_z: Optional initial parameters z in [0, 1]^41.
             verbose: Whether to print progress during optimization.
             align_latency: Whether to slice off chain latency (same_track only).
+            mix_preroll_samples: Optional list of causal pre-roll sample counts per chunk.
+                                 After running `self.chain(mix_k)`, the first `n_pre_k`
+                                 samples are stripped so the loss is evaluated strictly
+                                 on the warmed-up evaluation window `[s_k, e_k]`.
 
         Returns:
             Tuple of (optimal_z, list_of_mastered_chunks, loss_history).
@@ -95,6 +103,16 @@ class AutoMasteringOptimizer:
 
         K = len(mix_chunks)
         device = mix_chunks[0].device
+
+        if mix_preroll_samples is None:
+            preroll_counts = [0] * K
+        else:
+            assert len(mix_preroll_samples) == K, "mix_preroll_samples length must match mix_chunks length"
+            preroll_counts = [max(0, int(n)) for n in mix_preroll_samples]
+            for i, (c, n_pre) in enumerate(zip(mix_chunks, preroll_counts)):
+                assert c.shape[-1] > n_pre, (
+                    f"Chunk {i} length ({c.shape[-1]}) must exceed its pre-roll ({n_pre})"
+                )
 
         # Setup chunk weighting
         if chunk_weights is None:
@@ -158,7 +176,9 @@ class AutoMasteringOptimizer:
 
             for k in range(K):
                 mix_k = mix_chunks[k]
-                pred_k = self.chain(mix_k, z=z, eq_mode=eq_mode)
+                n_pre_k = preroll_counts[k]
+                pred_ext_k = self.chain(mix_k, z=z, eq_mode=eq_mode)
+                pred_k = pred_ext_k[..., n_pre_k:] if n_pre_k > 0 else pred_ext_k
 
                 if reference_mode == "stylistic":
                     ref_k = ref_chunks[k % len(ref_chunks)] if ref_chunks else None
@@ -208,10 +228,11 @@ class AutoMasteringOptimizer:
 
         optimal_z = torch.sigmoid(u).detach()
         with torch.no_grad():
-            final_chunks = [
-                self.chain(c, z=optimal_z, eq_mode="iir")
-                for c in mix_chunks
-            ]
+            final_chunks = []
+            for k, c in enumerate(mix_chunks):
+                n_pre_k = preroll_counts[k]
+                out_k = self.chain(c, z=optimal_z, eq_mode="iir")
+                final_chunks.append(out_k[..., n_pre_k:] if n_pre_k > 0 else out_k)
 
         return optimal_z, final_chunks, history
 

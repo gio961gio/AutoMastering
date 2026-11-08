@@ -307,3 +307,38 @@ class MultiChunkSelector:
             chunk = audio[:, c.start_sample : c.end_sample]
             out.append(np.ascontiguousarray(chunk, dtype=np.float32))
         return out
+
+    def extract_chunk_tensors_with_preroll(
+        self,
+        audio: np.ndarray,
+        chunks: List[ChunkSpec],
+        preroll_sec: float = 0.0,
+    ) -> Tuple[List[np.ndarray], List[int]]:
+        """Extract audio slices including causal pre-roll warm-up context.
+
+        When a chunk starts at `s_k < N_pre`, uses all available context from the
+        true start of the track (`0 .. s_k - 1`), never initializing artificial
+        DSP state mid-track.
+
+        Args:
+            audio: Stereo audio array of shape (2, T).
+            chunks: List of ChunkSpec objects defining evaluation intervals [s_k, e_k].
+            preroll_sec: Nominal pre-roll duration in seconds (e.g. 2.5s for V0p..V4).
+
+        Returns:
+            Tuple of:
+              - list of extended float32 arrays of shape (2, n_pre_eff_k + (e_k - s_k))
+              - list of effective pre-roll sample counts `n_pre_eff_k = s_k - s_ext_k`
+        """
+        n_pre_nominal = max(0, int(round(float(preroll_sec) * self.sample_rate)))
+        ext_chunks: List[np.ndarray] = []
+        preroll_samples: List[int] = []
+        for c in chunks:
+            s_k = int(c.start_sample)
+            e_k = int(c.end_sample)
+            s_ext = max(0, s_k - n_pre_nominal)
+            n_pre_eff = s_k - s_ext
+            chunk_ext = audio[:, s_ext:e_k]
+            ext_chunks.append(np.ascontiguousarray(chunk_ext, dtype=np.float32))
+            preroll_samples.append(int(n_pre_eff))
+        return ext_chunks, preroll_samples
