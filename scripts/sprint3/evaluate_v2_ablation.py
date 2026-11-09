@@ -131,7 +131,7 @@ class _FastCPUAnalyticalBiquad(torch.autograd.Function):
 
         grad_a = None
         if ctx.needs_input_grad[1]:
-            da0 = np.zeros(M, dtype=np.float64)
+            da0 = -(psi * y_np).sum(axis=-1)
             da1 = -(psi[:, 1:] * y_np[:, :-1]).sum(axis=-1)
             da2 = -(psi[:, 2:] * y_np[:, :-2]).sum(axis=-1)
             da_mat = np.stack([da0, da1, da2], axis=-1) / a0

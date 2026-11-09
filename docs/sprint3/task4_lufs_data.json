@@ -1,0 +1,56 @@
+[
+  {
+    "session_id": "track01",
+    "mode": "same_track",
+    "adam_opt_target": -14.0,
+    "mean_4chunks_ref_lufs": -6.94,
+    "full_track_ref_lufs": -7.29,
+    "delta_opt_vs_full": -6.71,
+    "delta_chunks_vs_full": 0.35
+  },
+  {
+    "session_id": "track02",
+    "mode": "same_track",
+    "adam_opt_target": -14.0,
+    "mean_4chunks_ref_lufs": -7.15,
+    "full_track_ref_lufs": -7.22,
+    "delta_opt_vs_full": -6.78,
+    "delta_chunks_vs_full": 0.07
+  },
+  {
+    "session_id": "track03",
+    "mode": "same_track",
+    "adam_opt_target": -14.0,
+    "mean_4chunks_ref_lufs": -6.63,
+    "full_track_ref_lufs": -6.9,
+    "delta_opt_vs_full": -7.1,
+    "delta_chunks_vs_full": 0.27
+  },
+  {
+    "session_id": "track01_style",
+    "mode": "stylistic",
+    "adam_opt_target": -19.92,
+    "mean_4chunks_ref_lufs": -19.92,
+    "full_track_ref_lufs": -17.99,
+    "delta_opt_vs_full": -1.93,
+    "delta_chunks_vs_full": -1.93
+  },
+  {
+    "session_id": "track02_style",
+    "mode": "stylistic",
+    "adam_opt_target": -9.37,
+    "mean_4chunks_ref_lufs": -9.37,
+    "full_track_ref_lufs": -9.04,
+    "delta_opt_vs_full": -0.33,
+    "delta_chunks_vs_full": -0.33
+  },
+  {
+    "session_id": "track03_style",
+    "mode": "stylistic",
+    "adam_opt_target": -6.8,
+    "mean_4chunks_ref_lufs": -6.8,
+    "full_track_ref_lufs": -6.46,
+    "delta_opt_vs_full": -0.34,
+    "delta_chunks_vs_full": -0.34
+  }
+]

@@ -6,6 +6,11 @@ from .compressor import (
     DifferentiableSingleBandCompressorFunction,
     DifferentiableMultibandCompressor,
 )
+from .fast_biquad import (
+    _FastCPUAnalyticalBiquad,
+    enable_fast_cpu_biquad,
+    disable_fast_cpu_biquad,
+)
 
 __all__ = [
     "DifferentiableEQ",
@@ -14,4 +19,7 @@ __all__ = [
     "DifferentiableHarmonicSaturator",
     "DifferentiableSingleBandCompressorFunction",
     "DifferentiableMultibandCompressor",
+    "_FastCPUAnalyticalBiquad",
+    "enable_fast_cpu_biquad",
+    "disable_fast_cpu_biquad",
 ]
