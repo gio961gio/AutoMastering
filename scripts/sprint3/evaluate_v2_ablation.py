@@ -259,14 +259,7 @@ def evaluate_single_session_v2(
         ref_full_64, _ = load_and_validate_wav(str(_REPO_ROOT / spec["ref_path"]), required_sr=48000, allow_mono=True)
         raw_full_32 = np.ascontiguousarray(raw_full_64, dtype=np.float32)
         ref_full_32 = np.ascontiguousarray(ref_full_64, dtype=np.float32)
-
-        if mode == "same_track":
-            alignment = estimate_time_alignment(raw_full_32, ref_full_32, sample_rate=48000.0)
-            raw_aligned, ref_aligned = apply_same_track_alignment(raw_full_32, ref_full_32, alignment)
-        else:
-            alignment = None
-            raw_aligned = raw_full_32
-            ref_aligned = ref_full_32
+        suite = MasteringBenchmarkSuite(sample_rate=48000.0)
 
         selector = MultiChunkSelector(
             sample_rate=48000.0,
@@ -274,49 +267,66 @@ def evaluate_single_session_v2(
             chunk_duration_sec=3.0,
             seed=seed_int,
         )
-        mix_chunks_spec = selector.select_chunks(raw_aligned)
 
-        # Extract mix chunks with 2.5s pre-roll
-        ext_np, preroll_counts = selector.extract_chunk_tensors_with_preroll(
-            raw_aligned, mix_chunks_spec, preroll_sec=2.5
-        )
-        mix_chunk_tensors = [torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in ext_np]
-
-        # Extract reference chunks with 2.5s pre-roll to warm up crossover LR4 in TransientEnvelopeLoss
         if mode == "same_track":
-            ref_ext_np, ref_preroll_counts = selector.extract_chunk_tensors_with_preroll(
-                ref_aligned, mix_chunks_spec, preroll_sec=2.5
+            alignment = estimate_time_alignment(raw_full_64, ref_full_64, sample_rate=48000.0)
+            mix_aligned, ref_aligned = apply_same_track_alignment(
+                raw_full_64, ref_full_64, alignment, enable_subsample=True
             )
-            ref_ext_chunk_tensors = [torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in ref_ext_np]
-            ref_chunk_tensors = [
-                c[..., pre:] if pre > 0 else c
-                for c, pre in zip(ref_ext_chunk_tensors, ref_preroll_counts)
-            ]
-        else:
-            ref_chunks_spec = selector.select_chunks(ref_full_32)
-            ref_ext_np, ref_preroll_counts = selector.extract_chunk_tensors_with_preroll(
-                ref_full_32, ref_chunks_spec, preroll_sec=2.5
-            )
-            ref_ext_chunk_tensors = [torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in ref_ext_np]
-            ref_chunk_tensors = [
-                c[..., pre:] if pre > 0 else c
-                for c, pre in zip(ref_ext_chunk_tensors, ref_preroll_counts)
-            ]
-
-        suite = MasteringBenchmarkSuite(sample_rate=48000.0)
-
-        # Full-track reference evaluation for exact integrated LUFS target (parity with evaluate_v0p_v1_ablation.py)
-        if mode == "same_track":
             mix_start, _, eval_len = get_same_track_slice_indices(
-                alignment, mix_len=raw_full_64.shape[1], ref_len=ref_full_64.shape[1], enable_subsample=True
+                alignment,
+                mix_len=raw_full_64.shape[1],
+                ref_len=ref_full_64.shape[1],
+                enable_subsample=True,
             )
             ref_eval_tensor = torch.tensor(ref_aligned, dtype=torch.float32).unsqueeze(0)
-        else:
-            ref_eval_tensor = torch.tensor(ref_full_32, dtype=torch.float32).unsqueeze(0)
+            ref_bm = suite.evaluate(ref_eval_tensor, ref_eval_tensor, align_latency=False, reference_mode="same_track")
+            target_lufs = float(ref_bm["pred_lufs"])
+            ref_bm["integrated_lufs"] = target_lufs
 
-        ref_bm = suite.evaluate(ref_eval_tensor, ref_eval_tensor, align_latency=False, reference_mode=mode)
-        target_lufs = float(ref_bm["pred_lufs"])
-        ref_bm["integrated_lufs"] = target_lufs
+            chunks = selector.select_chunks(mix_aligned.astype(np.float32))
+            ref_src_32 = ref_aligned.astype(np.float32)
+        else:
+            alignment = None
+            mix_start = 0
+            eval_len = raw_full_64.shape[1]
+            ref_eval_tensor = torch.tensor(ref_full_32, dtype=torch.float32).unsqueeze(0)
+            ref_bm = suite.evaluate(ref_eval_tensor, ref_eval_tensor, align_latency=False, reference_mode="stylistic")
+            target_lufs = float(ref_bm["pred_lufs"])
+            ref_bm["integrated_lufs"] = target_lufs
+
+            chunks = selector.select_chunks(raw_full_32)
+            ref_src_32 = ref_full_32
+
+        n_preroll_samples = 120000
+        mix_chunks, ref_chunks, preroll_list = [], [], []
+        ref_ext_chunks, ref_preroll_list = [], []
+        for ch in chunks:
+            s_idx = int(ch.start_sample) if hasattr(ch, "start_sample") else int(ch["start_sample"])
+            e_idx = int(ch.end_sample) if hasattr(ch, "end_sample") else int(ch["end_sample"])
+            abs_s = (mix_start + s_idx) if mode == "same_track" else s_idx
+            abs_e = (mix_start + e_idx) if mode == "same_track" else e_idx
+            pre_start = max(0, abs_s - n_preroll_samples)
+            actual_pre = abs_s - pre_start
+
+            mix_seg = torch.tensor(raw_full_32[:, pre_start:abs_e], dtype=torch.float32).unsqueeze(0)
+            ref_seg = torch.tensor(ref_src_32[:, s_idx:e_idx], dtype=torch.float32).unsqueeze(0)
+
+            ref_pre_start = max(0, s_idx - n_preroll_samples)
+            actual_ref_pre = s_idx - ref_pre_start
+            ref_ext_seg = torch.tensor(ref_src_32[:, ref_pre_start:e_idx], dtype=torch.float32).unsqueeze(0)
+
+            mix_chunks.append(mix_seg)
+            ref_chunks.append(ref_seg)
+            preroll_list.append(int(actual_pre))
+            ref_ext_chunks.append(ref_ext_seg)
+            ref_preroll_list.append(int(actual_ref_pre))
+
+        mix_chunk_tensors = mix_chunks
+        ref_chunk_tensors = ref_chunks
+        preroll_counts = preroll_list
+        ref_ext_chunk_tensors = ref_ext_chunks
+        ref_preroll_counts = ref_preroll_list
 
         # V2 Configuration: isolated transient & reference-aware PLR with frozen v3 hyperparameters
         opt = AutoMasteringOptimizer(
