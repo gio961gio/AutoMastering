@@ -1,542 +1,484 @@
 {
-  "track01": {
-    "alignment": {
-      "lag_samples": 152,
-      "subsample_offset": 0.11525915630894171,
-      "mix_start": 32,
-      "eval_len": 3066921
+  "sessions": {
+    "track01": {
+      "mode": "same_track",
+      "alignment": {
+        "lag": 152,
+        "subsample": 0.11525915630894171,
+        "mix_start": 32
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "s_idx": 48000,
+          "e_idx": 192000,
+          "mix_start": 32,
+          "actual_pre_A": 48000,
+          "actual_pre_B": 48032,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 9.853465453982311e-16
+        },
+        {
+          "chunk_index": 1,
+          "s_idx": 1440000,
+          "e_idx": 1584000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
+        },
+        {
+          "chunk_index": 2,
+          "s_idx": 2256000,
+          "e_idx": 2400000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
+        },
+        {
+          "chunk_index": 3,
+          "s_idx": 2592000,
+          "e_idx": 2736000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
+        }
+      ]
     },
-    "chunks": [
-      {
-        "start_sample": 48000,
-        "end_sample": 192000
+    "track02": {
+      "mode": "same_track",
+      "alignment": {
+        "lag": 2503,
+        "subsample": 0.4581383461804698,
+        "mix_start": 32
       },
-      {
-        "start_sample": 1440000,
-        "end_sample": 1584000
-      },
-      {
-        "start_sample": 2256000,
-        "end_sample": 2400000
-      },
-      {
-        "start_sample": 2592000,
-        "end_sample": 2736000
-      }
-    ],
-    "evaluations": {
-      "z_neutral": {
-        "V0p": {
-          "loss_a": 2.2071781158447266,
-          "loss_b": 2.2071781158447266,
-          "loss_c": 2.2071781158447266,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 1.314369855747331e-15,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "s_idx": 384000,
+          "e_idx": 528000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         },
-        "V1": {
-          "loss_a": 3.869154930114746,
-          "loss_b": 3.869154930114746,
-          "loss_c": 3.869154930114746,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 9.853465139622158e-16,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+        {
+          "chunk_index": 1,
+          "s_idx": 1392000,
+          "e_idx": 1536000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         },
-        "V1b": {
-          "loss_a": 3.8821895122528076,
-          "loss_b": 3.8821895122528076,
-          "loss_c": 3.8821895122528076,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 1.9969755319704704e-15,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+        {
+          "chunk_index": 2,
+          "s_idx": 1920000,
+          "e_idx": 2064000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
+        },
+        {
+          "chunk_index": 3,
+          "s_idx": 2832000,
+          "e_idx": 2976000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         }
-      },
-      "z_opt_v0p": {
-        "V0p": {
-          "loss_a": 4.979936599731445,
-          "loss_b": 4.979936599731445,
-          "loss_c": 4.979936599731445,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1": {
-          "loss_a": 5.627905368804932,
-          "loss_b": 5.627905368804932,
-          "loss_c": 5.627905368804932,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1b": {
-          "loss_a": 5.73408842086792,
-          "loss_b": 5.73408842086792,
-          "loss_c": 5.73408842086792,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        }
-      },
-      "z_opt_v1": {
-        "V0p": {
-          "loss_a": 4.977020263671875,
-          "loss_b": 4.977020263671875,
-          "loss_c": 4.977020263671875,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1": {
-          "loss_a": 5.625583171844482,
-          "loss_b": 5.625583171844482,
-          "loss_c": 5.625583171844482,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1b": {
-          "loss_a": 5.731216907501221,
-          "loss_b": 5.731216907501221,
-          "loss_c": 5.731216907501221,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        }
-      },
-      "z_opt_v1b": {
-        "V0p": {
-          "loss_a": 4.927347183227539,
-          "loss_b": 4.927347183227539,
-          "loss_c": 4.927347183227539,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1": {
-          "loss_a": 5.58563232421875,
-          "loss_b": 5.58563232421875,
-          "loss_c": 5.58563232421875,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1b": {
-          "loss_a": 5.643136024475098,
-          "loss_b": 5.643136024475098,
-          "loss_c": 5.643136024475098,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        }
-      }
-    }
-  },
-  "track02": {
-    "alignment": {
-      "lag_samples": 2503,
-      "subsample_offset": 0.4581383461804698,
-      "mix_start": 32,
-      "eval_len": 3430545
+      ]
     },
-    "chunks": [
-      {
-        "start_sample": 384000,
-        "end_sample": 528000
+    "track03": {
+      "mode": "same_track",
+      "alignment": {
+        "lag": 1748,
+        "subsample": -0.37580421258139074,
+        "mix_start": 32
       },
-      {
-        "start_sample": 1392000,
-        "end_sample": 1536000
-      },
-      {
-        "start_sample": 1920000,
-        "end_sample": 2064000
-      },
-      {
-        "start_sample": 2832000,
-        "end_sample": 2976000
-      }
-    ],
-    "evaluations": {
-      "z_neutral": {
-        "V0p": {
-          "loss_a": 7.8713836669921875,
-          "loss_b": 7.8713836669921875,
-          "loss_c": 7.8713836669921875,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "s_idx": 576000,
+          "e_idx": 720000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         },
-        "V1": {
-          "loss_a": 11.609394073486328,
-          "loss_b": 11.609394073486328,
-          "loss_c": 11.609394073486328,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+        {
+          "chunk_index": 1,
+          "s_idx": 1224000,
+          "e_idx": 1368000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         },
-        "V1b": {
-          "loss_a": 11.709493637084961,
-          "loss_b": 11.709493637084961,
-          "loss_c": 11.709493637084961,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+        {
+          "chunk_index": 2,
+          "s_idx": 1728000,
+          "e_idx": 1872000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
+        },
+        {
+          "chunk_index": 3,
+          "s_idx": 3120000,
+          "e_idx": 3264000,
+          "mix_start": 32,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         }
-      },
-      "z_opt_v0p": {
-        "V0p": {
-          "loss_a": 4.6800971031188965,
-          "loss_b": 4.6800971031188965,
-          "loss_c": 4.6800971031188965,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1": {
-          "loss_a": 7.353216648101807,
-          "loss_b": 7.353216648101807,
-          "loss_c": 7.353216648101807,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1b": {
-          "loss_a": 7.42582368850708,
-          "loss_b": 7.42582368850708,
-          "loss_c": 7.42582368850708,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        }
-      },
-      "z_opt_v1": {
-        "V0p": {
-          "loss_a": 4.682775974273682,
-          "loss_b": 4.682775974273682,
-          "loss_c": 4.682775974273682,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1": {
-          "loss_a": 7.354653835296631,
-          "loss_b": 7.354653835296631,
-          "loss_c": 7.354653835296631,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1b": {
-          "loss_a": 7.428690433502197,
-          "loss_b": 7.428690433502197,
-          "loss_c": 7.428690433502197,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        }
-      },
-      "z_opt_v1b": {
-        "V0p": {
-          "loss_a": 4.672891616821289,
-          "loss_b": 4.672891616821289,
-          "loss_c": 4.672891616821289,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1": {
-          "loss_a": 7.343629837036133,
-          "loss_b": 7.343629837036133,
-          "loss_c": 7.343629837036133,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        },
-        "V1b": {
-          "loss_a": 7.413214683532715,
-          "loss_b": 7.413214683532715,
-          "loss_c": 7.413214683532715,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
-        }
-      }
-    }
-  },
-  "track03": {
-    "alignment": {
-      "lag_samples": 1748,
-      "subsample_offset": -0.37580421258139074,
-      "mix_start": 32,
-      "eval_len": 3445592
+      ]
     },
-    "chunks": [
-      {
-        "start_sample": 576000,
-        "end_sample": 720000
-      },
-      {
-        "start_sample": 1224000,
-        "end_sample": 1368000
-      },
-      {
-        "start_sample": 1728000,
-        "end_sample": 1872000
-      },
-      {
-        "start_sample": 3120000,
-        "end_sample": 3264000
-      }
-    ],
-    "evaluations": {
-      "z_neutral": {
-        "V0p": {
-          "loss_a": 4.303348541259766,
-          "loss_b": 4.303348541259766,
-          "loss_c": 4.303348541259766,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+    "track01_style": {
+      "mode": "stylistic",
+      "alignment": null,
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "s_idx": 48000,
+          "e_idx": 192000,
+          "mix_start": 0,
+          "actual_pre_A": 48000,
+          "actual_pre_B": 48000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         },
-        "V1": {
-          "loss_a": 6.948641777038574,
-          "loss_b": 6.948641777038574,
-          "loss_c": 6.948641777038574,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+        {
+          "chunk_index": 1,
+          "s_idx": 1440000,
+          "e_idx": 1584000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         },
-        "V1b": {
-          "loss_a": 6.948641777038574,
-          "loss_b": 6.948641777038574,
-          "loss_c": 6.948641777038574,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+        {
+          "chunk_index": 2,
+          "s_idx": 2256000,
+          "e_idx": 2400000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
+        },
+        {
+          "chunk_index": 3,
+          "s_idx": 2592000,
+          "e_idx": 2736000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         }
-      },
-      "z_opt_v0p": {
-        "V0p": {
-          "loss_a": 1.8104265928268433,
-          "loss_b": 1.8104265928268433,
-          "loss_c": 1.8104265928268433,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+      ]
+    },
+    "track02_style": {
+      "mode": "stylistic",
+      "alignment": null,
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "s_idx": 384000,
+          "e_idx": 528000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         },
-        "V1": {
-          "loss_a": 3.365819215774536,
-          "loss_b": 3.365819215774536,
-          "loss_c": 3.365819215774536,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+        {
+          "chunk_index": 1,
+          "s_idx": 1392000,
+          "e_idx": 1536000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         },
-        "V1b": {
-          "loss_a": 3.3673441410064697,
-          "loss_b": 3.3673441410064697,
-          "loss_c": 3.3673441410064697,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -240.0,
-          "max_err_bc_dbfs": -240.0,
-          "rel_loss_diff_bc": 0.0
+        {
+          "chunk_index": 2,
+          "s_idx": 1920000,
+          "e_idx": 2064000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
+        },
+        {
+          "chunk_index": 3,
+          "s_idx": 2832000,
+          "e_idx": 2976000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         }
-      },
-      "z_opt_v1": {
-        "V0p": {
-          "loss_a": 1.8099104166030884,
-          "loss_b": 1.8099104166030884,
-          "loss_c": 1.809910535812378,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -211.12472534179688,
-          "max_err_bc_dbfs": -156.5355987548828,
-          "rel_loss_diff_bc": 6.586474582234737e-08
+      ]
+    },
+    "track03_style": {
+      "mode": "stylistic",
+      "alignment": null,
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "s_idx": 576000,
+          "e_idx": 720000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         },
-        "V1": {
-          "loss_a": 3.365457534790039,
-          "loss_b": 3.365457534790039,
-          "loss_c": 3.365457534790039,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -211.12472534179688,
-          "max_err_bc_dbfs": -156.5355987548828,
-          "rel_loss_diff_bc": 0.0
+        {
+          "chunk_index": 1,
+          "s_idx": 1224000,
+          "e_idx": 1368000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         },
-        "V1b": {
-          "loss_a": 3.3670668601989746,
-          "loss_b": 3.3670668601989746,
-          "loss_c": 3.3670670986175537,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -211.12472534179688,
-          "max_err_bc_dbfs": -156.5355987548828,
-          "rel_loss_diff_bc": 7.080898271425276e-08
+        {
+          "chunk_index": 2,
+          "s_idx": 1728000,
+          "e_idx": 1872000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
+        },
+        {
+          "chunk_index": 3,
+          "s_idx": 3120000,
+          "e_idx": 3264000,
+          "mix_start": 0,
+          "actual_pre_A": 120000,
+          "actual_pre_B": 120000,
+          "compared_samples": 143841,
+          "A_vs_C_rms_dbfs": -240.0,
+          "A_vs_C_max_dbfs": -240.0,
+          "B_vs_C_rms_dbfs": -240.0,
+          "B_vs_C_max_dbfs": -240.0,
+          "A_vs_B_rms_dbfs": -240.0,
+          "A_vs_B_max_dbfs": -240.0,
+          "loss_rel_diff_A_vs_C": 0.0,
+          "loss_rel_diff_A_vs_B": 0.0,
+          "grad_rel_diff_A_vs_B": 0.0
         }
-      },
-      "z_opt_v1b": {
-        "V0p": {
-          "loss_a": 1.8101001977920532,
-          "loss_b": 1.8101001977920532,
-          "loss_c": 1.8100999593734741,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -229.1865234375,
-          "max_err_bc_dbfs": -174.59739685058594,
-          "rel_loss_diff_bc": 1.3171568037635912e-07
-        },
-        "V1": {
-          "loss_a": 3.3656563758850098,
-          "loss_b": 3.3656563758850098,
-          "loss_c": 3.3656558990478516,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -229.1865234375,
-          "max_err_bc_dbfs": -174.59739685058594,
-          "rel_loss_diff_bc": 1.4167731489752551e-07
-        },
-        "V1b": {
-          "loss_a": 3.3671813011169434,
-          "loss_b": 3.3671813011169434,
-          "loss_c": 3.3671813011169434,
-          "rel_loss_diff_ab": 0.0,
-          "rel_grad_diff_ab": 0.0,
-          "rms_ab_dbfs": -240.0,
-          "max_err_ab_dbfs": -240.0,
-          "rms_bc_dbfs": -229.1865234375,
-          "max_err_bc_dbfs": -174.59739685058594,
-          "rel_loss_diff_bc": 0.0
-        }
-      }
+      ]
     }
   }
 }

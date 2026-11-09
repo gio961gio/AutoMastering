@@ -7,47 +7,51 @@
 
 ---
 
-## 1. Executive Summary & Diagnostica della Discrepanza
+## 1. Executive Summary & Nota di Rettifica Diagnostica
 
-Durante l'audit del codice di `scripts/sprint3/evaluate_v0p_v1_ablation.py` è emersa una discrepanza metodologica fondamentale nella gestione del target di loudness (`target_lufs`) tra la fase di ottimizzazione con l'algoritmo Adam e la successiva fase di valutazione della loss finale IIR.
+L'audit metodologico del codice storico `scripts/sprint3/evaluate_v0p_v1_ablation.py` e di `python/ddsp_mastering/optimize/optimizer.py` (righe 158–186) chiarisce in modo definitivo il funzionamento del target di loudness (`target_lufs`) nella discesa gradiente Adam rispetto alla successiva valutazione IIR:
 
-### Meccanismo Tecnico dell'Incoerenza Storica (V0p / V1 / V1b)
+### Meccanismo Reale dell'Ottimizzazione Storica (V0p / V1 / V1b)
 1. **Fase di Ottimizzazione (`optimize_multi_chunk`):**
-   - Alla riga 297 di `evaluate_v0p_v1_ablation.py`, la chiamata all'ottimizzatore veniva effettuata omettendo il parametro esplicito `target_lufs`:
+   - Nel codice storico, `opt.optimize_multi_chunk(mix_chunks, ref_chunks, ...)` veniva chiamato passando `target_lufs=None` e fornendo la lista `ref_chunks`.
+   - All'interno di `optimizer.py` (righe 158–186), quando `effective_target_lufs is None`:
      ```python
-     opt = AutoMasteringOptimizer(..., target_lufs=None, ...)
-     z_opt, _, _ = opt.optimize_multi_chunk(mix_chunks, ref_chunks, ...)
+     if ref_chunks is not None and len(ref_chunks) > 0:
+         with torch.no_grad():
+             lufs_vals = [
+                 self.loss_fn.loudness_loss.calculate_lufs(rc).item()
+                 for rc in ref_chunks
+             ]
+             effective_target_lufs = float(sum(lufs_vals) / len(lufs_vals))
      ```
-   - All'interno di `python/ddsp_mastering/optimize/optimizer.py` (righe 156–168), quando `target_lufs is None`:
-     - In modalità **`same_track`**, il codice imponeva come fallback fisso il valore nominale **`-14.00 LUFS`** per tutti i 30 step di discesa gradiente Adam.
-     - In modalità **`stylistic`**, l'ottimizzatore calcolava la media aritmetica dei LUFS dei 4 chunk reference estratti (`mean_4chunks_ref_lufs`).
+   - Poiché `ref_chunks` era sempre presente sia in `same_track` sia in `stylistic`, l'ottimizzatore storico **non usava il default di `-14.00 LUFS`**, bensì calcolava dinamicamente la media aritmetica dei LUFS dei 4 chunk reference (`historical_opt_target_lufs`).
 2. **Fase di Valutazione Loss IIR (`_eval_loss_iir`):**
-   - Immediatamente dopo i 30 step di ottimizzazione, per misurare la convergenza e la metrica di perdita finale, `evaluate_v0p_v1_ablation.py` (riga 298/466) calcolava la loss IIR passando come target:
+   - Alla riga 298/466 di `evaluate_v0p_v1_ablation.py`, `_eval_loss_iir` valutava la loss IIR finale passando:
      ```python
-     target_lufs = float(ref_bm["integrated_lufs"])  # LUFS Integrato Full-Track BS.1770-5
+     target_lufs = float(ref_bm["integrated_lufs"])  # Full-track reference ITU-R BS.1770
      ```
-   - In `same_track`, dove le tracce reference masterizzate commerciali hanno un volume tipicamente compreso tra **`-6.90 LUFS`** e **`-7.29 LUFS`**, Adam è stato forzato ad ottimizzare la catena DDSP verso `-14.00 LUFS` (un offset di circa **$-7.0\text{ LU}$**), per poi essere penalizzato nella valutazione IIR finale rispetto ad un target non armonizzato.
+   - Di conseguenza, lo scarto tra l'obiettivo seguito da Adam sui 4 chunk e la valutazione full-track della reference non era affatto di $7\text{ dB}$, ma era un offset microscopico compreso tra **$+0.07\text{ LU}$ e $+0.35\text{ LU}$** in `same_track` e tra **$-0.33\text{ LU}$ e $-1.93\text{ LU}$** in `stylistic`.
 
 ---
 
 ## 2. Quantificazione Quantitativa su Tutte le 6 Sessioni
 
-La seguente tabella riporta i valori esatti estratti mediante esecuzione analitica non invasiva (`scratch/run_task4_lufs.py` / ITU-R BS.1770-5) su tutte le sessioni:
+La seguente tabella riporta i valori esatti estratti dall'analisi analitica (`docs/sprint3/task4_lufs_data.json`):
 
-| Session ID | Modalità | Target Adam Storico ($\text{LUFS}_{\text{opt}}$) | Media 4 Chunk Ref ($\text{LUFS}_{\text{chunks}}$) | Ref Full-Track ($\text{LUFS}_{\text{full}}$) | $\Delta\text{LUFS}_{\text{opt - full}}$ (dB) | $\Delta\text{LUFS}_{\text{chunks - full}}$ (dB) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`track01`** | `same_track` | **-14.00** | -6.94 | -7.29 | **-6.71** | +0.35 |
-| **`track02`** | `same_track` | **-14.00** | -7.15 | -7.22 | **-6.78** | +0.07 |
-| **`track03`** | `same_track` | **-14.00** | -6.63 | -6.90 | **-7.10** | +0.27 |
-| **`track01_style`** | `stylistic` | -19.92 | -19.92 | -17.99 | **-1.93** | -1.93 |
-| **`track02_style`** | `stylistic` | -9.37 | -9.37 | -9.04 | **-0.33** | -0.33 |
-| **`track03_style`** | `stylistic` | -6.80 | -6.80 | -6.46 | **-0.34** | -0.34 |
+| Session ID | Modalità | Target Adam Storico (`historical_opt_target_lufs`) | Media 4 Chunk BS.1770 (`mean_4chunks_bs1770_lufs`) | Ref Full-Track Armonizzato (`harmonized_fulltrack_target_lufs`) | $\Delta\text{LUFS}$ (`historical` vs `harmonized`) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`track01`** | `same_track` | **-6.94** | -6.95 | **-7.29** | **+0.35 LU** |
+| **`track02`** | `same_track` | **-7.15** | -7.17 | **-7.22** | **+0.07 LU** |
+| **`track03`** | `same_track` | **-6.63** | -6.62 | **-6.90** | **+0.27 LU** |
+| **`track01_style`** | `stylistic` | **-19.92** | -19.78 | **-17.99** | **-1.93 LU** |
+| **`track02_style`** | `stylistic` | **-9.37** | -9.37 | **-9.04** | **-0.33 LU** |
+| **`track03_style`** | `stylistic` | **-6.80** | -6.81 | **-6.46** | **-0.34 LU** |
 
 ### Analisi dei Risultati
 - **Sessioni `same_track` (`track01`, `track02`, `track03`):**  
-  La discrepanza tra l'obiettivo di discesa di Adam e la metrica di riferimento full-track è imponente: tra **$-6.71\text{ LU}$** e **$-7.10\text{ LU}$**. Durante l'ottimizzazione, il termine `weight_loudness * (pred_lufs - (-14.0))^2` ha esercitato una spinta violenta verso il basso sul Makeup Gain e sui parametri dinamici. Al contrario, la differenza tra la media dei 4 chunk reference e la reference full-track è trascurabile ($\le 0.35\text{ LU}$), dimostrando che i 4 chunk selezionati sono altamente rappresentativi del livello globale del brano.
+  La deviazione tra la media dei 4 chunk reference e la reference full-track è inferiore a **$0.35\text{ LU}$**. Questo conferma che la selezione dei 4 chunk storici era già estremamente rappresentativa della dinamica complessiva del brano.
 - **Sessioni `stylistic` (`track01_style`, `track02_style`, `track03_style`):**  
-  In `stylistic`, l'uso di `mean_4chunks_ref_lufs` ha garantito una coerenza molto maggiore con la reference. Su `track02_style` e `track03_style`, l'errore è minimo ($\le 0.34\text{ LU}$). Su `track01_style`, la natura eterogenea dei chunk reference non correlati ha generato un offset moderato di $-1.93\text{ LU}$.
+  Su `track02_style` e `track03_style` lo scarto è minimo ($\le 0.34\text{ LU}$). Su `track01_style`, la reference stilistica non correlata presentava una differenza di $-1.93\text{ LU}$ tra i chunk e il brano intero.
 
 ---
 
