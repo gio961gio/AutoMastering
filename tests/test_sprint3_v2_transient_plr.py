@@ -12,16 +12,19 @@ Covers:
 """
 
 import math
+import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
 import torchaudio.functional as taf
 
+from ddsp_mastering.data.chunking import MultiChunkSelector
 from ddsp_mastering.loss.combined import MasteringPerceptualLoss
 from ddsp_mastering.loss.loudness import (
     DifferentiableLoudnessLoss,
     boltzmann_soft_peak_dbfs,
 )
+from ddsp_mastering.loss.stylistic import AggregatePerceptualLoss
 from ddsp_mastering.loss.transient import (
     TransientEnvelopeLoss,
     compute_transient_active_mask,
@@ -322,4 +325,76 @@ def test_true_peak_streaming_vs_monolithic_boundary_equivalence():
 
     diff = abs(stream_true_peak_dbtp - mono_true_peak_dbtp)
     assert diff < 1e-4, f"Streaming true peak differs from monolithic by {diff:.6f} dBTP (stream={stream_true_peak_dbtp:.4f}, mono={mono_true_peak_dbtp:.4f})"
+
+
+def test_v2_runner_hyperparams_and_stylistic_chunk_independence():
+    """Verify MultiChunkSelector extraction on synthetic audio and default V2 hyperparameters (Spec v3)."""
+    fs = 48000.0
+    duration_sec = 60.0
+    total_samples = int(duration_sec * fs)
+
+    # 1. Verify MultiChunkSelector independence and dimensions on synthetic stereo signals
+    t = np.linspace(0.0, duration_sec, total_samples, endpoint=False, dtype=np.float32)
+    # Synthetic mix: sine wave at 440 Hz
+    mix_synth = np.stack([0.3 * np.sin(2.0 * np.pi * 440.0 * t), 0.3 * np.cos(2.0 * np.pi * 440.0 * t)], axis=0)
+    # Synthetic ref: sine wave at 880 Hz
+    ref_synth = np.stack([0.2 * np.sin(2.0 * np.pi * 880.0 * t), 0.2 * np.cos(2.0 * np.pi * 880.0 * t)], axis=0)
+
+    selector = MultiChunkSelector(sample_rate=fs, num_chunks=4, chunk_duration_sec=3.0, seed=12345)
+    mix_sel = selector.select_chunks(mix_synth, None, mode="stylistic")
+    ref_sel = selector.select_chunks(ref_synth, None, mode="stylistic")
+
+    assert len(mix_sel) == 4, f"Expected 4 mix chunks, got {len(mix_sel)}"
+    assert len(ref_sel) == 4, f"Expected 4 ref chunks, got {len(ref_sel)}"
+
+    n_preroll_samples = 120000
+    for k, (m_ch, r_ch) in enumerate(zip(mix_sel, ref_sel)):
+        ms, me = int(m_ch["start_sample"]), int(m_ch["end_sample"])
+        pre_start = max(0, ms - n_preroll_samples)
+        actual_pre = ms - pre_start
+        mix_seg = mix_synth[:, pre_start:me]
+        assert mix_seg.shape[-1] - actual_pre == 144000, (
+            f"Chunk {k} mix eval len != 144000: {mix_seg.shape[-1] - actual_pre}"
+        )
+
+        rs, re = int(r_ch["start_sample"]), int(r_ch["end_sample"])
+        ref_pre_start = max(0, rs - n_preroll_samples)
+        actual_ref_pre = rs - ref_pre_start
+        ref_ext_seg = ref_synth[:, ref_pre_start:re]
+        assert ref_ext_seg.shape[-1] - actual_ref_pre == 144000, (
+            f"Chunk {k} ref_ext eval len != 144000: {ref_ext_seg.shape[-1] - actual_ref_pre}"
+        )
+
+    # 2. Verify default V2 hyperparameters match Technical Proposal v3 (§2.C.2 and §2.C.3)
+    l_loss = DifferentiableLoudnessLoss(sample_rate=fs)
+    assert l_loss.plr_d_style == 1.0
+    assert l_loss.plr_gamma_floor == 1.0
+    assert l_loss.soft_peak_p == 8
+    assert l_loss.soft_peak_beta == 2.0
+    assert l_loss.soft_peak_block_duration_sec == 0.010
+
+    m_loss = MasteringPerceptualLoss(sample_rate=fs)
+    assert m_loss.loudness_loss.plr_d_style == 1.0
+    assert m_loss.loudness_loss.plr_gamma_floor == 1.0
+    assert m_loss.loudness_loss.soft_peak_p == 8
+    assert m_loss.loudness_loss.soft_peak_beta == 2.0
+    assert m_loss.loudness_loss.soft_peak_block_duration_sec == 0.010
+    assert m_loss.transient_loss.beta_atk == 0.5
+
+    a_loss = AggregatePerceptualLoss(sample_rate=fs)
+    assert a_loss.loudness_loss.plr_d_style == 1.0
+    assert a_loss.loudness_loss.plr_gamma_floor == 1.0
+    assert a_loss.loudness_loss.soft_peak_p == 8
+    assert a_loss.loudness_loss.soft_peak_beta == 2.0
+    assert a_loss.loudness_loss.soft_peak_block_duration_sec == 0.010
+    assert a_loss.transient_loss.beta_atk == 0.5
+
+    opt = AutoMasteringOptimizer(sample_rate=fs)
+    assert opt.beta_atk == 0.5
+    assert opt.plr_d_style == 1.0
+    assert opt.plr_gamma_floor == 1.0
+    assert opt.soft_peak_p == 8
+    assert opt.soft_peak_beta == 2.0
+    assert opt.soft_peak_block_duration_sec == 0.010
+
 

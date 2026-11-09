@@ -7,7 +7,7 @@ and spectral diversity.
 
 from dataclasses import dataclass, asdict
 import math
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import warnings
 import numpy as np
 from scipy import signal
@@ -28,6 +28,9 @@ class ChunkSpec:
 
     def to_dict(self) -> Dict[str, Union[int, float]]:
         return asdict(self)
+
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item)
 
 
 class MultiChunkSelector:
@@ -105,7 +108,7 @@ class MultiChunkSelector:
 
         return rms_db, crest_factor_db, centroid_hz
 
-    def select_chunks(self, audio: np.ndarray) -> List[ChunkSpec]:
+    def select_chunks(self, audio: np.ndarray, *args: Any, **kwargs: Any) -> List[ChunkSpec]:
         """Select representative chunks distributed chronologically and spectrally.
 
         Args:
