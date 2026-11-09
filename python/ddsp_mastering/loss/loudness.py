@@ -470,6 +470,8 @@ class DifferentiableLoudnessLoss(nn.Module):
             metrics = {
                 "pred_plr_proxy": pred_plr.mean().item(),
                 "ref_plr_proxy": ref_plr.mean().item(),
+                "pred_plr_boltzmann": pred_plr.mean().item(),
+                "ref_plr_boltzmann": ref_plr.mean().item(),
                 "plr_proxy_diff_db": plr_diff.abs().mean().item(),
                 "plr_loss": plr_loss.item(),
             }
@@ -490,6 +492,8 @@ class DifferentiableLoudnessLoss(nn.Module):
             metrics = {
                 "pred_plr_proxy": pred_plr.mean().item(),
                 "ref_plr_proxy": ref_plr.mean().item(),
+                "pred_plr_boltzmann": pred_plr.mean().item(),
+                "ref_plr_boltzmann": ref_plr.mean().item(),
                 "plr_proxy_diff_db": delta_plr.abs().mean().item(),
                 "plr_floor_db": plr_floor.mean().item(),
                 "plr_deadzone_loss": deadzone_loss.item(),

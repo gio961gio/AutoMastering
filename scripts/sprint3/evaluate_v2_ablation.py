@@ -275,30 +275,55 @@ def evaluate_single_session_v2(
             seed=seed_int,
         )
         mix_chunks_spec = selector.select_chunks(raw_aligned)
-        if mode == "same_track":
-            ref_chunk_tensors = [
-                torch.tensor(ref_aligned[:, c.start_sample : c.end_sample], dtype=torch.float32).unsqueeze(0)
-                for c in mix_chunks_spec
-            ]
-        else:
-            ref_chunks_spec = selector.select_chunks(ref_full_32)
-            ref_chunks_np = selector.extract_chunk_tensors(ref_full_32, ref_chunks_spec)
-            ref_chunk_tensors = [torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in ref_chunks_np]
 
-        suite = MasteringBenchmarkSuite(sample_rate=48000.0)
-
-        # Extract with 2.5s pre-roll
+        # Extract mix chunks with 2.5s pre-roll
         ext_np, preroll_counts = selector.extract_chunk_tensors_with_preroll(
             raw_aligned, mix_chunks_spec, preroll_sec=2.5
         )
         mix_chunk_tensors = [torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in ext_np]
 
-        # V2 Configuration: isolated transient & reference-aware PLR
+        # Extract reference chunks with 2.5s pre-roll to warm up crossover LR4 in TransientEnvelopeLoss
+        if mode == "same_track":
+            ref_ext_np, ref_preroll_counts = selector.extract_chunk_tensors_with_preroll(
+                ref_aligned, mix_chunks_spec, preroll_sec=2.5
+            )
+            ref_ext_chunk_tensors = [torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in ref_ext_np]
+            ref_chunk_tensors = [
+                c[..., pre:] if pre > 0 else c
+                for c, pre in zip(ref_ext_chunk_tensors, ref_preroll_counts)
+            ]
+        else:
+            ref_chunks_spec = selector.select_chunks(ref_full_32)
+            ref_ext_np, ref_preroll_counts = selector.extract_chunk_tensors_with_preroll(
+                ref_full_32, ref_chunks_spec, preroll_sec=2.5
+            )
+            ref_ext_chunk_tensors = [torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in ref_ext_np]
+            ref_chunk_tensors = [
+                c[..., pre:] if pre > 0 else c
+                for c, pre in zip(ref_ext_chunk_tensors, ref_preroll_counts)
+            ]
+
+        suite = MasteringBenchmarkSuite(sample_rate=48000.0)
+
+        # Full-track reference evaluation for exact integrated LUFS target (parity with evaluate_v0p_v1_ablation.py)
+        if mode == "same_track":
+            mix_start, _, eval_len = get_same_track_slice_indices(
+                alignment, mix_len=raw_full_64.shape[1], ref_len=ref_full_64.shape[1], enable_subsample=True
+            )
+            ref_eval_tensor = torch.tensor(ref_aligned, dtype=torch.float32).unsqueeze(0)
+        else:
+            ref_eval_tensor = torch.tensor(ref_full_32, dtype=torch.float32).unsqueeze(0)
+
+        ref_bm = suite.evaluate(ref_eval_tensor, ref_eval_tensor, align_latency=False, reference_mode=mode)
+        target_lufs = float(ref_bm["pred_lufs"])
+        ref_bm["integrated_lufs"] = target_lufs
+
+        # V2 Configuration: isolated transient & reference-aware PLR with frozen v3 hyperparameters
         opt = AutoMasteringOptimizer(
             sample_rate=48000.0,
             lr=0.04,
             num_steps=30,
-            target_lufs=None,
+            target_lufs=target_lufs,
             weight_stft=1.0,
             weight_loudness=0.8,
             weight_param_reg=0.01,
@@ -309,11 +334,11 @@ def evaluate_single_session_v2(
             weight_trans=0.2,  # V2 transient loss weight
             plr_mode="reference_aware",  # V2 reference-aware PLR
             beta_atk=0.5,
-            plr_d_style=2.0,
-            plr_gamma_floor=0.05,
+            plr_d_style=1.0,
+            plr_gamma_floor=1.0,
             soft_peak_p=8,
-            soft_peak_beta=12.0,
-            soft_peak_block_duration_sec=0.400,
+            soft_peak_beta=2.0,
+            soft_peak_block_duration_sec=0.010,
         )
 
         z_opt, _, _ = opt.optimize_multi_chunk(
@@ -323,15 +348,15 @@ def evaluate_single_session_v2(
             verbose=False,
             align_latency=True,
             mix_preroll_samples=preroll_counts,
+            target_lufs=target_lufs,
+            ref_ext_chunks=ref_ext_chunk_tensors,
+            ref_preroll_list=ref_preroll_counts,
         )
 
         K = len(mix_chunk_tensors)
         weights = [1.0 / K] * K
-        with torch.no_grad():
-            lufs_vals = [opt.loss_fn.loudness_loss.calculate_lufs(rc).item() for rc in ref_chunk_tensors]
-            eff_target_lufs = float(sum(lufs_vals) / len(lufs_vals))
 
-        def _eval_loss_iir(z_in: torch.Tensor) -> Tuple[float, Dict[str, float]]:
+        def _eval_loss_iir(z_in: torch.Tensor, eval_target_lufs: float) -> Tuple[float, Dict[str, float]]:
             with torch.no_grad():
                 tot_l = 0.0
                 agg_m: Dict[str, float] = {}
@@ -341,15 +366,19 @@ def evaluate_single_session_v2(
                     y_ext = opt.chain(mk, z=z_in, eq_mode="iir")
                     y_k = y_ext[..., n_pre:]
                     ref_k = ref_chunk_tensors[k]
+                    ref_ext_k = ref_ext_chunk_tensors[k]
+                    ref_pre_k = ref_preroll_counts[k]
                     if mode == "same_track":
                         lk, mk_dict = opt.loss_fn(
                             pred_audio=y_k,
                             target_audio=ref_k,
-                            target_lufs=eff_target_lufs,
+                            target_lufs=eval_target_lufs,
                             normalized_params=z_in,
                             align_latency=True,
                             pred_ext_audio=y_ext,
                             pred_preroll_samples=n_pre,
+                            ref_ext_audio=ref_ext_k,
+                            ref_preroll_samples=ref_pre_k,
                         )
                     else:
                         anchor_k = mk[..., n_pre:]
@@ -357,18 +386,20 @@ def evaluate_single_session_v2(
                             pred_audio=y_k,
                             ref_audio=ref_k,
                             normalized_params=z_in,
-                            target_lufs=eff_target_lufs,
+                            target_lufs=eval_target_lufs,
                             mix_anchor_audio=anchor_k,
                             pred_ext_audio=y_ext,
                             pred_preroll_samples=n_pre,
+                            ref_ext_audio=ref_ext_k,
+                            ref_preroll_samples=ref_pre_k,
                         )
                     tot_l += weights[k] * float(lk.item())
                     for mk_key, mk_val in mk_dict.items():
                         agg_m[mk_key] = agg_m.get(mk_key, 0.0) + weights[k] * float(mk_val)
                 return tot_l, agg_m
 
-        loss_z0_iir, _ = _eval_loss_iir(Z_NEUTRAL)
-        loss_zopt_iir, metrics_final = _eval_loss_iir(z_opt)
+        loss_z0_iir, metrics_init = _eval_loss_iir(Z_NEUTRAL, eval_target_lufs=target_lufs)
+        loss_zopt_iir, metrics_final = _eval_loss_iir(z_opt, eval_target_lufs=target_lufs)
         reduction_pct = (
             ((loss_zopt_iir - loss_z0_iir) / loss_z0_iir) * 100.0 if loss_z0_iir > 0.0 else 0.0
         )
@@ -401,12 +432,33 @@ def evaluate_single_session_v2(
         theta_opt = map_z_to_theta(z_opt)
         theta_dict = {spec.name: float(theta_opt[name_to_idx[spec.name]].item()) for spec in PARAM_SPECS}
 
+        v2_config = {
+            "preroll_samples": 120000,
+            "erb_weight": 0.0,
+            "de_harsh_weight": 0.0,
+            "weight_trans": 0.2,
+            "beta_atk": 0.5,
+            "plr_mode": "reference_aware_same" if mode == "same_track" else "reference_aware",
+            "plr_d_style": 1.0,
+            "plr_gamma_floor": 1.0,
+            "soft_peak_p": 8,
+            "soft_peak_beta": 2.0,
+            "soft_peak_block_duration_sec": 0.010,
+        }
+
         v2_data = {
+            "config": v2_config,
+            "v2": {
+                "config": v2_config,
+            },
             "preroll_sec": 2.5,
             "preroll_samples_per_chunk": preroll_counts,
+            "ref_preroll_samples_per_chunk": ref_preroll_counts,
+            "target_lufs": float(target_lufs),
             "initial_loss_z0_iir": float(loss_z0_iir),
             "final_loss_z_opt_iir": float(loss_zopt_iir),
             "loss_reduction_iir_pct": float(reduction_pct),
+            "chunk_metrics_init_iir": metrics_init,
             "chunk_metrics_final_iir": metrics_final,
             "full_track_benchmark": bm_full,
             "normalized_z_opt": [float(v) for v in z_opt.detach().cpu().numpy().tolist()],
@@ -466,11 +518,11 @@ def main():
             "weight_trans": 0.2,
             "plr_mode": "reference_aware",
             "beta_atk": 0.5,
-            "plr_d_style": 2.0,
-            "plr_gamma_floor": 0.05,
+            "plr_d_style": 1.0,
+            "plr_gamma_floor": 1.0,
             "soft_peak_p": 8,
-            "soft_peak_beta": 12.0,
-            "soft_peak_block_duration_sec": 0.400,
+            "soft_peak_beta": 2.0,
+            "soft_peak_block_duration_sec": 0.010,
         },
         "sessions": session_results,
     }

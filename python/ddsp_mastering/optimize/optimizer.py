@@ -121,6 +121,9 @@ class AutoMasteringOptimizer:
         verbose: bool = False,
         align_latency: bool = True,
         mix_preroll_samples: Optional[List[int]] = None,
+        target_lufs: Optional[float] = None,
+        ref_ext_chunks: Optional[List[torch.Tensor]] = None,
+        ref_preroll_list: Optional[List[int]] = None,
     ) -> Tuple[torch.Tensor, List[torch.Tensor], Dict[str, List[float]]]:
         """Run optimization loop across multiple representative audio chunks.
 
@@ -170,7 +173,7 @@ class AutoMasteringOptimizer:
             weights = [w / total_w for w in chunk_weights]
 
         # Determine effective target LUFS
-        effective_target_lufs = self.target_lufs
+        effective_target_lufs = target_lufs if target_lufs is not None else self.target_lufs
         if effective_target_lufs is None:
             if ref_chunks is not None and len(ref_chunks) > 0:
                 with torch.no_grad():
@@ -227,8 +230,11 @@ class AutoMasteringOptimizer:
                 pred_k = pred_ext_k[..., n_pre_k:] if n_pre_k > 0 else pred_ext_k
                 mix_eval_k = mix_k[..., n_pre_k:] if n_pre_k > 0 else mix_k
 
+                ref_k = ref_chunks[k % len(ref_chunks)] if ref_chunks else None
+                ref_ext_k = ref_ext_chunks[k % len(ref_ext_chunks)] if ref_ext_chunks else None
+                ref_n_pre_k = ref_preroll_list[k % len(ref_preroll_list)] if ref_preroll_list else 0
+
                 if reference_mode == "stylistic":
-                    ref_k = ref_chunks[k % len(ref_chunks)] if ref_chunks else None
                     if ref_k is None:
                         raise ValueError("Reference audio chunk required for stylistic mode")
                     chunk_loss, chunk_metrics = self.stylistic_loss_fn(
@@ -239,10 +245,11 @@ class AutoMasteringOptimizer:
                         mix_anchor_audio=mix_eval_k,
                         pred_ext_audio=pred_ext_k,
                         pred_preroll_samples=n_pre_k,
+                        ref_ext_audio=ref_ext_k,
+                        ref_preroll_samples=ref_n_pre_k,
                     )
                     step_stft += weights[k] * chunk_metrics.get("stylistic_spectral_loss", 0.0)
                 else:
-                    ref_k = ref_chunks[k] if ref_chunks and k < len(ref_chunks) else None
                     chunk_loss, chunk_metrics = self.loss_fn(
                         pred_audio=pred_k,
                         target_audio=ref_k,
@@ -251,6 +258,8 @@ class AutoMasteringOptimizer:
                         align_latency=align_latency,
                         pred_ext_audio=pred_ext_k,
                         pred_preroll_samples=n_pre_k,
+                        ref_ext_audio=ref_ext_k,
+                        ref_preroll_samples=ref_n_pre_k,
                     )
                     step_stft += weights[k] * chunk_metrics.get("stft_loss_total", 0.0)
 

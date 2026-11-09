@@ -150,6 +150,8 @@ class AggregatePerceptualLoss(nn.Module):
         mix_anchor_audio: Optional[torch.Tensor] = None,
         pred_ext_audio: Optional[torch.Tensor] = None,
         pred_preroll_samples: int = 0,
+        ref_ext_audio: Optional[torch.Tensor] = None,
+        ref_preroll_samples: int = 0,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """Compute multi-feature aggregate distance for stylistic reference mastering.
 
@@ -162,6 +164,8 @@ class AggregatePerceptualLoss(nn.Module):
                               active-frame selection (`no_grad`) in `erb48` mode.
             pred_ext_audio: Optional full audio tensor with pre-roll (B, 2, N_pre + T_pred) for transient loss.
             pred_preroll_samples: Number of pre-roll samples in `pred_ext_audio`.
+            ref_ext_audio: Optional full reference audio tensor with pre-roll (B, 2, N_pre_ref + T_ref).
+            ref_preroll_samples: Number of pre-roll samples in `ref_ext_audio`.
 
         Returns:
             Tuple of (total_loss, metrics_dict).
@@ -231,12 +235,19 @@ class AggregatePerceptualLoss(nn.Module):
                 trans_pred = pred_audio
                 trans_pre = 0
 
+            if ref_ext_audio is not None and ref_preroll_samples > 0:
+                trans_ref = ref_ext_audio
+                trans_ref_pre = ref_preroll_samples
+            else:
+                trans_ref = ref_audio
+                trans_ref_pre = 0
+
             trans_total, trans_metrics = self.transient_loss.forward_stylistic(
                 pred_audio=trans_pred,
-                ref_audio=ref_audio,
+                ref_audio=trans_ref,
                 mix_anchor_audio=mix_anchor_audio,
                 pred_preroll_samples=trans_pre,
-                ref_preroll_samples=0,
+                ref_preroll_samples=trans_ref_pre,
             )
             metrics.update(trans_metrics)
             total_loss = total_loss + self.weight_trans * trans_total

@@ -127,6 +127,8 @@ class MasteringPerceptualLoss(nn.Module):
         align_latency: bool = True,
         pred_ext_audio: Optional[torch.Tensor] = None,
         pred_preroll_samples: int = 0,
+        ref_ext_audio: Optional[torch.Tensor] = None,
+        ref_preroll_samples: int = 0,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """Compute the composite perceptual loss.
 
@@ -138,6 +140,8 @@ class MasteringPerceptualLoss(nn.Module):
             align_latency: Whether to slice off chain latency before reference comparison.
             pred_ext_audio: Optional full audio tensor with pre-roll (B, 2, N_pre + T) for transient loss.
             pred_preroll_samples: Number of pre-roll samples in `pred_ext_audio`.
+            ref_ext_audio: Optional full reference audio tensor with pre-roll (B, 2, N_pre_ref + T).
+            ref_preroll_samples: Number of pre-roll samples in `ref_ext_audio`.
 
         Returns:
             Tuple of (total_loss, metrics_dict).
@@ -166,14 +170,27 @@ class MasteringPerceptualLoss(nn.Module):
 
             if self.weight_trans > 0.0:
                 if pred_ext_audio is not None and pred_preroll_samples > 0:
-                    eff_pre = pred_preroll_samples + (self.latency_samples if align_latency else 0)
-                    trans_val, trans_metrics = self.transient_loss.forward_same_track(
-                        pred_ext_audio, t_aligned, pred_preroll_samples=eff_pre, ref_preroll_samples=0
-                    )
+                    eff_pre_pred = pred_preroll_samples + (self.latency_samples if align_latency else 0)
+                    pred_for_trans = pred_ext_audio
                 else:
-                    trans_val, trans_metrics = self.transient_loss.forward_same_track(
-                        p_aligned, t_aligned, pred_preroll_samples=0, ref_preroll_samples=0
-                    )
+                    eff_pre_pred = 0
+                    pred_for_trans = p_aligned
+
+                if ref_ext_audio is not None and ref_preroll_samples > 0:
+                    D_tail = self.latency_samples if align_latency else 0
+                    T_orig = target_audio.shape[-1]
+                    ref_for_trans = ref_ext_audio[..., : ref_preroll_samples + T_orig - D_tail]
+                    eff_pre_ref = ref_preroll_samples
+                else:
+                    ref_for_trans = t_aligned
+                    eff_pre_ref = 0
+
+                trans_val, trans_metrics = self.transient_loss.forward_same_track(
+                    pred_audio=pred_for_trans,
+                    target_audio=ref_for_trans,
+                    pred_preroll_samples=eff_pre_pred,
+                    ref_preroll_samples=eff_pre_ref,
+                )
                 metrics.update(trans_metrics)
                 total_loss = total_loss + self.weight_trans * trans_val
 
