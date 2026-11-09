@@ -105,25 +105,30 @@ def calculate_true_peak_dbtp(
 
     # Explicit zero-padding boundary condition (64 samples each side) so boundary peaks
     # at index 0 and T-1 and their filter reconstruction tails are completely preserved.
-    # Uses streaming chunking (chunk_size = 480000 = 10s at 48 kHz) to prevent multi-gigabyte
+    # Uses streaming chunking (chunk_size = 480000 = 10s at 48 kHz) with halo context
+    # (halo_width = 2 * filter_width = 128 samples) to prevent multi-gigabyte
     # memory allocations and page thrashing on long audio files while guaranteeing exact numerical identity.
     filter_width = 64
+    halo_width = 2 * filter_width
     chunk_size = 480000
+    os_fac = int(oversampling_factor)
     total_len = x.shape[-1]
     max_oversampled_linear = 0.0
 
     for s_idx in range(0, total_len, chunk_size):
         e_idx = min(total_len, s_idx + chunk_size)
-        pl = min(s_idx, filter_width)
-        pr = min(total_len - e_idx, filter_width)
+        pl = min(s_idx, halo_width)
+        pr = min(total_len - e_idx, halo_width)
         ctx_seg = x[:, s_idx - pl : e_idx + pr]
-        seg_padded = F.pad(ctx_seg, (filter_width - pl, filter_width - pr), mode="constant", value=0.0)
+        pad_left = filter_width if s_idx == 0 else 0
+        pad_right = filter_width if e_idx == total_len else 0
+        seg_padded = F.pad(ctx_seg, (pad_left, pad_right), mode="constant", value=0.0)
 
         try:
             seg_oversampled = taf.resample(
                 seg_padded,
                 orig_freq=1,
-                new_freq=int(oversampling_factor),
+                new_freq=os_fac,
                 lowpass_filter_width=filter_width,
                 rolloff=1.0,
                 resampling_method="sinc_interp_kaiser",
@@ -133,15 +138,19 @@ def calculate_true_peak_dbtp(
             seg_oversampled = taf.resample(
                 seg_padded,
                 orig_freq=1,
-                new_freq=int(oversampling_factor),
+                new_freq=os_fac,
                 lowpass_filter_width=filter_width,
                 rolloff=1.0,
                 resampling_method="kaiser_window",
                 beta=14.769656459379492,
             )
 
+        valid_start_os = pl * os_fac if s_idx > 0 else 0
+        valid_end_os = seg_oversampled.shape[-1] - (pr * os_fac if e_idx < total_len else 0)
+        seg_valid = seg_oversampled[:, valid_start_os:valid_end_os]
+
         max_oversampled_linear = max(
-            max_oversampled_linear, torch.max(torch.abs(seg_oversampled)).item()
+            max_oversampled_linear, torch.max(torch.abs(seg_valid)).item()
         )
 
     max_peak_linear = max(sample_peak_linear, max_oversampled_linear)

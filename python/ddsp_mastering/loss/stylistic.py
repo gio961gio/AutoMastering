@@ -43,7 +43,13 @@ class AggregatePerceptualLoss(nn.Module):
         spectral_mode: str = "mel40",
         weight_de_harsh: float = 0.0,
         weight_trans: float = 0.0,
+        beta_atk: float = 0.5,
         plr_mode: str = "mse",
+        plr_d_style: float = 1.0,
+        plr_gamma_floor: float = 1.0,
+        soft_peak_p: int = 8,
+        soft_peak_beta: float = 2.0,
+        soft_peak_block_duration_sec: float = 0.010,
     ):
         super().__init__()
         if spectral_mode not in ("mel40", "erb48"):
@@ -55,7 +61,13 @@ class AggregatePerceptualLoss(nn.Module):
         self.spectral_mode = spectral_mode
         self.weight_de_harsh = weight_de_harsh
         self.weight_trans = weight_trans
+        self.beta_atk = beta_atk
         self.plr_mode = plr_mode
+        self.plr_d_style = plr_d_style
+        self.plr_gamma_floor = plr_gamma_floor
+        self.soft_peak_p = soft_peak_p
+        self.soft_peak_beta = soft_peak_beta
+        self.soft_peak_block_duration_sec = soft_peak_block_duration_sec
 
         self.weight_spectral = weight_spectral
         self.weight_loudness = weight_loudness
@@ -82,8 +94,17 @@ class AggregatePerceptualLoss(nn.Module):
         )
         self.transient_loss = TransientEnvelopeLoss(
             sample_rate=sample_rate,
+            beta_atk=beta_atk,
         )
-        self.loudness_loss = DifferentiableLoudnessLoss(sample_rate=sample_rate)
+        self.loudness_loss = DifferentiableLoudnessLoss(
+            sample_rate=sample_rate,
+            plr_mode="reference_aware_style" if plr_mode == "reference_aware" else "box",
+            soft_peak_p=soft_peak_p,
+            soft_peak_beta=soft_peak_beta,
+            soft_peak_block_duration_sec=soft_peak_block_duration_sec,
+            plr_d_style=plr_d_style,
+            plr_gamma_floor=plr_gamma_floor,
+        )
 
     def _extract_mel_spectrum_distribution(self, audio: torch.Tensor) -> torch.Tensor:
         """Compute long-term average log-Mel energy distribution [B, n_mels] via incoherent stereo power."""
@@ -127,6 +148,8 @@ class AggregatePerceptualLoss(nn.Module):
         normalized_params: Optional[torch.Tensor] = None,
         target_lufs: Optional[float] = None,
         mix_anchor_audio: Optional[torch.Tensor] = None,
+        pred_ext_audio: Optional[torch.Tensor] = None,
+        pred_preroll_samples: int = 0,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """Compute multi-feature aggregate distance for stylistic reference mastering.
 
@@ -137,6 +160,8 @@ class AggregatePerceptualLoss(nn.Module):
             target_lufs: Optional explicit target LUFS (overrides reference LUFS).
             mix_anchor_audio: Optional unoptimized mix chunk `x_mix` used to anchor
                               active-frame selection (`no_grad`) in `erb48` mode.
+            pred_ext_audio: Optional full audio tensor with pre-roll (B, 2, N_pre + T_pred) for transient loss.
+            pred_preroll_samples: Number of pre-roll samples in `pred_ext_audio`.
 
         Returns:
             Tuple of (total_loss, metrics_dict).
@@ -197,12 +222,21 @@ class AggregatePerceptualLoss(nn.Module):
             metrics["ref_plr"] = ref_plr.mean().item()
             total_loss = total_loss + self.weight_dynamics * plr_loss
 
-        # 3b. Multi-band Transient / Envelope Distributional Loss (Sprint 3 V2)
+        # 3b. Multi-band Transient / Envelope Distributional Loss (Sprint 3 V2, Fix D)
         if self.weight_trans > 0.0:
+            if pred_ext_audio is not None and pred_preroll_samples > 0:
+                trans_pred = pred_ext_audio
+                trans_pre = pred_preroll_samples
+            else:
+                trans_pred = pred_audio
+                trans_pre = 0
+
             trans_total, trans_metrics = self.transient_loss.forward_stylistic(
-                pred_audio=pred_audio,
+                pred_audio=trans_pred,
                 ref_audio=ref_audio,
                 mix_anchor_audio=mix_anchor_audio,
+                pred_preroll_samples=trans_pre,
+                ref_preroll_samples=0,
             )
             metrics.update(trans_metrics)
             total_loss = total_loss + self.weight_trans * trans_total

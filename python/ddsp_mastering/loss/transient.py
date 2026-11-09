@@ -9,7 +9,8 @@ velocity Delta^+ e_c^fast[m] across three psychoacoustic analysis bands:
 Supports:
   1. `same_track`: point-to-point active-frame-weighted Huber_1.0 matching.
   2. `stylistic`: multi-quantile (P50, P90, P95) distributional distance on active frames.
-  3. Safe fallback for silent and sparse chunks (no NaN, Inf, or zero division).
+  3. Causal DSP pre-roll / warm-up handling for LR4 crossover states and running cumsum envelopes (Fix D).
+  4. Safe fallback for silent and sparse chunks (no NaN, Inf, or zero division).
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -25,6 +26,7 @@ def compute_transient_active_mask(
     sample_rate: float = 48000.0,
     hop_samples: int = 120,
     window_samples: int = 2400,
+    preroll_samples: int = 0,
     min_active_frames: int = 8,
     silence_floor_dbfs: float = -70.0,
     active_floor_dbfs: float = -60.0,
@@ -32,13 +34,14 @@ def compute_transient_active_mask(
     sigmoid_temp_db: float = 2.0,
     eps: float = 1e-12,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Compute active-frame weights and discrete mask for transient evaluation (§2.A.2).
+    """Compute active-frame weights and discrete mask for transient evaluation (§2.A.2, Fix D).
 
     Args:
         anchor_audio: Anchor tensor `(B, C, T)` or `(C, T)` outside autograd (`no_grad`).
         sample_rate: Sampling frequency in Hz.
         hop_samples: Hop size between envelope frames (default: 120 samples / 2.5 ms).
         window_samples: Analysis window size for RMS gating (default: 2400 samples / 50 ms).
+        preroll_samples: Causal pre-roll sample count before evaluation window.
         min_active_frames: Minimum active frames required (default: 8).
         silence_floor_dbfs: Digital silence threshold in dBFS (default: -70.0).
         active_floor_dbfs: Minimum active floor in dBFS (default: -60.0).
@@ -56,22 +59,30 @@ def compute_transient_active_mask(
         x0 = anchor_audio.detach()
         if x0.dim() == 2:
             x0 = x0.unsqueeze(0)
-        B, C, T = x0.shape
+        B, C, T_tot = x0.shape
         device = x0.device
 
-        # Channel mean square: (B, 1, T)
+        n_pre = max(0, int(preroll_samples))
+        if n_pre >= T_tot:
+            n_pre = 0
+        t_eval = T_tot - n_pre
+
+        # Channel mean square: (B, 1, T_tot)
         s = torch.mean(x0.to(torch.float64) ** 2, dim=1, keepdim=True)
 
-        # Running RMS over window_samples via float64 cumsum
         half_w = window_samples // 2
-        s_pad = F.pad(s, (half_w, half_w), mode="replicate")
+        if n_pre >= half_w:
+            s_left = s[:, :, n_pre - half_w :]
+            s_pad = F.pad(s_left, (0, half_w), mode="replicate")
+        else:
+            s_pad = F.pad(s, (half_w - n_pre, half_w), mode="replicate")
+
         cs = torch.cumsum(s_pad, dim=-1)
         cs_pad = F.pad(cs, (1, 0), mode="constant", value=0.0)
 
-        indices = torch.arange(0, s_pad.shape[-1] - window_samples + 1, hop_samples, device=device)
-        ms = (cs_pad[..., indices + window_samples] - cs_pad[..., indices]) / float(window_samples)
-        # ms: (B, 1, M) -> (B, M)
-        ms = ms.squeeze(1)
+        idx = torch.arange(0, t_eval, hop_samples, device=device)
+        ms = (cs_pad[..., idx + window_samples] - cs_pad[..., idx]) / float(window_samples)
+        ms = ms.squeeze(1)  # (B, M)
         M_frames = ms.shape[-1]
 
         l_rms = 10.0 * torch.log10(ms.clamp(min=eps))  # (B, M)
@@ -110,7 +121,7 @@ def compute_transient_active_mask(
 
 
 class TransientEnvelopeLoss(nn.Module):
-    """Multi-band Transient / Envelope Loss Module (§2.C.1).
+    """Multi-band Transient / Envelope Loss Module (§2.C.1, Fix D, Fix E).
 
     Extracts RMS envelopes on fast (5 ms) and slow (50 ms) timescales, local crest factor
     `C_c[m] = e_c^fast[m] - e_c^slow[m]`, and attack onset velocity
@@ -149,12 +160,13 @@ class TransientEnvelopeLoss(nn.Module):
         self.register_buffer("fc_high", torch.tensor(self.f_crossover_high, dtype=torch.float32))
 
     def extract_band_envelopes(
-        self, audio: torch.Tensor
+        self, audio: torch.Tensor, preroll_samples: int = 0
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Extract multi-band local crest factor and positive onset velocity.
+        """Extract multi-band local crest factor and positive onset velocity with pre-roll context (Fix D).
 
         Args:
-            audio: Audio tensor `(B, C, T)` or `(C, T)`.
+            audio: Audio tensor `(B, C, T_tot)` or `(C, T_tot)`.
+            preroll_samples: Causal warm-up samples before evaluation region.
 
         Returns:
             Tuple `(crest_factors, onset_slopes)`:
@@ -163,11 +175,16 @@ class TransientEnvelopeLoss(nn.Module):
         """
         if audio.dim() == 2:
             audio = audio.unsqueeze(0)
-        B, C, T = audio.shape
+        B, C, T_tot = audio.shape
         device = audio.device
         dtype = audio.dtype
 
-        # 3-band split: each band is (B, C, T)
+        n_pre = max(0, int(preroll_samples))
+        if n_pre >= T_tot:
+            n_pre = 0
+        t_eval = T_tot - n_pre
+
+        # Crossover on the full audio buffer (including pre-roll) to warm up filter states
         y_low, y_mid, y_high = self.crossover(audio, self.fc_low, self.fc_high)
         bands = [y_low, y_mid, y_high]
 
@@ -177,33 +194,38 @@ class TransientEnvelopeLoss(nn.Module):
         half_f = self.w_fast_samples // 2
         half_s = self.w_slow_samples // 2
 
+        idx = torch.arange(0, t_eval, self.hop_samples, device=device)
+
         for band in bands:
-            # Channel mean-square: (B, 1, T)
+            # Channel mean-square: (B, 1, T_tot)
             s = torch.mean(band.to(torch.float64) ** 2, dim=1, keepdim=True)
 
-            # Fast envelope via float64 cumsum
-            s_pad_f = F.pad(s, (half_f, half_f), mode="replicate")
+            # Fast envelope via float64 cumsum utilizing real left context
+            if n_pre >= half_f:
+                s_left_f = s[:, :, n_pre - half_f :]
+                s_pad_f = F.pad(s_left_f, (0, half_f), mode="replicate")
+            else:
+                s_pad_f = F.pad(s, (half_f - n_pre, half_f), mode="replicate")
+
             cs_f = torch.cumsum(s_pad_f, dim=-1)
             cs_f_pad = F.pad(cs_f, (1, 0), mode="constant", value=0.0)
-            idx_f = torch.arange(
-                0, s_pad_f.shape[-1] - self.w_fast_samples + 1, self.hop_samples, device=device
-            )
-            ms_fast = (cs_f_pad[..., idx_f + self.w_fast_samples] - cs_f_pad[..., idx_f]) / float(
+            ms_fast = (cs_f_pad[..., idx + self.w_fast_samples] - cs_f_pad[..., idx]) / float(
                 self.w_fast_samples
             )
 
-            # Slow envelope via float64 cumsum
-            s_pad_s = F.pad(s, (half_s, half_s), mode="replicate")
+            # Slow envelope via float64 cumsum utilizing real left context
+            if n_pre >= half_s:
+                s_left_s = s[:, :, n_pre - half_s :]
+                s_pad_s = F.pad(s_left_s, (0, half_s), mode="replicate")
+            else:
+                s_pad_s = F.pad(s, (half_s - n_pre, half_s), mode="replicate")
+
             cs_s = torch.cumsum(s_pad_s, dim=-1)
             cs_s_pad = F.pad(cs_s, (1, 0), mode="constant", value=0.0)
-            idx_s = torch.arange(
-                0, s_pad_s.shape[-1] - self.w_slow_samples + 1, self.hop_samples, device=device
-            )
-            ms_slow = (cs_s_pad[..., idx_s + self.w_slow_samples] - cs_s_pad[..., idx_s]) / float(
+            ms_slow = (cs_s_pad[..., idx + self.w_slow_samples] - cs_s_pad[..., idx]) / float(
                 self.w_slow_samples
             )
 
-            # Align frame counts
             M = min(ms_fast.shape[-1], ms_slow.shape[-1])
             ms_fast = ms_fast[..., :M].squeeze(1).clamp(min=self.eps)
             ms_slow = ms_slow[..., :M].squeeze(1).clamp(min=self.eps)
@@ -231,12 +253,16 @@ class TransientEnvelopeLoss(nn.Module):
         self,
         pred_audio: torch.Tensor,
         target_audio: torch.Tensor,
+        pred_preroll_samples: int = 0,
+        ref_preroll_samples: int = 0,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """Compute point-to-point active-frame-weighted Huber transient loss (§2.C.1).
+        """Compute point-to-point active-frame-weighted Huber transient loss (§2.C.1, Fix D).
 
         Args:
-            pred_audio: Audio generated by the chain `(B, 2, T)`.
-            target_audio: Aligned reference audio `(B, 2, T)`.
+            pred_audio: Audio generated by the chain `(B, 2, T_pred)` (with optional pre-roll).
+            target_audio: Aligned reference audio `(B, 2, T_ref)` (with optional pre-roll).
+            pred_preroll_samples: Pre-roll samples in `pred_audio`.
+            ref_preroll_samples: Pre-roll samples in `target_audio`.
 
         Returns:
             Tuple `(loss, metrics_dict)`.
@@ -246,12 +272,13 @@ class TransientEnvelopeLoss(nn.Module):
             sample_rate=self.sample_rate,
             hop_samples=self.hop_samples,
             window_samples=self.w_slow_samples,
+            preroll_samples=ref_preroll_samples,
             eps=self.eps,
         )
 
-        crest_pred, onset_pred = self.extract_band_envelopes(pred_audio)
+        crest_pred, onset_pred = self.extract_band_envelopes(pred_audio, preroll_samples=pred_preroll_samples)
         with torch.no_grad():
-            crest_ref, onset_ref = self.extract_band_envelopes(target_audio)
+            crest_ref, onset_ref = self.extract_band_envelopes(target_audio, preroll_samples=ref_preroll_samples)
 
         # Align frame count between envelopes and w_tilde
         M = min(crest_pred.shape[-1], crest_ref.shape[-1], w_tilde.shape[-1])
@@ -260,15 +287,11 @@ class TransientEnvelopeLoss(nn.Module):
         o_p = onset_pred[..., :M]
         o_r = onset_ref[..., :M]
         w = w_tilde[..., :M]
-        # Re-normalize weights over trimmed M
         w = w / torch.sum(w, dim=-1, keepdim=True).clamp(min=self.eps)
 
-        # Huber_1.0 on crest differences: (B, 3, M)
         huber_crest = F.huber_loss(c_p, c_r, reduction="none", delta=1.0)
-        # Huber_1.0 on onset slope differences: (B, 3, M)
         huber_onset = F.huber_loss(o_p, o_r, reduction="none", delta=1.0)
 
-        # Weighted average over frames and mean over 3 bands
         loss_crest_bands = torch.sum(huber_crest * w.unsqueeze(1), dim=-1)  # (B, 3)
         loss_onset_bands = torch.sum(huber_onset * w.unsqueeze(1), dim=-1)  # (B, 3)
 
@@ -289,24 +312,34 @@ class TransientEnvelopeLoss(nn.Module):
         pred_audio: torch.Tensor,
         ref_audio: torch.Tensor,
         mix_anchor_audio: Optional[torch.Tensor] = None,
+        pred_preroll_samples: int = 0,
+        ref_preroll_samples: int = 0,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """Compute multi-quantile (P50, P90, P95) distributional transient loss (§2.C.1).
+        """Compute multi-quantile (P50, P90, P95) distributional transient loss (§2.C.1, Fix D).
 
         Args:
             pred_audio: Audio generated by the chain `(B, 2, T_pred)`.
             ref_audio: Stylistic reference audio `(B, 2, T_ref)`.
             mix_anchor_audio: Optional unoptimized mix chunk `(B, 2, T_pred)` for anchor mask.
+            pred_preroll_samples: Pre-roll samples in `pred_audio`.
+            ref_preroll_samples: Pre-roll samples in `ref_audio`.
 
         Returns:
             Tuple `(loss, metrics_dict)`.
         """
         anchor = mix_anchor_audio if mix_anchor_audio is not None else pred_audio.detach()
+        anchor_pre = (
+            pred_preroll_samples
+            if (mix_anchor_audio is not None and mix_anchor_audio.shape[-1] == pred_audio.shape[-1])
+            else (pred_preroll_samples if mix_anchor_audio is None else 0)
+        )
 
         _, mask_pred, is_valid_pred = compute_transient_active_mask(
             anchor,
             sample_rate=self.sample_rate,
             hop_samples=self.hop_samples,
             window_samples=self.w_slow_samples,
+            preroll_samples=anchor_pre,
             eps=self.eps,
         )
         _, mask_ref, is_valid_ref = compute_transient_active_mask(
@@ -314,13 +347,14 @@ class TransientEnvelopeLoss(nn.Module):
             sample_rate=self.sample_rate,
             hop_samples=self.hop_samples,
             window_samples=self.w_slow_samples,
+            preroll_samples=ref_preroll_samples,
             eps=self.eps,
         )
         is_valid = is_valid_pred * is_valid_ref  # (B,)
 
-        crest_p, onset_p = self.extract_band_envelopes(pred_audio)
+        crest_p, onset_p = self.extract_band_envelopes(pred_audio, preroll_samples=pred_preroll_samples)
         with torch.no_grad():
-            crest_r, onset_r = self.extract_band_envelopes(ref_audio)
+            crest_r, onset_r = self.extract_band_envelopes(ref_audio, preroll_samples=ref_preroll_samples)
 
         B = pred_audio.shape[0] if pred_audio.dim() == 3 else 1
         q_probs = torch.tensor([0.50, 0.90, 0.95], device=pred_audio.device, dtype=pred_audio.dtype)
@@ -329,21 +363,18 @@ class TransientEnvelopeLoss(nn.Module):
         onset_dist_list: List[torch.Tensor] = []
 
         for b in range(B):
-            # Active frames for pred
             m_p = min(crest_p.shape[-1], mask_pred.shape[-1])
             act_idx_p = torch.nonzero(mask_pred[b, :m_p], as_tuple=False).squeeze(-1)
-            # Active frames for ref
+
             m_r = min(crest_r.shape[-1], mask_ref.shape[-1])
             act_idx_r = torch.nonzero(mask_ref[b, :m_r], as_tuple=False).squeeze(-1)
 
-            # Compute quantiles across active frames: shape (3_quantiles, 3_bands)
             q_cp = torch.quantile(crest_p[b, :, act_idx_p], q_probs, dim=-1)
             q_cr = torch.quantile(crest_r[b, :, act_idx_r], q_probs, dim=-1)
 
             q_op = torch.quantile(onset_p[b, :, act_idx_p], q_probs, dim=-1)
             q_or = torch.quantile(onset_r[b, :, act_idx_r], q_probs, dim=-1)
 
-            # L1 difference averaged across 3 quantiles and 3 bands
             diff_c = torch.mean(torch.abs(q_cp - q_cr))
             diff_o = torch.mean(torch.abs(q_op - q_or))
 
@@ -367,12 +398,25 @@ class TransientEnvelopeLoss(nn.Module):
         target_audio: torch.Tensor,
         reference_mode: str = "same_track",
         mix_anchor_audio: Optional[torch.Tensor] = None,
+        pred_preroll_samples: int = 0,
+        ref_preroll_samples: int = 0,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """Dispatch forward pass according to reference mode."""
         if reference_mode == "same_track":
-            return self.forward_same_track(pred_audio, target_audio)
+            return self.forward_same_track(
+                pred_audio,
+                target_audio,
+                pred_preroll_samples=pred_preroll_samples,
+                ref_preroll_samples=ref_preroll_samples,
+            )
         elif reference_mode == "stylistic":
-            return self.forward_stylistic(pred_audio, target_audio, mix_anchor_audio=mix_anchor_audio)
+            return self.forward_stylistic(
+                pred_audio,
+                target_audio,
+                mix_anchor_audio=mix_anchor_audio,
+                pred_preroll_samples=pred_preroll_samples,
+                ref_preroll_samples=ref_preroll_samples,
+            )
         else:
             raise ValueError(
                 f"Unsupported reference_mode '{reference_mode}'. Expected 'same_track' or 'stylistic'."

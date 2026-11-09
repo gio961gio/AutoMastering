@@ -2,12 +2,12 @@
 
 Evaluates:
   - V0p: Context control baseline (2.5s pre-roll, historical Sprint 2 loss).
-  - V2:  2.5s pre-roll + Transient/Envelope Loss (weight_trans=0.2) + Reference-Aware
-         PLR Loss with Boltzmann soft-peak mean (plr_mode="reference_aware").
+  - V2:  2.5s pre-roll + Transient/Envelope Loss (weight_trans=0.2, beta_atk=0.5)
+         + Reference-Aware PLR Loss with Boltzmann soft-peak mean (plr_mode="reference_aware").
 
 Runs multi-chunk optimization (num_steps=30, lr=0.04, exact Sprint 2 seeds and chunk coordinates)
 across all 6 sessions (track01..03 same_track and track01..03_style stylistic),
-renders full-track offline C++ output, and benchmarks objective metrics.
+renders full-track offline C++ output with tail flush, and benchmarks objective metrics.
 Exports results to docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json.
 """
 
@@ -15,6 +15,7 @@ import gc
 import json
 import math
 import os
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -34,10 +35,19 @@ if str(_REPO_ROOT) not in sys.path:
 
 
 class _FastCPUAnalyticalBiquad(torch.autograd.Function):
-    """Fast float64 analytical IIR biquad using SciPy lfilter on CPU."""
+    """Exact float64 analytical forward & adjoint IIR biquad filter using C/SciPy lfilter on CPU.
+
+    Matches `torchaudio.functional.lfilter(..., clamp=False)` to machine epsilon (~1e-14 in float64)
+    while running >50x faster on CPU for long buffers (5.5s pre-roll chunks and full tracks).
+    """
 
     @staticmethod
-    def forward(ctx, waveform: torch.Tensor, a_coeffs: torch.Tensor, b_coeffs: torch.Tensor) -> torch.Tensor:
+    def forward(
+        ctx,
+        waveform: torch.Tensor,
+        a_coeffs: torch.Tensor,
+        b_coeffs: torch.Tensor,
+    ) -> torch.Tensor:
         orig_shape = waveform.shape
         orig_dtype = waveform.dtype
         device = waveform.device
@@ -50,6 +60,7 @@ class _FastCPUAnalyticalBiquad(torch.autograd.Function):
         a_2d = a_coeffs.detach().to(torch.float64).reshape(-1, 3).cpu().numpy()
         b_2d = b_coeffs.detach().to(torch.float64).reshape(-1, 3).cpu().numpy()
 
+        # Normalize by a0 if a0 != 1.0
         a0 = a_2d[:, 0:1]
         b_norm = b_2d / a0
         a_norm = a_2d / a0
@@ -80,63 +91,102 @@ class _FastCPUAnalyticalBiquad(torch.autograd.Function):
 
         x_np = np.ascontiguousarray(x_saved.reshape(-1, N).cpu().numpy(), dtype=np.float64)
         y_np = np.ascontiguousarray(y_2d.reshape(-1, N).cpu().numpy(), dtype=np.float64)
-        gy_np = np.ascontiguousarray(grad_output.detach().to(torch.float64).reshape(-1, N).cpu().numpy(), dtype=np.float64)
+        gy_np = np.ascontiguousarray(
+            grad_output.detach().to(torch.float64).reshape(-1, N).cpu().numpy(), dtype=np.float64
+        )
+        M = x_np.shape[0]
 
-        a_2d = a_coeffs.detach().reshape(-1, 3).cpu().numpy()
-        b_2d = b_coeffs.detach().reshape(-1, 3).cpu().numpy()
+        a_2d = a_coeffs.reshape(-1, 3).cpu().numpy()
+        b_2d = b_coeffs.reshape(-1, 3).cpu().numpy()
         a0 = a_2d[:, 0:1]
         b_norm = b_2d / a0
         a_norm = a_2d / a0
 
-        gy_rev = np.ascontiguousarray(gy_np[:, ::-1])
-        M = x_np.shape[0]
-
-        if b_norm.shape[0] == 1 or np.allclose(b_norm, b_norm[0:1]) and np.allclose(a_norm, a_norm[0:1]):
-            gx_rev = scipy_lfilter(b_norm[0], a_norm[0], gy_rev, axis=-1)
-            u_rev = scipy_lfilter([1.0], a_norm[0], gy_rev, axis=-1)
+        shared_coeffs = (
+            b_norm.shape[0] == 1
+            or (np.allclose(b_norm, b_norm[0:1]) and np.allclose(a_norm, a_norm[0:1]))
+        )
+        if shared_coeffs:
+            psi_rev = scipy_lfilter(np.array([1.0], dtype=np.float64), a_norm[0], gy_np[:, ::-1], axis=-1)
+            psi = np.ascontiguousarray(psi_rev[:, ::-1])
         else:
-            gx_rev = np.empty_like(gy_rev)
-            u_rev = np.empty_like(gy_rev)
+            psi = np.empty_like(gy_np)
             for m in range(M):
-                idx = min(m, b_norm.shape[0] - 1)
-                gx_rev[m] = scipy_lfilter(b_norm[idx], a_norm[idx], gy_rev[m], axis=-1)
-                u_rev[m] = scipy_lfilter([1.0], a_norm[idx], gy_rev[m], axis=-1)
+                idx = min(m, a_norm.shape[0] - 1)
+                psi_rev = scipy_lfilter(np.array([1.0], dtype=np.float64), a_norm[idx], gy_np[m, ::-1], axis=-1)
+                psi[m] = psi_rev[::-1]
 
-        gx_np = np.ascontiguousarray(gx_rev[:, ::-1])
-        u_np = np.ascontiguousarray(u_rev[:, ::-1])
+        grad_x = None
+        if ctx.needs_input_grad[0]:
+            if shared_coeffs:
+                gx_rev = scipy_lfilter(b_norm[0], np.array([1.0], dtype=np.float64), psi[:, ::-1], axis=-1)
+                gx_np = np.ascontiguousarray(gx_rev[:, ::-1])
+            else:
+                gx_np = np.empty_like(psi)
+                for m in range(M):
+                    idx = min(m, b_norm.shape[0] - 1)
+                    gx_rev = scipy_lfilter(b_norm[idx], np.array([1.0], dtype=np.float64), psi[m, ::-1], axis=-1)
+                    gx_np[m] = gx_rev[::-1]
+            grad_x = torch.from_numpy(gx_np).to(device=device, dtype=grad_output.dtype).reshape(orig_shape)
 
-        gb0 = np.sum(gy_np * x_np, axis=-1, keepdims=True)
-        gb1 = np.sum(gy_np[:, 1:] * x_np[:, :-1], axis=-1, keepdims=True)
-        gb2 = np.sum(gy_np[:, 2:] * x_np[:, :-2], axis=-1, keepdims=True)
-        gb_norm = np.concatenate([gb0, gb1, gb2], axis=-1)
+        grad_a = None
+        if ctx.needs_input_grad[1]:
+            da0 = np.zeros(M, dtype=np.float64)
+            da1 = -(psi[:, 1:] * y_np[:, :-1]).sum(axis=-1)
+            da2 = -(psi[:, 2:] * y_np[:, :-2]).sum(axis=-1)
+            da_mat = np.stack([da0, da1, da2], axis=-1) / a0
+            if a_coeffs.dim() == 1:
+                da_mat = da_mat.sum(axis=0)
+            elif a_coeffs.shape[0] == 1 and M > 1:
+                da_mat = da_mat.sum(axis=0, keepdims=True)
+            grad_a = torch.from_numpy(da_mat).to(device=device, dtype=a_coeffs.dtype).reshape(a_coeffs.shape)
 
-        ga1 = -np.sum(u_np[:, 1:] * y_np[:, :-1], axis=-1, keepdims=True)
-        ga2 = -np.sum(u_np[:, 2:] * y_np[:, :-2], axis=-1, keepdims=True)
-        ga_norm = np.concatenate([np.zeros_like(ga1), ga1, ga2], axis=-1)
-
-        grad_x = torch.from_numpy(gx_np).to(device=device, dtype=grad_output.dtype).reshape(orig_shape)
-        grad_b = torch.from_numpy(gb_norm / a0).to(device=device, dtype=b_coeffs.dtype).reshape(b_coeffs.shape)
-        grad_a = torch.from_numpy(ga_norm / a0).to(device=device, dtype=a_coeffs.dtype).reshape(a_coeffs.shape)
+        grad_b = None
+        if ctx.needs_input_grad[2]:
+            db0 = (psi * x_np).sum(axis=-1)
+            db1 = (psi[:, 1:] * x_np[:, :-1]).sum(axis=-1)
+            db2 = (psi[:, 2:] * x_np[:, :-2]).sum(axis=-1)
+            db_mat = np.stack([db0, db1, db2], axis=-1) / a0
+            if b_coeffs.dim() == 1:
+                db_mat = db_mat.sum(axis=0)
+            elif b_coeffs.shape[0] == 1 and M > 1:
+                db_mat = db_mat.sum(axis=0, keepdims=True)
+            grad_b = torch.from_numpy(db_mat).to(device=device, dtype=b_coeffs.dtype).reshape(b_coeffs.shape)
 
         return grad_x, grad_a, grad_b
 
 
-def _patched_taf_lfilter(waveform, a_coeffs, b_coeffs, clamp=False, batching=True):
-    if waveform.device.type == "cpu":
+_ORIG_TAF_LFILTER = taf.lfilter
+
+
+def _fast_cpu_lfilter(
+    waveform: torch.Tensor,
+    a_coeffs: torch.Tensor,
+    b_coeffs: torch.Tensor,
+    clamp: bool = True,
+    batching: bool = True,
+) -> torch.Tensor:
+    if not clamp and not waveform.is_cuda and a_coeffs.shape[-1] == 3 and b_coeffs.shape[-1] == 3:
         return _FastCPUAnalyticalBiquad.apply(waveform, a_coeffs, b_coeffs)
     return _ORIG_TAF_LFILTER(waveform, a_coeffs, b_coeffs, clamp=clamp, batching=batching)
 
 
-_ORIG_TAF_LFILTER = taf.lfilter
-taf.lfilter = _patched_taf_lfilter
+taf.lfilter = _fast_cpu_lfilter
 
-from ddsp_mastering.data.chunking import MultiChunkSelector
-from scripts.human_validation.validate_inputs import load_and_validate_wav
+from ddsp_mastering.data import (
+    MultiChunkSelector,
+    apply_same_track_alignment,
+    estimate_time_alignment,
+    get_same_track_slice_indices,
+)
+from ddsp_mastering.data.chunking import ChunkSpec
 from ddsp_mastering.dsp.chain import DifferentiableMasteringChain
-from ddsp_mastering.dsp.alignment import apply_same_track_alignment, estimate_time_alignment
-from ddsp_mastering.optimize.benchmark import MasteringBenchmarkSuite
-from ddsp_mastering.optimize.optimizer import AutoMasteringOptimizer
-from ddsp_mastering.param_space import PARAM_SPECS, Z_NEUTRAL, map_z_to_theta
+from ddsp_mastering.loss.combined import MasteringPerceptualLoss
+from ddsp_mastering.loss.stylistic import AggregatePerceptualLoss
+from ddsp_mastering.optimize import AutoMasteringOptimizer, MasteringBenchmarkSuite
+from ddsp_mastering.param_space import PARAM_SPECS, Z_NEUTRAL, map_theta_to_z, map_z_to_theta
+from scripts.human_validation.offline_renderer import render_offline_with_tail_flush
+from scripts.human_validation.validate_inputs import load_and_validate_wav
 
 SESSIONS_SPEC = [
     {
@@ -161,19 +211,19 @@ SESSIONS_SPEC = [
         "track_prefix": "track01_style",
         "mode": "stylistic",
         "mix_path": "human_validation/private/input/track01_mix.wav",
-        "ref_path": "human_validation/private/input/track01_style_ref.wav",
+        "ref_path": "human_validation/private/input/track01_ref_altro_brano.wav",
     },
     {
         "track_prefix": "track02_style",
         "mode": "stylistic",
         "mix_path": "human_validation/private/input/track02_mix.wav",
-        "ref_path": "human_validation/private/input/track02_style_ref.wav",
+        "ref_path": "human_validation/private/input/track02_ref_altro_brano.wav",
     },
     {
         "track_prefix": "track03_style",
         "mode": "stylistic",
         "mix_path": "human_validation/private/input/track03_mix.wav",
-        "ref_path": "human_validation/private/input/track03_style_ref.wav",
+        "ref_path": "human_validation/private/input/track03_ref_altro_brano.wav",
     },
 ]
 
@@ -258,6 +308,12 @@ def evaluate_single_session_v2(
             weight_de_harsh=0.0,
             weight_trans=0.2,  # V2 transient loss weight
             plr_mode="reference_aware",  # V2 reference-aware PLR
+            beta_atk=0.5,
+            plr_d_style=2.0,
+            plr_gamma_floor=0.05,
+            soft_peak_p=8,
+            soft_peak_beta=12.0,
+            soft_peak_block_duration_sec=0.400,
         )
 
         z_opt, _, _ = opt.optimize_multi_chunk(
@@ -281,28 +337,33 @@ def evaluate_single_session_v2(
                 agg_m: Dict[str, float] = {}
                 for k in range(K):
                     n_pre = preroll_counts[k]
-                    y_ext = opt.chain(mix_chunk_tensors[k], z=z_in, eq_mode="iir")
+                    mk = mix_chunk_tensors[k]
+                    y_ext = opt.chain(mk, z=z_in, eq_mode="iir")
                     y_k = y_ext[..., n_pre:]
                     ref_k = ref_chunk_tensors[k]
                     if mode == "same_track":
-                        lk, mk = opt.loss_fn(
-                            y_k,
-                            ref_k,
+                        lk, mk_dict = opt.loss_fn(
+                            pred_audio=y_k,
+                            target_audio=ref_k,
                             target_lufs=eff_target_lufs,
                             normalized_params=z_in,
                             align_latency=True,
+                            pred_ext_audio=y_ext,
+                            pred_preroll_samples=n_pre,
                         )
                     else:
-                        anchor_k = mix_chunk_tensors[k][..., n_pre:]
-                        lk, mk = opt.stylistic_loss_fn(
-                            y_k,
-                            ref_k,
+                        anchor_k = mk[..., n_pre:]
+                        lk, mk_dict = opt.stylistic_loss_fn(
+                            pred_audio=y_k,
+                            ref_audio=ref_k,
                             normalized_params=z_in,
                             target_lufs=eff_target_lufs,
                             mix_anchor_audio=anchor_k,
+                            pred_ext_audio=y_ext,
+                            pred_preroll_samples=n_pre,
                         )
                     tot_l += weights[k] * float(lk.item())
-                    for mk_key, mk_val in mk.items():
+                    for mk_key, mk_val in mk_dict.items():
                         agg_m[mk_key] = agg_m.get(mk_key, 0.0) + weights[k] * float(mk_val)
                 return tot_l, agg_m
 
@@ -313,20 +374,28 @@ def evaluate_single_session_v2(
         )
 
         # Full-track offline C++ render
-        chain_eval = DifferentiableMasteringChain(sample_rate=48000.0)
-        mastered_wav_32 = chain_eval.render_offline_with_tail_flush(
-            raw_aligned,
-            z=z_opt,
-            eq_mode="iir",
-            block_size=512,
-            tail_duration_sec=3.0,
+        mastered_full_64, _ = render_offline_with_tail_flush(
+            raw_full_64, mode="z", z=z_opt.tolist(), sample_rate=48000.0
         )
 
-        bm_full = suite.evaluate_master(
-            pred_audio=mastered_wav_32,
-            target_audio=ref_aligned if mode == "same_track" else ref_full_32,
-            reference_mode=mode,
-        )
+        if mode == "same_track":
+            mix_start, _, eval_len = get_same_track_slice_indices(
+                alignment, mix_len=raw_full_64.shape[1], ref_len=ref_full_64.shape[1], enable_subsample=True
+            )
+            ref_eval_tensor = torch.tensor(ref_aligned, dtype=torch.float32).unsqueeze(0)
+            mastered_eval_seg = mastered_full_64[:, mix_start : mix_start + eval_len].astype(np.float32)
+            mastered_eval_tensor = torch.tensor(mastered_eval_seg, dtype=torch.float32).unsqueeze(0)
+            bm_full = suite.evaluate(
+                mastered_eval_tensor, ref_eval_tensor, align_latency=False, reference_mode="same_track"
+            )
+        else:
+            ref_eval_tensor = torch.tensor(ref_full_32, dtype=torch.float32).unsqueeze(0)
+            mastered_eval_tensor = torch.tensor(
+                mastered_full_64.astype(np.float32), dtype=torch.float32
+            ).unsqueeze(0)
+            bm_full = suite.evaluate(
+                mastered_eval_tensor, ref_eval_tensor, align_latency=False, reference_mode="stylistic"
+            )
 
         name_to_idx = {spec.name: i for i, spec in enumerate(PARAM_SPECS)}
         theta_opt = map_z_to_theta(z_opt)
@@ -347,7 +416,7 @@ def evaluate_single_session_v2(
         elapsed = time.time() - t0
         print(
             f"[{prefix}:V2] ({elapsed:.1f}s) init={loss_z0_iir:.4f} -> final={loss_zopt_iir:.4f} "
-            f"({reduction_pct:+.2f}%) | LUFS={bm_full['pred_lufs']:.2f} | PLR={bm_full['pred_plr_db']:.2f} "
+            f"({reduction_pct:+.2f}%) | LUFS={bm_full['pred_lufs']:.2f} | PLR={bm_full.get('pred_plr_db', 0.0):.2f} "
             f"| trans_loss={metrics_final.get('trans_same_total_loss', metrics_final.get('trans_style_total_loss', 0.0)):.4f}",
             flush=True,
         )
@@ -393,6 +462,16 @@ def main():
         "artifact_type": "AutoMastering_Sprint3_V2_Ablation_Results",
         "version": "1.0.0",
         "seed_serialization_note": "All 64-bit unsigned integer seeds (uint64) in 'seed' are serialized as decimal strings.",
+        "v2_hyperparameters": {
+            "weight_trans": 0.2,
+            "plr_mode": "reference_aware",
+            "beta_atk": 0.5,
+            "plr_d_style": 2.0,
+            "plr_gamma_floor": 0.05,
+            "soft_peak_p": 8,
+            "soft_peak_beta": 12.0,
+            "soft_peak_block_duration_sec": 0.400,
+        },
         "sessions": session_results,
     }
     out_file.write_text(json.dumps(results_payload, indent=2), encoding="utf-8")

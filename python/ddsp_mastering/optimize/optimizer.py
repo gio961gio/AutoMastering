@@ -45,7 +45,13 @@ class AutoMasteringOptimizer:
         stylistic_spectral_mode: str = "mel40",
         weight_de_harsh: float = 0.0,
         weight_trans: float = 0.0,
+        beta_atk: float = 0.5,
         plr_mode: str = "box",
+        plr_d_style: float = 1.0,
+        plr_gamma_floor: float = 1.0,
+        soft_peak_p: int = 8,
+        soft_peak_beta: float = 2.0,
+        soft_peak_block_duration_sec: float = 0.010,
     ):
         self.sample_rate = sample_rate
         self.lr = lr
@@ -56,7 +62,13 @@ class AutoMasteringOptimizer:
         self.stylistic_spectral_mode = stylistic_spectral_mode
         self.weight_de_harsh = weight_de_harsh
         self.weight_trans = weight_trans
+        self.beta_atk = beta_atk
         self.plr_mode = plr_mode
+        self.plr_d_style = plr_d_style
+        self.plr_gamma_floor = plr_gamma_floor
+        self.soft_peak_p = soft_peak_p
+        self.soft_peak_beta = soft_peak_beta
+        self.soft_peak_block_duration_sec = soft_peak_block_duration_sec
 
         self.chain = DifferentiableMasteringChain(sample_rate=sample_rate)
         default_lufs = target_lufs if target_lufs is not None else -14.0
@@ -73,7 +85,13 @@ class AutoMasteringOptimizer:
             weight_erb=weight_erb,
             weight_de_harsh=weight_de_harsh,
             weight_trans=weight_trans,
+            beta_atk=beta_atk,
             plr_mode=same_plr_mode,
+            plr_d_style=plr_d_style,
+            plr_gamma_floor=plr_gamma_floor,
+            soft_peak_p=soft_peak_p,
+            soft_peak_beta=soft_peak_beta,
+            soft_peak_block_duration_sec=soft_peak_block_duration_sec,
         )
         self.stylistic_loss_fn = AggregatePerceptualLoss(
             sample_rate=sample_rate,
@@ -83,7 +101,13 @@ class AutoMasteringOptimizer:
             spectral_mode=stylistic_spectral_mode,
             weight_de_harsh=weight_de_harsh,
             weight_trans=weight_trans,
+            beta_atk=beta_atk,
             plr_mode=style_plr_mode,
+            plr_d_style=plr_d_style,
+            plr_gamma_floor=plr_gamma_floor,
+            soft_peak_p=soft_peak_p,
+            soft_peak_beta=soft_peak_beta,
+            soft_peak_block_duration_sec=soft_peak_block_duration_sec,
         )
         self.benchmark = MasteringBenchmarkSuite(sample_rate=sample_rate)
 
@@ -213,6 +237,8 @@ class AutoMasteringOptimizer:
                         normalized_params=z,
                         target_lufs=effective_target_lufs,
                         mix_anchor_audio=mix_eval_k,
+                        pred_ext_audio=pred_ext_k,
+                        pred_preroll_samples=n_pre_k,
                     )
                     step_stft += weights[k] * chunk_metrics.get("stylistic_spectral_loss", 0.0)
                 else:
@@ -223,6 +249,8 @@ class AutoMasteringOptimizer:
                         target_lufs=effective_target_lufs,
                         normalized_params=z,
                         align_latency=align_latency,
+                        pred_ext_audio=pred_ext_k,
+                        pred_preroll_samples=n_pre_k,
                     )
                     step_stft += weights[k] * chunk_metrics.get("stft_loss_total", 0.0)
 

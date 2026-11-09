@@ -298,19 +298,33 @@ def boltzmann_soft_peak_dbfs(
     orig_dtype = x_in.dtype
 
     N_b = int(round(block_duration_sec * sample_rate))
-    M = T // N_b
-    if M <= 0:
-        M = 1
-        N_b = T
+    if T <= N_b:
+        # Single block case: normalized by C * T
+        x64 = x_in.to(torch.float64)
+        mean_p = torch.mean(torch.abs(x64) ** (2 * p), dim=(1, 2), keepdim=False).unsqueeze(-1)  # (B, 1)
+    else:
+        M_full = T // N_b
+        T_rem = T - M_full * N_b
 
-    x_trimmed = x_in[:, :, : M * N_b]
-    x_blocks = x_trimmed.reshape(B, C, M, N_b)
+        # Full blocks: normalized by C * N_b
+        x_full = x_in[:, :, : M_full * N_b].reshape(B, C, M_full, N_b).to(torch.float64)
+        mean_p_full = torch.mean(torch.abs(x_full) ** (2 * p), dim=(1, 3))  # (B, M_full)
 
-    # Accumulate in float64 for absolute precision over |x|^(2p)
-    x64 = x_blocks.to(torch.float64)
-    mean_p = torch.mean(torch.abs(x64 + 1e-18) ** (2 * p), dim=(1, 3))  # (B, M)
+        if T_rem > 0:
+            # Partial last block: normalized by actual sample count C * T_rem
+            x_rem = x_in[:, :, M_full * N_b :].to(torch.float64)  # (B, C, T_rem)
+            mean_p_rem = torch.mean(torch.abs(x_rem) ** (2 * p), dim=(1, 2), keepdim=False).unsqueeze(-1)  # (B, 1)
+            mean_p = torch.cat([mean_p_full, mean_p_rem], dim=-1)  # (B, M_full + 1)
+        else:
+            mean_p = mean_p_full
 
-    p_m = (10.0 / float(p)) * torch.log10(mean_p.clamp(min=eps))  # (B, M)
+    # Root mean p with autograd protection on strictly zero blocks (Fix A)
+    root_mean_p = torch.where(
+        mean_p > 0.0,
+        mean_p.clamp(min=1e-160) ** (1.0 / float(p)),
+        torch.zeros_like(mean_p),
+    )
+    p_m = 10.0 * torch.log10(root_mean_p + eps)  # (B, M)
     p_max = torch.max(p_m, dim=-1, keepdim=True).values.detach()  # (B, 1)
 
     weights = torch.exp(beta * (p_m - p_max))  # (B, M), in (0, 1]
@@ -333,6 +347,11 @@ class DifferentiableLoudnessLoss(nn.Module):
         plr_min: float = 8.0,
         plr_max: float = 14.0,
         plr_mode: str = "box",
+        soft_peak_p: int = 8,
+        soft_peak_beta: float = 2.0,
+        soft_peak_block_duration_sec: float = 0.010,
+        plr_d_style: float = 1.0,
+        plr_gamma_floor: float = 1.0,
         eps: float = 1e-12,
     ):
         super().__init__()
@@ -344,6 +363,11 @@ class DifferentiableLoudnessLoss(nn.Module):
         self.plr_min = plr_min
         self.plr_max = plr_max
         self.plr_mode = plr_mode
+        self.soft_peak_p = int(soft_peak_p)
+        self.soft_peak_beta = float(soft_peak_beta)
+        self.soft_peak_block_duration_sec = float(soft_peak_block_duration_sec)
+        self.plr_d_style = float(plr_d_style)
+        self.plr_gamma_floor = float(plr_gamma_floor)
         self.eps = eps
 
         self.k_filter = DifferentiableKWeighting(sample_rate=sample_rate)
@@ -395,7 +419,14 @@ class DifferentiableLoudnessLoss(nn.Module):
 
     def calculate_plr_proxy(self, x: torch.Tensor) -> torch.Tensor:
         """Compute reference-aware PLR proxy using Boltzmann soft-peak mean in dB (§2.C.2)."""
-        peak_soft = boltzmann_soft_peak_dbfs(x, sample_rate=self.sample_rate, eps=self.eps)
+        peak_soft = boltzmann_soft_peak_dbfs(
+            x,
+            sample_rate=self.sample_rate,
+            block_duration_sec=self.soft_peak_block_duration_sec,
+            p=self.soft_peak_p,
+            beta=self.soft_peak_beta,
+            eps=self.eps,
+        )
         lufs = self.calculate_ungated_k_weighted_loudness(x)
         return peak_soft - lufs
 
@@ -404,8 +435,8 @@ class DifferentiableLoudnessLoss(nn.Module):
         pred: torch.Tensor,
         ref: torch.Tensor,
         mode: str = "same_track",
-        d_style: float = 1.0,
-        gamma_floor: float = 1.0,
+        d_style: Optional[float] = None,
+        gamma_floor: Optional[float] = None,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """Compute reference-aware PLR loss using Boltzmann soft-peak proxy (§2.C.2).
 
@@ -413,12 +444,22 @@ class DifferentiableLoudnessLoss(nn.Module):
             pred: Processed audio tensor (B, 2, T).
             ref: Reference target audio tensor (B, 2, T_ref).
             mode: 'same_track' (direct Huber_1.0 matching) or 'stylistic' (dead-zone + floor).
-            d_style: Dead-zone tolerance width in dB (default: 1.0 dB).
-            gamma_floor: Dynamic floor violation penalty weight (default: 1.0).
+            d_style: Dead-zone tolerance width in dB (default: self.plr_d_style = 1.0 dB).
+            gamma_floor: Dynamic floor violation penalty weight (default: self.plr_gamma_floor = 1.0).
 
         Returns:
             Tuple of (plr_loss, metrics_dict).
         """
+        eff_d_style = d_style if d_style is not None else self.plr_d_style
+        eff_gamma_floor = gamma_floor if gamma_floor is not None else self.plr_gamma_floor
+
+        if mode == "same_track":
+            if pred.shape[-1] != ref.shape[-1]:
+                raise ValueError(
+                    f"In same_track PLR mode, pred and ref must be aligned and have identical length, "
+                    f"got pred={pred.shape[-1]} and ref={ref.shape[-1]}."
+                )
+
         pred_plr = self.calculate_plr_proxy(pred)
         with torch.no_grad():
             ref_plr = self.calculate_plr_proxy(ref)
@@ -435,7 +476,7 @@ class DifferentiableLoudnessLoss(nn.Module):
             return plr_loss, metrics
         elif mode == "stylistic":
             delta_plr = pred_plr - ref_plr
-            excess = F.relu(torch.abs(delta_plr) - d_style)
+            excess = F.relu(torch.abs(delta_plr) - eff_d_style)
             deadzone_loss = F.huber_loss(excess, torch.zeros_like(excess), reduction="mean", delta=1.0)
 
             plr_floor = torch.minimum(
@@ -445,7 +486,7 @@ class DifferentiableLoudnessLoss(nn.Module):
             floor_violation = F.relu(plr_floor - pred_plr)
             floor_loss = torch.mean(floor_violation ** 2)
 
-            plr_loss = deadzone_loss + gamma_floor * floor_loss
+            plr_loss = deadzone_loss + eff_gamma_floor * floor_loss
             metrics = {
                 "pred_plr_proxy": pred_plr.mean().item(),
                 "ref_plr_proxy": ref_plr.mean().item(),
