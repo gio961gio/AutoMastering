@@ -53,11 +53,20 @@ Abbiamo valutato le differenze numeriche su tutti i 4 chunk di tutte le 6 sessio
 - **Percorso B (coordinate assolute continue da `raw_full_32`):** `raw_full_32[:, max(0, mix_start + s_idx - 120000) : mix_start + e_idx]`.
 - **Percorso C (riferimento streaming full-track continuo):** segnale continuo processato attraverso la catena DDSP in modalità IIR dall'inizio fisico della traccia ($t=0$) e affettato sulla finestra utile post-latenza ($D = 159$ campioni, $143\,841$ campioni valutati in `same_track`, $144\,000$ campioni in `stylistic`).
 
-I risultati quantitativi confermano:
-- Su tutti i chunk di tutte le sessioni `same_track` (`track01`, `track02`, `track03`) e `stylistic` (`track01_style`, `track02_style`, `track03_style`):
-  - **Differenza RMS A vs C:** $\le -240.00\text{ dBFS}$ (zero floating point su tutti i 24 chunk analizzati);
-  - **Differenza RMS A vs B:** $\le -240.00\text{ dBFS}$ quando `mix_start` è correttamente considerato;
-  - **Differenza relativa sulle loss $\frac{|\mathcal{L}_A - \mathcal{L}_C|}{|\mathcal{L}_C|}$:** $0.00$ esatto.
+I risultati quantitativi estratti da `task1_audit_data.json` confermano precisione a livello macchina su tutti i 24 chunk analizzati:
+
+| Session ID | Modalità | Chunks Analizzati | RMS $A \text{ vs } C$ (dBFS) | MaxAbs $A \text{ vs } C$ (dBFS) | RMS $A \text{ vs } B$ (dBFS) | Rel. $\Delta\text{Loss}$ $A \text{ vs } C$ | Rel. $\nabla$ Diff $A \text{ vs } B$ | Esito Gate |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`track01`** | `same_track` | 4 chunk (3.0 s, $D=159$) | $\le -240.00$ | $\le -240.00$ | $\le -240.00$ | $0.00$ | $\le 9.85 \times 10^{-16}$ | **PASS** |
+| **`track02`** | `same_track` | 4 chunk (3.0 s, $D=159$) | $\le -240.00$ | $\le -240.00$ | $\le -240.00$ | $0.00$ | $0.00$ | **PASS** |
+| **`track03`** | `same_track` | 4 chunk (3.0 s, $D=159$) | $\le -240.00$ | $\le -240.00$ | $\le -240.00$ | $0.00$ | $0.00$ | **PASS** |
+| **`track01_style`** | `stylistic` | 4 chunk (3.0 s, indipendenti) | $\le -240.00$ | $\le -240.00$ | $\le -240.00$ | $0.00$ | $0.00$ | **PASS** |
+| **`track02_style`** | `stylistic` | 4 chunk (3.0 s, indipendenti) | $\le -240.00$ | $\le -240.00$ | $\le -240.00$ | $0.00$ | $0.00$ | **PASS** |
+| **`track03_style`** | `stylistic` | 4 chunk (3.0 s, indipendenti) | $\le -240.00$ | $\le -240.00$ | $\le -240.00$ | $0.00$ | $0.00$ | **PASS** |
+
+- **Differenza RMS A vs C:** $\le -240.00\text{ dBFS}$ (zero floating point su tutti i 24 chunk analizzati);
+- **Differenza RMS A vs B:** $\le -240.00\text{ dBFS}$ quando `mix_start` è correttamente considerato;
+- **Differenza relativa sulle loss $\frac{|\mathcal{L}_A - \mathcal{L}_C|}{|\mathcal{L}_C|}$:** $0.00$ esatto.
 
 ### C. Riconciliazione: Troncamento del Pre-Roll vs Disallineamento Sub-Sample
 È essenziale distinguere con chiarezza due fenomeni fisici e numerici distinti:

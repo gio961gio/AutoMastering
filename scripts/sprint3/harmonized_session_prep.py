@@ -424,3 +424,15 @@ def compute_individual_loss_breakdown(
         "stereo": float(np.mean(stereo_vals)) if len(stereo_vals) > 0 else 0.0,
         "param_reg": float(param_reg_val),
     }
+
+
+def evaluate_all_10_terms_iir(*args, **kwargs) -> Dict[str, float]:
+    """Canonical evaluator for all 10 unweighted individual loss terms in IIR mode.
+    
+    Accepts either (chain, z, prep_data, [sr]) or (optimizer, z, prep_data, [sr]).
+    """
+    if len(args) >= 1 and hasattr(args[0], "chain"):
+        chain = args[0].chain
+        return compute_individual_loss_breakdown(chain, *args[1:], **kwargs)
+    return compute_individual_loss_breakdown(*args, **kwargs)
+

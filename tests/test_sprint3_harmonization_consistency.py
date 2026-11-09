@@ -177,3 +177,30 @@ def test_harmonized_parameter_serialization():
                 theta = v_obj.get("physical_parameters_theta")
                 assert theta is not None, f"[{prefix}:{v_name}] Missing physical_parameters_theta"
                 assert len(theta) == 41, f"[{prefix}:{v_name}] physical_parameters_theta len {len(theta)} != 41"
+
+
+def test_harmonized_loss_breakdown_erb_deharsh_positive():
+    """Gate 8: Verify that all_10_terms_init and all_10_terms_final contain strictly positive ERB terms."""
+    v2_data = _load_results(_V2_RESULTS_PATH)
+    v1_data = _load_results(_V1_HARMONIZED_PATH)
+
+    for dataset, dname in [(v2_data, "V2"), (v1_data, "V1_Harmonized")]:
+        for s in dataset["sessions"]:
+            prefix = s["track_prefix"]
+            for v_name, v_obj in s["variants"].items():
+                if v_name == "v0p_historical":
+                    continue
+                init_terms = v_obj.get("all_10_terms_init")
+                assert init_terms is not None, f"[{dname}:{prefix}:{v_name}] Missing all_10_terms_init"
+                assert "erb" in init_terms, f"[{dname}:{prefix}:{v_name}] Missing 'erb' in all_10_terms_init"
+                assert init_terms["erb"] > 0.0, (
+                    f"[{dname}:{prefix}:{v_name}] all_10_terms_init['erb'] must be > 0.0, got {init_terms['erb']}"
+                )
+
+                final_terms = v_obj.get("all_10_terms_final")
+                assert final_terms is not None, f"[{dname}:{prefix}:{v_name}] Missing all_10_terms_final"
+                assert "erb" in final_terms, f"[{dname}:{prefix}:{v_name}] Missing 'erb' in all_10_terms_final"
+                assert final_terms["erb"] > 0.0, (
+                    f"[{dname}:{prefix}:{v_name}] all_10_terms_final['erb'] must be > 0.0, got {final_terms['erb']}"
+                )
+

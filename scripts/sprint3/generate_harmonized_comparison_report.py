@@ -167,7 +167,7 @@ def generate_report():
             "V2": s2["variants"]["V2"],
         }
         for v in ["V0p", "V1", "V1b", "V2"]:
-            bd = vars_dict[v].get("loss_breakdown_final", {})
+            bd = vars_dict[v].get("all_10_terms_final", vars_dict[v].get("loss_breakdown_final", {}))
             row = (
                 f"| `{prefix}` | **`{v}`** "
                 f"| {format_val(bd.get('mrstft'))} "
