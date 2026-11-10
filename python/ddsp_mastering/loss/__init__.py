@@ -22,6 +22,7 @@ from .transient import (
     TransientEnvelopeLoss,
     compute_transient_active_mask,
 )
+from .eq_prior import CompositeEQPriorLoss
 
 __all__ = [
     "DifferentiableKWeighting",
@@ -38,4 +39,5 @@ __all__ = [
     "compute_active_sample_mask",
     "TransientEnvelopeLoss",
     "compute_transient_active_mask",
+    "CompositeEQPriorLoss",
 ]

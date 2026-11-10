@@ -18,6 +18,7 @@ import torch.optim as optim
 from ddsp_mastering.dsp.chain import DifferentiableMasteringChain
 from ddsp_mastering.loss.combined import MasteringPerceptualLoss
 from ddsp_mastering.loss.stylistic import AggregatePerceptualLoss
+from ddsp_mastering.loss.eq_prior import CompositeEQPriorLoss
 from ddsp_mastering.param_space import (
     PARAM_SPECS,
     NUM_PARAMS,
@@ -46,6 +47,11 @@ class AutoMasteringOptimizer:
         weight_de_harsh: float = 0.0,
         weight_trans: float = 0.0,
         beta_atk: float = 0.5,
+        weight_eq_prior: float = 0.0,
+        eq_tau_shape: float = 1.5,
+        eq_tau_offset: float = 1.0,
+        eq_w_slope: float = 2.0,
+        eq_w_offset: float = 1.0,
         plr_mode: str = "box",
         plr_d_style: float = 1.0,
         plr_gamma_floor: float = 1.0,
@@ -63,6 +69,11 @@ class AutoMasteringOptimizer:
         self.weight_de_harsh = weight_de_harsh
         self.weight_trans = weight_trans
         self.beta_atk = beta_atk
+        self.weight_eq_prior = weight_eq_prior
+        self.eq_tau_shape = eq_tau_shape
+        self.eq_tau_offset = eq_tau_offset
+        self.eq_w_slope = eq_w_slope
+        self.eq_w_offset = eq_w_offset
         self.plr_mode = plr_mode
         self.plr_d_style = plr_d_style
         self.plr_gamma_floor = plr_gamma_floor
@@ -71,6 +82,13 @@ class AutoMasteringOptimizer:
         self.soft_peak_block_duration_sec = soft_peak_block_duration_sec
 
         self.chain = DifferentiableMasteringChain(sample_rate=sample_rate)
+        self.eq_prior_loss = CompositeEQPriorLoss(
+            sample_rate=sample_rate,
+            tau_shape=eq_tau_shape,
+            tau_offset=eq_tau_offset,
+            w_slope=eq_w_slope,
+            w_offset=eq_w_offset,
+        )
         default_lufs = target_lufs if target_lufs is not None else -14.0
 
         same_plr_mode = "reference_aware_same" if plr_mode in ("reference_aware", "reference_aware_same") else "box"
@@ -86,6 +104,11 @@ class AutoMasteringOptimizer:
             weight_de_harsh=weight_de_harsh,
             weight_trans=weight_trans,
             beta_atk=beta_atk,
+            weight_eq_prior=weight_eq_prior,
+            eq_tau_shape=eq_tau_shape,
+            eq_tau_offset=eq_tau_offset,
+            eq_w_slope=eq_w_slope,
+            eq_w_offset=eq_w_offset,
             plr_mode=same_plr_mode,
             plr_d_style=plr_d_style,
             plr_gamma_floor=plr_gamma_floor,
@@ -102,6 +125,11 @@ class AutoMasteringOptimizer:
             weight_de_harsh=weight_de_harsh,
             weight_trans=weight_trans,
             beta_atk=beta_atk,
+            weight_eq_prior=weight_eq_prior,
+            eq_tau_shape=eq_tau_shape,
+            eq_tau_offset=eq_tau_offset,
+            eq_w_slope=eq_w_slope,
+            eq_w_offset=eq_w_offset,
             plr_mode=style_plr_mode,
             plr_d_style=plr_d_style,
             plr_gamma_floor=plr_gamma_floor,
@@ -247,6 +275,7 @@ class AutoMasteringOptimizer:
                         pred_preroll_samples=n_pre_k,
                         ref_ext_audio=ref_ext_k,
                         ref_preroll_samples=ref_n_pre_k,
+                        include_eq_prior=False,
                     )
                     step_stft += weights[k] * chunk_metrics.get("stylistic_spectral_loss", 0.0)
                 else:
@@ -260,11 +289,17 @@ class AutoMasteringOptimizer:
                         pred_preroll_samples=n_pre_k,
                         ref_ext_audio=ref_ext_k,
                         ref_preroll_samples=ref_n_pre_k,
+                        include_eq_prior=False,
                     )
                     step_stft += weights[k] * chunk_metrics.get("stft_loss_total", 0.0)
 
                 step_loss = step_loss + weights[k] * chunk_loss
                 step_lufs += weights[k] * chunk_metrics.get("lufs_pred", 0.0)
+
+            # Single evaluation of EQ composite prior outside chunk loop
+            if self.weight_eq_prior > 0.0:
+                eq_prior_val, eq_prior_metrics = self.eq_prior_loss(z)
+                step_loss = step_loss + self.weight_eq_prior * eq_prior_val.to(step_loss.dtype)
 
             step_loss.backward()
 
@@ -296,6 +331,80 @@ class AutoMasteringOptimizer:
                 final_chunks.append(out_k[..., n_pre_k:] if n_pre_k > 0 else out_k)
 
         return optimal_z, final_chunks, history
+
+    def _eval_loss_iir(
+        self,
+        mix_chunks: List[torch.Tensor],
+        ref_chunks: Optional[List[torch.Tensor]] = None,
+        z: Optional[torch.Tensor] = None,
+        reference_mode: str = "same_track",
+        chunk_weights: Optional[List[float]] = None,
+        target_lufs: Optional[float] = None,
+        mix_preroll_samples: Optional[List[int]] = None,
+        ref_ext_chunks: Optional[List[torch.Tensor]] = None,
+        ref_preroll_list: Optional[List[int]] = None,
+        align_latency: bool = True,
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """Evaluate full composite objective in IIR mode across chunks with single EQ prior evaluation."""
+        if z is None:
+            z = Z_NEUTRAL.to(device=mix_chunks[0].device)
+        K = len(mix_chunks)
+        weights = [1.0 / K] * K if chunk_weights is None else [w / sum(chunk_weights) for w in chunk_weights]
+        preroll_counts = [0] * K if mix_preroll_samples is None else [max(0, int(n)) for n in mix_preroll_samples]
+
+        tot_loss = torch.tensor(0.0, device=mix_chunks[0].device, dtype=torch.float32)
+        agg_metrics: Dict[str, float] = {}
+
+        for k in range(K):
+            mk = mix_chunks[k]
+            n_pre = preroll_counts[k]
+            y_ext = self.chain(mk, z=z, eq_mode="iir")
+            y_k = y_ext[..., n_pre:] if n_pre > 0 else y_ext
+            ref_k = ref_chunks[k % len(ref_chunks)] if ref_chunks else None
+            ref_ext_k = ref_ext_chunks[k % len(ref_ext_chunks)] if ref_ext_chunks else None
+            ref_n_pre_k = ref_preroll_list[k % len(ref_preroll_list)] if ref_preroll_list else 0
+
+            if reference_mode == "stylistic":
+                anchor_k = mk[..., n_pre:] if n_pre > 0 else mk
+                lk, mk_dict = self.stylistic_loss_fn(
+                    pred_audio=y_k,
+                    ref_audio=ref_k,
+                    normalized_params=z,
+                    target_lufs=target_lufs,
+                    mix_anchor_audio=anchor_k,
+                    pred_ext_audio=y_ext,
+                    pred_preroll_samples=n_pre,
+                    ref_ext_audio=ref_ext_k,
+                    ref_preroll_samples=ref_n_pre_k,
+                    include_eq_prior=False,
+                )
+            else:
+                lk, mk_dict = self.loss_fn(
+                    pred_audio=y_k,
+                    target_audio=ref_k,
+                    target_lufs=target_lufs,
+                    normalized_params=z,
+                    align_latency=align_latency,
+                    pred_ext_audio=y_ext,
+                    pred_preroll_samples=n_pre,
+                    ref_ext_audio=ref_ext_k,
+                    ref_preroll_samples=ref_n_pre_k,
+                    include_eq_prior=False,
+                )
+
+            tot_loss = tot_loss + weights[k] * lk
+            for mk_key, mk_val in mk_dict.items():
+                agg_metrics[mk_key] = agg_metrics.get(mk_key, 0.0) + weights[k] * float(mk_val)
+
+        if self.weight_eq_prior > 0.0:
+            eq_val, eq_metrics = self.eq_prior_loss(z)
+            tot_loss = tot_loss + self.weight_eq_prior * eq_val.to(tot_loss.dtype)
+            agg_metrics["eq_prior_loss"] = float(eq_val.item())
+            for k_m, v_m in eq_metrics.items():
+                agg_metrics[f"eq_prior_{k_m}"] = v_m
+
+        agg_metrics["total_loss"] = float(tot_loss.item())
+        return tot_loss, agg_metrics
 
     def optimize(
         self,

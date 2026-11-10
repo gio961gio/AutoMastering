@@ -1,0 +1,457 @@
+{
+  "artifact_type": "AutoMastering_Sprint3_V3a_Preflight_Gradient_Diagnostics",
+  "version": "1.0.0",
+  "v3a_hyperparameters": {
+    "K_eq": 128,
+    "f_min": 20.0,
+    "f_max": 20000.0,
+    "sample_rate": 48000.0,
+    "tau_shape": 1.5,
+    "tau_offset": 1.0,
+    "w_slope": 2.0,
+    "w_offset": 1.0,
+    "weight_eq_prior": 0.02,
+    "eps_eq": 1e-12,
+    "precision": "torch.float64 analytical biquad frequency response"
+  },
+  "sessions": [
+    {
+      "track_prefix": "track01",
+      "reference_mode": "same_track",
+      "seed": "5405783196615117109",
+      "target_lufs": -7.28948637213072,
+      "metadata_assertion_verified": true,
+      "z_neutral_diagnostics": {
+        "eq_metrics": {
+          "G_bar": -6.784194403369028e-15,
+          "G_tilde_max": 6.784194403369028e-15,
+          "G_tilde_min": -4.787735195270426e-15,
+          "max_abs_G_tilde": 6.784194403369028e-15,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 1.8067685152231176e-30,
+          "L_offset_raw": 0.0,
+          "L_eq_shape": 3.613537030446235e-30,
+          "L_eq_offset": 0.0,
+          "L_eq_prior_unweighted": 3.613537030446235e-30,
+          "L_eq_prior_weighted": 7.22707406089247e-32
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 1.236489431978967e-16,
+          "grad_norm_eq_prior_weighted": 2.472978863957934e-18,
+          "grad_norm_v0p_total": 5.527224063873291,
+          "individual_terms_weighted": {
+            "mrstft": 0.8105052709579468,
+            "lufs": 4.9698710441589355,
+            "param_reg": 0.0
+          },
+          "individual_terms_unweighted": {
+            "mrstft": 0.8105052709579468,
+            "lufs": 6.212338924407959,
+            "param_reg": 0.0
+          },
+          "cos_sim_eq_vs_v0p": 0.0
+        }
+      },
+      "v0p_z_opt_diagnostics": {
+        "eq_metrics": {
+          "G_bar": 2.4808534086864924,
+          "G_tilde_max": 1.2337741211787825,
+          "G_tilde_min": -0.7078449263681332,
+          "max_abs_G_tilde": 1.2337741211787825,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 0.002290691622111255,
+          "L_offset_raw": 2.1929268180184036,
+          "L_eq_shape": 0.00458138324422251,
+          "L_eq_offset": 2.1929268180184036,
+          "L_eq_prior_unweighted": 2.197508201262626,
+          "L_eq_prior_weighted": 0.04395016402525252
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 19.924583435058594,
+          "grad_norm_eq_prior_weighted": 0.39849166870117186,
+          "grad_norm_v0p_total": 6.057780742645264,
+          "individual_terms_weighted": {
+            "mrstft": 0.7268319725990295,
+            "lufs": 5.512985706329346,
+            "param_reg": 0.00028947164537385106
+          },
+          "individual_terms_unweighted": {
+            "mrstft": 0.7268319725990295,
+            "lufs": 6.891231536865234,
+            "param_reg": 0.028947163373231888
+          },
+          "cos_sim_eq_vs_v0p": -0.9513352394516672
+        }
+      }
+    },
+    {
+      "track_prefix": "track02",
+      "reference_mode": "same_track",
+      "seed": "3048363069421082382",
+      "target_lufs": -7.22295729859563,
+      "metadata_assertion_verified": true,
+      "z_neutral_diagnostics": {
+        "eq_metrics": {
+          "G_bar": -6.784194403369028e-15,
+          "G_tilde_max": 6.784194403369028e-15,
+          "G_tilde_min": -4.787735195270426e-15,
+          "max_abs_G_tilde": 6.784194403369028e-15,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 1.8067685152231176e-30,
+          "L_offset_raw": 0.0,
+          "L_eq_shape": 3.613537030446235e-30,
+          "L_eq_offset": 0.0,
+          "L_eq_prior_unweighted": 3.613537030446235e-30,
+          "L_eq_prior_weighted": 7.22707406089247e-32
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 1.236489431978967e-16,
+          "grad_norm_eq_prior_weighted": 2.472978863957934e-18,
+          "grad_norm_v0p_total": 5.423608779907227,
+          "individual_terms_weighted": {
+            "mrstft": 0.719153106212616,
+            "lufs": 5.0146565437316895,
+            "param_reg": 0.0
+          },
+          "individual_terms_unweighted": {
+            "mrstft": 0.719153106212616,
+            "lufs": 6.268320083618164,
+            "param_reg": 0.0
+          },
+          "cos_sim_eq_vs_v0p": 0.0
+        }
+      },
+      "v0p_z_opt_diagnostics": {
+        "eq_metrics": {
+          "G_bar": 2.478200071902924,
+          "G_tilde_max": 0.751142763108489,
+          "G_tilde_min": -1.0688214488594665,
+          "max_abs_G_tilde": 1.0688214488594665,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 0.0015895240291936904,
+          "L_offset_raw": 2.185075452573809,
+          "L_eq_shape": 0.0031790480583873807,
+          "L_eq_offset": 2.185075452573809,
+          "L_eq_prior_unweighted": 2.1882545006321963,
+          "L_eq_prior_weighted": 0.04376509001264393
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 19.938329696655273,
+          "grad_norm_eq_prior_weighted": 0.3987665939331055,
+          "grad_norm_v0p_total": 6.846623420715332,
+          "individual_terms_weighted": {
+            "mrstft": 0.8621710538864136,
+            "lufs": 6.261909484863281,
+            "param_reg": 0.000286499853245914
+          },
+          "individual_terms_unweighted": {
+            "mrstft": 0.8621710538864136,
+            "lufs": 7.827386379241943,
+            "param_reg": 0.028649982064962387
+          },
+          "cos_sim_eq_vs_v0p": -0.9711315558400712
+        }
+      }
+    },
+    {
+      "track_prefix": "track03",
+      "reference_mode": "same_track",
+      "seed": "12990700764526553868",
+      "target_lufs": -6.896129906076177,
+      "metadata_assertion_verified": true,
+      "z_neutral_diagnostics": {
+        "eq_metrics": {
+          "G_bar": -6.784194403369028e-15,
+          "G_tilde_max": 6.784194403369028e-15,
+          "G_tilde_min": -4.787735195270426e-15,
+          "max_abs_G_tilde": 6.784194403369028e-15,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 1.8067685152231176e-30,
+          "L_offset_raw": 0.0,
+          "L_eq_shape": 3.613537030446235e-30,
+          "L_eq_offset": 0.0,
+          "L_eq_prior_unweighted": 3.613537030446235e-30,
+          "L_eq_prior_weighted": 7.22707406089247e-32
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 1.236489431978967e-16,
+          "grad_norm_eq_prior_weighted": 2.472978863957934e-18,
+          "grad_norm_v0p_total": 5.5836687088012695,
+          "individual_terms_weighted": {
+            "mrstft": 0.802394688129425,
+            "lufs": 5.028351783752441,
+            "param_reg": 0.0
+          },
+          "individual_terms_unweighted": {
+            "mrstft": 0.802394688129425,
+            "lufs": 6.2854390144348145,
+            "param_reg": 0.0
+          },
+          "cos_sim_eq_vs_v0p": 0.0
+        }
+      },
+      "v0p_z_opt_diagnostics": {
+        "eq_metrics": {
+          "G_bar": 2.4752240491446127,
+          "G_tilde_max": 1.2042430653419185,
+          "G_tilde_min": -0.7126301106222899,
+          "max_abs_G_tilde": 1.2042430653419185,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 0.002233711295089148,
+          "L_offset_raw": 2.1762859951746267,
+          "L_eq_shape": 0.004467422590178296,
+          "L_eq_offset": 2.1762859951746267,
+          "L_eq_prior_unweighted": 2.180753417764805,
+          "L_eq_prior_weighted": 0.043615068355296105
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 19.842994689941406,
+          "grad_norm_eq_prior_weighted": 0.39685989379882813,
+          "grad_norm_v0p_total": 7.685666084289551,
+          "individual_terms_weighted": {
+            "mrstft": 0.9472993016242981,
+            "lufs": 6.944213390350342,
+            "param_reg": 0.00028793251840397716
+          },
+          "individual_terms_unweighted": {
+            "mrstft": 0.9472993016242981,
+            "lufs": 8.680266380310059,
+            "param_reg": 0.028793253004550934
+          },
+          "cos_sim_eq_vs_v0p": -0.9421927563833186
+        }
+      }
+    },
+    {
+      "track_prefix": "track01_style",
+      "reference_mode": "stylistic",
+      "seed": "14887125631601849244",
+      "target_lufs": -17.9875588318886,
+      "metadata_assertion_verified": true,
+      "z_neutral_diagnostics": {
+        "eq_metrics": {
+          "G_bar": -6.784194403369028e-15,
+          "G_tilde_max": 6.784194403369028e-15,
+          "G_tilde_min": -4.787735195270426e-15,
+          "max_abs_G_tilde": 6.784194403369028e-15,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 1.8067685152231176e-30,
+          "L_offset_raw": 0.0,
+          "L_eq_shape": 3.613537030446235e-30,
+          "L_eq_offset": 0.0,
+          "L_eq_prior_unweighted": 3.613537030446235e-30,
+          "L_eq_prior_weighted": 7.22707406089247e-32
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 1.236489431978967e-16,
+          "grad_norm_eq_prior_weighted": 2.472978863957934e-18,
+          "grad_norm_v0p_total": 36.037967681884766,
+          "individual_terms_weighted": {
+            "mel_spectral": 0.5018766522407532,
+            "lufs": 39.27592086791992,
+            "plr_box": 4.965438365936279,
+            "stereo": 0.026659846305847168,
+            "param_reg": 0.0
+          },
+          "individual_terms_unweighted": {
+            "mel_spectral": 0.5018766522407532,
+            "lufs": 49.09489440917969,
+            "plr_box": 9.930876731872559,
+            "stereo": 0.08886616677045822,
+            "param_reg": 0.0
+          },
+          "cos_sim_eq_vs_v0p": 0.0
+        }
+      },
+      "v0p_z_opt_diagnostics": {
+        "eq_metrics": {
+          "G_bar": -2.4965205680302436,
+          "G_tilde_max": 0.6843884026788338,
+          "G_tilde_min": -1.1385496313606143,
+          "max_abs_G_tilde": 1.1385496313606143,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 0.002036895094082597,
+          "L_offset_raw": 2.239573810537563,
+          "L_eq_shape": 0.004073790188165194,
+          "L_eq_offset": 2.239573810537563,
+          "L_eq_prior_unweighted": 2.243647600725728,
+          "L_eq_prior_weighted": 0.044872952014514564
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 20.128061294555664,
+          "grad_norm_eq_prior_weighted": 0.4025612258911133,
+          "grad_norm_v0p_total": 6.05318021774292,
+          "individual_terms_weighted": {
+            "mel_spectral": 0.5431438684463501,
+            "lufs": 7.3330535888671875,
+            "plr_box": 4.225956439971924,
+            "stereo": 0.03301252797245979,
+            "param_reg": 0.00057446543360129
+          },
+          "individual_terms_unweighted": {
+            "mel_spectral": 0.5431438684463501,
+            "lufs": 9.166316032409668,
+            "plr_box": 8.451912879943848,
+            "stereo": 0.11004175990819931,
+            "param_reg": 0.02872326970100403
+          },
+          "cos_sim_eq_vs_v0p": -0.8980121293720604
+        }
+      }
+    },
+    {
+      "track_prefix": "track02_style",
+      "reference_mode": "stylistic",
+      "seed": "3606996967096283602",
+      "target_lufs": -9.036983959989,
+      "metadata_assertion_verified": true,
+      "z_neutral_diagnostics": {
+        "eq_metrics": {
+          "G_bar": -6.784194403369028e-15,
+          "G_tilde_max": 6.784194403369028e-15,
+          "G_tilde_min": -4.787735195270426e-15,
+          "max_abs_G_tilde": 6.784194403369028e-15,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 1.8067685152231176e-30,
+          "L_offset_raw": 0.0,
+          "L_eq_shape": 3.613537030446235e-30,
+          "L_eq_offset": 0.0,
+          "L_eq_prior_unweighted": 3.613537030446235e-30,
+          "L_eq_prior_weighted": 7.22707406089247e-32
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 1.236489431978967e-16,
+          "grad_norm_eq_prior_weighted": 2.472978863957934e-18,
+          "grad_norm_v0p_total": 126.45986938476562,
+          "individual_terms_weighted": {
+            "mel_spectral": 0.6235214471817017,
+            "lufs": 124.16020202636719,
+            "plr_box": 7.85581111907959,
+            "stereo": 0.15994031727313995,
+            "param_reg": 0.0
+          },
+          "individual_terms_unweighted": {
+            "mel_spectral": 0.6235214471817017,
+            "lufs": 155.2002410888672,
+            "plr_box": 15.71162223815918,
+            "stereo": 0.5331344604492188,
+            "param_reg": 0.0
+          },
+          "cos_sim_eq_vs_v0p": 0.0
+        }
+      },
+      "v0p_z_opt_diagnostics": {
+        "eq_metrics": {
+          "G_bar": 2.4641117328420004,
+          "G_tilde_max": 0.7739698001169244,
+          "G_tilde_min": -1.0557357653253796,
+          "max_abs_G_tilde": 1.0557357653253796,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 0.0016646194925461974,
+          "L_offset_raw": 2.143623166245605,
+          "L_eq_shape": 0.003329238985092395,
+          "L_eq_offset": 2.143623166245605,
+          "L_eq_prior_unweighted": 2.1469524052306976,
+          "L_eq_prior_weighted": 0.04293904810461396
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 19.745935440063477,
+          "grad_norm_eq_prior_weighted": 0.39491870880126956,
+          "grad_norm_v0p_total": 118.88536071777344,
+          "individual_terms_weighted": {
+            "mel_spectral": 0.7105680704116821,
+            "lufs": 114.07838439941406,
+            "plr_box": 8.783143043518066,
+            "stereo": 0.13107813894748688,
+            "param_reg": 0.0005734208389185369
+          },
+          "individual_terms_unweighted": {
+            "mel_spectral": 0.7105680704116821,
+            "lufs": 142.5979766845703,
+            "plr_box": 17.566286087036133,
+            "stereo": 0.43692705035209656,
+            "param_reg": 0.028671039268374443
+          },
+          "cos_sim_eq_vs_v0p": -0.9396187737255721
+        }
+      }
+    },
+    {
+      "track_prefix": "track03_style",
+      "reference_mode": "stylistic",
+      "seed": "15136152743686100324",
+      "target_lufs": -6.463308295428326,
+      "metadata_assertion_verified": true,
+      "z_neutral_diagnostics": {
+        "eq_metrics": {
+          "G_bar": -6.784194403369028e-15,
+          "G_tilde_max": 6.784194403369028e-15,
+          "G_tilde_min": -4.787735195270426e-15,
+          "max_abs_G_tilde": 6.784194403369028e-15,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 1.8067685152231176e-30,
+          "L_offset_raw": 0.0,
+          "L_eq_shape": 3.613537030446235e-30,
+          "L_eq_offset": 0.0,
+          "L_eq_prior_unweighted": 3.613537030446235e-30,
+          "L_eq_prior_weighted": 7.22707406089247e-32
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 1.236489431978967e-16,
+          "grad_norm_eq_prior_weighted": 2.472978863957934e-18,
+          "grad_norm_v0p_total": 107.41366577148438,
+          "individual_terms_weighted": {
+            "mel_spectral": 0.20930345356464386,
+            "lufs": 111.02952575683594,
+            "plr_box": 14.042043685913086,
+            "stereo": 0.06589803844690323,
+            "param_reg": 0.0
+          },
+          "individual_terms_unweighted": {
+            "mel_spectral": 0.20930345356464386,
+            "lufs": 138.78689575195312,
+            "plr_box": 28.084087371826172,
+            "stereo": 0.21966007351875305,
+            "param_reg": 0.0
+          },
+          "cos_sim_eq_vs_v0p": 0.0
+        }
+      },
+      "v0p_z_opt_diagnostics": {
+        "eq_metrics": {
+          "G_bar": 2.398092548250756,
+          "G_tilde_max": 1.2864426645971063,
+          "G_tilde_min": -1.116482445299512,
+          "max_abs_G_tilde": 1.2864426645971063,
+          "L_shape_exc": 0.0,
+          "L_slope_raw": 0.0029370031270617046,
+          "L_offset_raw": 1.9546627734742925,
+          "L_eq_shape": 0.005874006254123409,
+          "L_eq_offset": 1.9546627734742925,
+          "L_eq_prior_unweighted": 1.960536779728416,
+          "L_eq_prior_weighted": 0.03921073559456832
+        },
+        "gradient_norms_eq_params": {
+          "grad_norm_eq_prior_unweighted": 18.79271125793457,
+          "grad_norm_eq_prior_weighted": 0.37585422515869144,
+          "grad_norm_v0p_total": 116.78890228271484,
+          "individual_terms_weighted": {
+            "mel_spectral": 0.1743452250957489,
+            "lufs": 94.05337524414062,
+            "plr_box": 23.888166427612305,
+            "stereo": 0.09029829502105713,
+            "param_reg": 0.0005627936334349215
+          },
+          "individual_terms_unweighted": {
+            "mel_spectral": 0.1743452250957489,
+            "lufs": 117.56671905517578,
+            "plr_box": 47.77633285522461,
+            "stereo": 0.30099430680274963,
+            "param_reg": 0.028139682486653328
+          },
+          "cos_sim_eq_vs_v0p": -0.927628316008613
+        }
+      }
+    }
+  ]
+}

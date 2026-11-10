@@ -14,6 +14,7 @@ import torchaudio.functional as taf
 from ddsp_mastering.loss.loudness import DifferentiableLoudnessLoss
 from ddsp_mastering.loss.erb import ERBSpectralLoss
 from ddsp_mastering.loss.transient import TransientEnvelopeLoss
+from ddsp_mastering.loss.eq_prior import CompositeEQPriorLoss
 from ddsp_mastering.param_space import Z_NEUTRAL
 
 
@@ -44,6 +45,11 @@ class AggregatePerceptualLoss(nn.Module):
         weight_de_harsh: float = 0.0,
         weight_trans: float = 0.0,
         beta_atk: float = 0.5,
+        weight_eq_prior: float = 0.0,
+        eq_tau_shape: float = 1.5,
+        eq_tau_offset: float = 1.0,
+        eq_w_slope: float = 2.0,
+        eq_w_offset: float = 1.0,
         plr_mode: str = "mse",
         plr_d_style: float = 1.0,
         plr_gamma_floor: float = 1.0,
@@ -62,6 +68,11 @@ class AggregatePerceptualLoss(nn.Module):
         self.weight_de_harsh = weight_de_harsh
         self.weight_trans = weight_trans
         self.beta_atk = beta_atk
+        self.weight_eq_prior = weight_eq_prior
+        self.eq_tau_shape = eq_tau_shape
+        self.eq_tau_offset = eq_tau_offset
+        self.eq_w_slope = eq_w_slope
+        self.eq_w_offset = eq_w_offset
         self.plr_mode = plr_mode
         self.plr_d_style = plr_d_style
         self.plr_gamma_floor = plr_gamma_floor
@@ -95,6 +106,13 @@ class AggregatePerceptualLoss(nn.Module):
         self.transient_loss = TransientEnvelopeLoss(
             sample_rate=sample_rate,
             beta_atk=beta_atk,
+        )
+        self.eq_prior_loss = CompositeEQPriorLoss(
+            sample_rate=sample_rate,
+            tau_shape=eq_tau_shape,
+            tau_offset=eq_tau_offset,
+            w_slope=eq_w_slope,
+            w_offset=eq_w_offset,
         )
         self.loudness_loss = DifferentiableLoudnessLoss(
             sample_rate=sample_rate,
@@ -152,6 +170,8 @@ class AggregatePerceptualLoss(nn.Module):
         pred_preroll_samples: int = 0,
         ref_ext_audio: Optional[torch.Tensor] = None,
         ref_preroll_samples: int = 0,
+        z: Optional[torch.Tensor] = None,
+        include_eq_prior: bool = True,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """Compute multi-feature aggregate distance for stylistic reference mastering.
 
@@ -273,11 +293,22 @@ class AggregatePerceptualLoss(nn.Module):
         total_loss = total_loss + self.weight_stereo * stereo_diff
 
         # 5. Parameter Regularization Prior
+        if z is not None and normalized_params is None:
+            normalized_params = z
+
         if normalized_params is not None:
             z_target = Z_NEUTRAL.to(device=normalized_params.device, dtype=normalized_params.dtype)
             param_reg = torch.mean((normalized_params - z_target) ** 2)
             metrics["param_reg_loss"] = param_reg.item()
             total_loss = total_loss + self.weight_param_reg * param_reg
+
+        # 6. Composite Parametric EQ Response Prior (Sprint 3 Step V3a)
+        if self.weight_eq_prior > 0.0 and normalized_params is not None and include_eq_prior:
+            eq_prior_val, eq_metrics = self.eq_prior_loss(normalized_params)
+            total_loss = total_loss + self.weight_eq_prior * eq_prior_val.to(total_loss.dtype)
+            metrics["eq_prior_loss"] = float(eq_prior_val.item())
+            for k, v in eq_metrics.items():
+                metrics[f"eq_prior_{k}"] = v
 
         metrics["mastering_loss_total"] = total_loss.item()
         return total_loss, metrics
