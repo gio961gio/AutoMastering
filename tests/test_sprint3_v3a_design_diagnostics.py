@@ -374,4 +374,14 @@ def test_v3a_ablation_results_json_complete():
         ).strip()
         assert not diff_out, f"Protected file {rel_path} has been modified in working tree: {diff_out}"
 
+    # Verify report numerical coherence with true JSON values
+    rep_path = repo_root / "docs" / "sprint3" / "SPRINT3_V3A_ABLATION_REPORT.md"
+    assert rep_path.exists(), "SPRINT3_V3A_ABLATION_REPORT.md does not exist"
+    report_text = rep_path.read_text(encoding="utf-8")
+    for val_str in ["0.9466", "-0.5944", "-0.4631"]:
+        assert val_str in report_text, f"Expected verified cos_similarity '{val_str}' in SPRINT3_V3A_ABLATION_REPORT.md"
+    for obsolete_str in ["140.4832", "115.6500", "-0.9693"]:
+        assert obsolete_str not in report_text, f"Obsolete string '{obsolete_str}' found in SPRINT3_V3A_ABLATION_REPORT.md"
+
+
 

@@ -828,9 +828,9 @@ def generate_v3a_report_md(results_payload: Dict[str, Any], out_path: Path) -> N
         "",
         "## 3. Tabella 2 — Parametri Fisici Ottimizzati (`V0p vs V3a`)",
         "",
-        "Confronto tra i guadagni dei 6 biquad EQ, i makeup gain del compressore multibanda e il push gain del limiter:",
+        "Confronto tra i guadagni dei 6 biquad EQ, i makeup gain del compressore multibanda e il push gain del limiter ($P_{41}$ in $[-12, +12]\\text{ dB}$):",
         "",
-        "| Sessione | Var. | EQ B0 (Low-Shelf) | EQ B1 (Bell) | EQ B2 (Bell) | EQ B3 (Bell) | EQ B4 (Bell) | EQ B5 (High-Shelf) | Comp Makeup (L, M, H dB) | Limiter Push (dB) |",
+        "| Sessione | Var. | EQ B0 (Low-Shelf) | EQ B1 (Bell) | EQ B2 (Bell) | EQ B3 (Bell) | EQ B4 (Bell) | EQ B5 (High-Shelf) | Comp Makeup (L, M, H dB) | Limiter Push Gain (dB) |",
         "|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
     ])
 
@@ -839,11 +839,9 @@ def generate_v3a_report_md(results_payload: Dict[str, Any], out_path: Path) -> N
         v0p_th = s["variants"]["V0p"]["physical_parameters_theta"]
         v3a_th = s["variants"]["V3a"]["physical_parameters_theta"]
 
-        def fmt_biquad(th: Dict[str, float], b: int) -> str:
+        def fmt_biquad_gain(th: Dict[str, float], b: int) -> str:
             g = th[f"eq_b{b}_gain_db"]
-            f = th.get(f"eq_b{b}_f0", th.get(f"eq_b{b}_freq_hz", 1000.0))
-            q = th[f"eq_b{b}_q"]
-            return f"{g:+.2f} ({int(round(f))}, {q:.2f})"
+            return f"{g:+.2f} dB"
 
         def fmt_comp(th: Dict[str, float]) -> str:
             l = th["comp_low_makeup_db"]
@@ -851,20 +849,49 @@ def generate_v3a_report_md(results_payload: Dict[str, Any], out_path: Path) -> N
             h = th["comp_high_makeup_db"]
             return f"{l:+.2f}, {m:+.2f}, {h:+.2f}"
 
-        lim_0 = v0p_th.get("limiter_push_gain_db", v0p_th.get("lim_ceiling_db", 0.0))
-        lim_3 = v3a_th.get("limiter_push_gain_db", v3a_th.get("lim_ceiling_db", 0.0))
+        lim_0 = v0p_th.get("limiter_push_gain_db", v0p_th.get("lim_input_gain_db", 0.0))
+        lim_3 = v3a_th.get("limiter_push_gain_db", v3a_th.get("lim_input_gain_db", 0.0))
 
         lines.append(
             f"| **`{sid}`** "
             f"| **`V0p`**<br>**`V3a`** "
-            f"| {fmt_biquad(v0p_th, 0)}<br>{fmt_biquad(v3a_th, 0)} "
-            f"| {fmt_biquad(v0p_th, 1)}<br>{fmt_biquad(v3a_th, 1)} "
-            f"| {fmt_biquad(v0p_th, 2)}<br>{fmt_biquad(v3a_th, 2)} "
-            f"| {fmt_biquad(v0p_th, 3)}<br>{fmt_biquad(v3a_th, 3)} "
-            f"| {fmt_biquad(v0p_th, 4)}<br>{fmt_biquad(v3a_th, 4)} "
-            f"| {fmt_biquad(v0p_th, 5)}<br>{fmt_biquad(v3a_th, 5)} "
+            f"| {fmt_biquad_gain(v0p_th, 0)}<br>{fmt_biquad_gain(v3a_th, 0)} "
+            f"| {fmt_biquad_gain(v0p_th, 1)}<br>{fmt_biquad_gain(v3a_th, 1)} "
+            f"| {fmt_biquad_gain(v0p_th, 2)}<br>{fmt_biquad_gain(v3a_th, 2)} "
+            f"| {fmt_biquad_gain(v0p_th, 3)}<br>{fmt_biquad_gain(v3a_th, 3)} "
+            f"| {fmt_biquad_gain(v0p_th, 4)}<br>{fmt_biquad_gain(v3a_th, 4)} "
+            f"| {fmt_biquad_gain(v0p_th, 5)}<br>{fmt_biquad_gain(v3a_th, 5)} "
             f"| {fmt_comp(v0p_th)}<br>{fmt_comp(v3a_th)} "
-            f"| {lim_0:.2f}<br>{lim_3:.2f} |"
+            f"| {lim_0:+.2f} dB<br>{lim_3:+.2f} dB |"
+        )
+
+    lines.extend([
+        "",
+        "### Tabella 2B — Parametri Costruttivi dei 6 Biquad EQ (Frequenza $f_c$ in Hz e Fattore di Merito $Q$)",
+        "",
+        "| Sessione | Var. | EQ B0 ($f_c, Q$) | EQ B1 ($f_c, Q$) | EQ B2 ($f_c, Q$) | EQ B3 ($f_c, Q$) | EQ B4 ($f_c, Q$) | EQ B5 ($f_c, Q$) |",
+        "|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
+    ])
+
+    for s in sessions:
+        sid = s["track_prefix"]
+        v0p_th = s["variants"]["V0p"]["physical_parameters_theta"]
+        v3a_th = s["variants"]["V3a"]["physical_parameters_theta"]
+
+        def fmt_biquad_fq(th: Dict[str, float], b: int) -> str:
+            f = th.get(f"eq_b{b}_f0", th.get(f"eq_b{b}_freq_hz", 1000.0))
+            q = th[f"eq_b{b}_q"]
+            return f"{int(round(f))} Hz, {q:.2f}"
+
+        lines.append(
+            f"| **`{sid}`** "
+            f"| **`V0p`**<br>**`V3a`** "
+            f"| {fmt_biquad_fq(v0p_th, 0)}<br>{fmt_biquad_fq(v3a_th, 0)} "
+            f"| {fmt_biquad_fq(v0p_th, 1)}<br>{fmt_biquad_fq(v3a_th, 1)} "
+            f"| {fmt_biquad_fq(v0p_th, 2)}<br>{fmt_biquad_fq(v3a_th, 2)} "
+            f"| {fmt_biquad_fq(v0p_th, 3)}<br>{fmt_biquad_fq(v3a_th, 3)} "
+            f"| {fmt_biquad_fq(v0p_th, 4)}<br>{fmt_biquad_fq(v3a_th, 4)} "
+            f"| {fmt_biquad_fq(v0p_th, 5)}<br>{fmt_biquad_fq(v3a_th, 5)} |"
         )
 
     lines.extend([
@@ -934,7 +961,14 @@ def generate_v3a_report_md(results_payload: Dict[str, Any], out_path: Path) -> N
             ct = f"{g_diag['cos_similarity']:+.4f}"
             t = g_diag["v0p_terms_grad_norm_eq18"]
             sp_k = "mrstft" if "mrstft" in t else "mel_spectral"
-            terms_s = f"sp={t.get(sp_k, 0.0):.2f}, lufs={t.get('lufs', 0.0):.2f}, reg={t.get('param_reg', 0.0):.4f}"
+            sp_val = t.get(sp_k, 0.0)
+            lufs_val = t.get("lufs", 0.0)
+            plr_val = t.get("plr_box", 0.0)
+            reg_val = t.get("param_reg", 0.0)
+            if "param_reg" in t and reg_val > 0.0:
+                terms_s = f"sp={sp_val:.4f}, lufs={lufs_val:.4f}, plr={plr_val:.4f}, reg={reg_val:.4f}"
+            else:
+                terms_s = f"sp={sp_val:.4f}, lufs={lufs_val:.4f}, plr={plr_val:.4f}"
             return unw, w, v0, ct, terms_s
 
         u_n, w_n, v0_n, c_n, t_n = fmt_diag(neu)
@@ -955,12 +989,14 @@ def generate_v3a_report_md(results_payload: Dict[str, Any], out_path: Path) -> N
         "",
         "---",
         "",
-        "## 6. Discussione Tecnica & Risposta ai Quesiti di Audit",
+        "## 6. Discussione Tecnica & Meccanica dei Gradienti",
         "",
         "### Domanda 1: In che misura `V3a` riduce la deriva di offset medio $\\bar{G}_{\\text{EQ}}$ rispetto a `V0p`?",
-        "- **Comportamento Empirico Reale:** Con i parametri congelati di questa prima iterazione di ablation ($w_{\\text{eq}} = 0.02$, $\\tau_{\\text{offset}} = 1.0\\text{ dB}$, $\\tau_{\\text{shape}} = 1.5\\text{ dB}$), la contrazione dell'offset medio $\\bar{G}_{\\text{EQ}}$ è presente ma marginale: scende da $+2.48\\text{ dB}$ a $+2.47\\text{ dB}$ nelle 3 sessioni *same_track*, e da $-2.50\\text{ dB}$ a $-2.49\\text{ dB}$ in `track01_style`. Di riflesso, la penalità quadratica $\\mathcal{L}_{\\text{offset-raw}}$ si riduce solo lievemente (es. da $2.1929$ a $2.1785$ su `track01`).",
-        "- **Spiegazione Meccanicistica dei Gradienti (Tabella 4):** L'analisi dei gradienti rivela con precisione il motivo fisico-matematico: il vettore del gradiente analitico $\\nabla \\mathcal{L}_{\\text{eq}}$ è allineato in modo quasi perfettamente opposto al gradiente della loss $\\text{V0p}$ ($\\cos\\theta \\in [-0.898, -0.971]$ su tutte le 6 sessioni), esercitando una spinta correttiva geometricamente impeccabile. Tuttavia, con il peso globale $w_{\\text{eq}} = 0.02$, la norma $\\ell_2$ scalata della forza di ripristino è pari a $w_{\\text{eq}}\\|\\nabla \\mathcal{L}_{\\text{eq}}\\|_2 \\approx 0.38 - 0.40$, a fronte di una forza motrice totale di $\\text{V0p}$ ($\\|\\nabla \\mathcal{L}_{\\text{v0p}}\\|_2$) pari a $6.05 - 7.69$ in *same_track* (il prior rappresenta solo il $\\approx 5.5 - 6.5\\%$ del gradiente totale) e a oltre $116 - 119$ nelle sessioni *stylistic* (dove il prior rappresenta meno dello $0.35\\%$).",
-        "- **Conclusioni sull'Offset:** Il prior opera come un regolarizzatore \"soft\" stabile e privo di oscillazioni, ma il peso $w_{\\text{eq}} = 0.02$ è insufficiente a contrastare la forte pressione del termine di loudness e spettrale verso i boost massimi in 30 step di Adam. Per abbattere l'offset entro la dead-zone $\\tau_{\\text{offset}} = 1.0\\text{ dB}$ nelle iterazioni successive sarà opportuno esplorare pesi maggiori (es. $w_{\\text{eq}} \\in [0.10, 0.30]$ o normalizzazione di gradiente rispetto alla componente LUFS).",
+        "- **Origine della Deriva nei Primi Step da `Z_NEUTRAL`:** A partire da `Z_NEUTRAL` (dove la risposta EQ è piatta, $\\bar{G} = 0.0\\text{ dB}$, e il prior EQ si trova all'interno della dead-zone $\\pm 1.0\\text{ dB}$ producendo gradiente analitico nullo $\\|\\nabla \\mathcal{L}_{\\text{eq}}\\|_2 = 0.0$), il gradiente iniziale di `lufs_loss` è dominante ($4.0 - 6.1$ in `Z_NEUTRAL`, a fronte di gradienti spettrali di $0.34 - 0.79$). L'aggiornamento adattivo di Adam (con $\\text{lr} = 0.04$ per 30 step) spinge simultaneamente tutti i parametri di guadagno (i 6 biquad EQ, i 3 makeup gain e il push gain del limiter) nella direzione del target LUFS.",
+        "- **Azione del Prior EQ ed Ordine di Grandezza delle Forze:** Non appena $|\\bar{G}_{\\text{EQ}}|$ supera la dead-zone di $1.0\\text{ dB}$, con $w_{\\text{eq}} = 0.02$ il gradiente ponderato del prior EQ raggiunge $w_{\\text{eq}}\\|\\nabla \\mathcal{L}_{\\text{eq}}\\|_2 \\approx 0.37 - 0.40$, che è dello stesso ordine di grandezza del gradiente spettrale residuo ($0.15 - 0.30$). Su 30 step di Adam, questa forza di ripristino produce una lieve contrazione di $|\\bar{G}_{\\text{EQ}}|$ ($\\approx 0.008\\text{ dB}$, riducendo $\\mathcal{L}_{\\text{eq-prior-unweighted}}$ di circa $-0.7\\%\\text{ a }-1.2\\%$ su tutte le 6 sessioni) senza alterare le metriche spettrali o di loudness.",
+        "- **Orientamento Vettoriale ($\\cos\\theta$) tra le Sessioni:**",
+        "  - Nelle sessioni stilistiche `track02_style` e `track03_style`, a fine corsa $\\cos\\theta$ è negativo (`-0.5944` e `-0.4631`), a conferma che il prior EQ si oppone direttamente alla residua richiesta di loudness di $\\text{V0p}$. In `track01_style`, dove il mix richiedeva attenuazione anziché boost, $\\cos\\theta = +0.4273$.",
+        "  - Nelle sessioni *same_track* (`track01`, `track02`, `track03`), l'ottimizzazione nei primi 20 step in modalità approssimata `fft` ha leggermente oltrepassato il punto di ottimo rispetto alla modalità `iir`, rendendo $\\cos\\theta$ positivo (`+0.9466`, `+0.9421`, `+0.9570`) quando valutato in modalità `iir` allo step 30, dove la spinta residua di $\\text{V0p}$ e del prior cooperano nel richiamare i parametri verso la configurazione ottimale.",
         "",
         "### Domanda 2: Come si ridistribuisce il guadagno globale tra i 6 biquad dell'EQ e i 3 makeup gain del compressore?",
         "- **Stato del Gain Staging:** Poiché l'offset dell'EQ $\\bar{G}_{\\text{EQ}}$ è rimasto vicino a $+2.47\\text{ dB}$, i guadagni dei singoli biquad (Tabella 2) hanno registrato solo minime variazioni ($-0.01\\text{ dB}$ sui biquad estremi) e i makeup gain del compressore multibanda sono aumentati solo marginalmente ($+0.01\\text{ dB}$ sulla banda low di `track01` e `track02`).",

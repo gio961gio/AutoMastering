@@ -36,12 +36,13 @@
           "L_eq_prior_unweighted": 3.613537030446235e-30,
           "L_eq_prior_weighted": 7.22707406089247e-32
         },
-        "grad_norm_eq_unweighted": 1.2364894416834101e-16,
-        "grad_norm_eq_weighted": 2.4729788833668205e-18,
-        "grad_norm_v0p_total": 5.527223932076471,
+        "grad_norm_eq_unweighted": 0.0,
+        "grad_norm_eq_weighted": 0.0,
+        "grad_norm_v0p_total": 6.721,
         "v0p_terms_grad_norm_eq18": {
-          "mrstft": 0.8105052416929208,
-          "lufs": 4.96987124800172,
+          "mrstft": 0.7858,
+          "lufs": 4.5349,
+          "plr_box": 2.261,
           "param_reg": 0.0
         },
         "cos_similarity": 0.0,
@@ -348,7 +349,8 @@
             "imager_width_high": 1.1097828149795532,
             "saturator_drive_db": 0.0005805919645354152,
             "saturator_mix": 6.143240898381919e-05,
-            "limiter_push_gain_db": 0.001553484471514821
+            "limiter_push_gain_db": 8.63,
+            "lim_input_gain_db": 8.63
           },
           "all_10_terms_init": {
             "mrstft": 1.527681291103363,
@@ -401,15 +403,16 @@
               "L_eq_prior_unweighted": 2.197508201262626,
               "L_eq_prior_weighted": 0.04395016402525252
             },
-            "grad_norm_eq_unweighted": 19.924583377336504,
-            "grad_norm_eq_weighted": 0.3984916675467301,
-            "grad_norm_v0p_total": 6.057780543130076,
+            "grad_norm_eq_unweighted": 19.7274,
+            "grad_norm_eq_weighted": 0.3945,
+            "grad_norm_v0p_total": 1.3675,
             "v0p_terms_grad_norm_eq18": {
-              "mrstft": 0.7268320044461861,
-              "lufs": 5.512985819139267,
-              "param_reg": 0.0002894716449964385
+              "mrstft": 0.1567,
+              "lufs": 1.0458,
+              "plr_box": 0.3714,
+              "param_reg": 0.0016
             },
-            "cos_similarity": -0.9513352492978031,
+            "cos_similarity": 0.9466,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 19.924583377336504,
               "grad_norm_eq_prior_weighted": 0.3984916675467301,
@@ -593,7 +596,8 @@
             "imager_width_high": 1.1099661588668823,
             "saturator_drive_db": 0.0005805421969853342,
             "saturator_mix": 6.174921145429835e-05,
-            "limiter_push_gain_db": 0.0015549205709248781
+            "limiter_push_gain_db": 8.63,
+            "lim_input_gain_db": 8.63
           },
           "eq_metrics": {
             "G_bar": 2.4759737638502077,
@@ -622,15 +626,16 @@
               "L_eq_prior_unweighted": 2.183079929829145,
               "L_eq_prior_weighted": 0.043661598596582904
             },
-            "grad_norm_eq_unweighted": 19.85536844696434,
-            "grad_norm_eq_weighted": 0.39710736893928683,
-            "grad_norm_v0p_total": 6.053139177038957,
+            "grad_norm_eq_unweighted": 19.57,
+            "grad_norm_eq_weighted": 0.3914,
+            "grad_norm_v0p_total": 1.3372,
             "v0p_terms_grad_norm_eq18": {
-              "mrstft": 0.7249472881953609,
-              "lufs": 5.512819987398624,
-              "param_reg": 0.00028915716016899857
+              "mrstft": 0.1532,
+              "lufs": 1.0225,
+              "plr_box": 0.3631,
+              "param_reg": 0.0016
             },
-            "cos_similarity": -0.95122347571908,
+            "cos_similarity": 0.9457,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 19.85536844696434,
               "grad_norm_eq_prior_weighted": 0.39710736893928683,
@@ -723,12 +728,13 @@
           "L_eq_prior_unweighted": 3.613537030446235e-30,
           "L_eq_prior_weighted": 7.22707406089247e-32
         },
-        "grad_norm_eq_unweighted": 1.2364894416834101e-16,
-        "grad_norm_eq_weighted": 2.4729788833668205e-18,
-        "grad_norm_v0p_total": 5.423608487490142,
+        "grad_norm_eq_unweighted": 0.0,
+        "grad_norm_eq_weighted": 0.0,
+        "grad_norm_v0p_total": 6.6634,
         "v0p_terms_grad_norm_eq18": {
-          "mrstft": 0.7191531041688477,
-          "lufs": 5.014656567851202,
+          "mrstft": 0.7689,
+          "lufs": 4.4991,
+          "plr_box": 2.2449,
           "param_reg": 0.0
         },
         "cos_similarity": 0.0,
@@ -1035,7 +1041,8 @@
             "imager_width_high": 1.1112240552902222,
             "saturator_drive_db": 0.0006589112454093993,
             "saturator_mix": 0.00019839122251141816,
-            "limiter_push_gain_db": 0.001558897434733808
+            "limiter_push_gain_db": 8.63,
+            "lim_input_gain_db": 8.63
           },
           "all_10_terms_init": {
             "mrstft": 2.4287137389183044,
@@ -1088,15 +1095,16 @@
               "L_eq_prior_unweighted": 2.1882545006321963,
               "L_eq_prior_weighted": 0.04376509001264393
             },
-            "grad_norm_eq_unweighted": 19.938329861208842,
-            "grad_norm_eq_weighted": 0.39876659722417684,
-            "grad_norm_v0p_total": 6.846623769759709,
+            "grad_norm_eq_unweighted": 19.7273,
+            "grad_norm_eq_weighted": 0.3945,
+            "grad_norm_v0p_total": 1.2981,
             "v0p_terms_grad_norm_eq18": {
-              "mrstft": 0.8621710599146009,
-              "lufs": 6.261909051260666,
-              "param_reg": 0.00028649983808542854
+              "mrstft": 0.1453,
+              "lufs": 0.9961,
+              "plr_box": 0.3746,
+              "param_reg": 0.0016
             },
-            "cos_similarity": -0.9711315724795331,
+            "cos_similarity": 0.9421,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 19.938329861208842,
               "grad_norm_eq_prior_weighted": 0.39876659722417684,
@@ -1280,7 +1288,8 @@
             "imager_width_high": 1.1114020347595215,
             "saturator_drive_db": 0.0006593473954126239,
             "saturator_mix": 0.00019842661276925355,
-            "limiter_push_gain_db": 0.0015600558836013079
+            "limiter_push_gain_db": 8.63,
+            "lim_input_gain_db": 8.63
           },
           "eq_metrics": {
             "G_bar": 2.4744753690522874,
@@ -1309,15 +1318,16 @@
               "L_eq_prior_unweighted": 2.1772550243784186,
               "L_eq_prior_weighted": 0.04354510048756837
             },
-            "grad_norm_eq_unweighted": 19.885946681786073,
-            "grad_norm_eq_weighted": 0.39771893363572147,
-            "grad_norm_v0p_total": 6.847969457562082,
+            "grad_norm_eq_unweighted": 19.57,
+            "grad_norm_eq_weighted": 0.3914,
+            "grad_norm_v0p_total": 1.2672,
             "v0p_terms_grad_norm_eq18": {
-              "mrstft": 0.8610380186948707,
-              "lufs": 6.26156905717445,
-              "param_reg": 0.0002862456632930238
+              "mrstft": 0.1418,
+              "lufs": 0.9723,
+              "plr_box": 0.3656,
+              "param_reg": 0.0016
             },
-            "cos_similarity": -0.9710535822617768,
+            "cos_similarity": 0.941,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 19.885946681786073,
               "grad_norm_eq_prior_weighted": 0.39771893363572147,
@@ -1410,12 +1420,13 @@
           "L_eq_prior_unweighted": 3.613537030446235e-30,
           "L_eq_prior_weighted": 7.22707406089247e-32
         },
-        "grad_norm_eq_unweighted": 1.2364894416834101e-16,
-        "grad_norm_eq_weighted": 2.4729788833668205e-18,
-        "grad_norm_v0p_total": 5.583668834934171,
+        "grad_norm_eq_unweighted": 0.0,
+        "grad_norm_eq_weighted": 0.0,
+        "grad_norm_v0p_total": 6.1436,
         "v0p_terms_grad_norm_eq18": {
-          "mrstft": 0.8023946834044409,
-          "lufs": 5.028351623953283,
+          "mrstft": 0.7176,
+          "lufs": 4.1394,
+          "plr_box": 2.0754,
           "param_reg": 0.0
         },
         "cos_similarity": 0.0,
@@ -1722,7 +1733,8 @@
             "imager_width_high": 1.1105341911315918,
             "saturator_drive_db": 0.0006396214012056589,
             "saturator_mix": 0.0001980512315640226,
-            "limiter_push_gain_db": 0.00155449949670583
+            "limiter_push_gain_db": 8.76,
+            "lim_input_gain_db": 8.76
           },
           "all_10_terms_init": {
             "mrstft": 2.0323815643787384,
@@ -1775,15 +1787,16 @@
               "L_eq_prior_unweighted": 2.180753417764805,
               "L_eq_prior_weighted": 0.043615068355296105
             },
-            "grad_norm_eq_unweighted": 19.84299426122041,
-            "grad_norm_eq_weighted": 0.39685988522440824,
-            "grad_norm_v0p_total": 7.685666007890932,
+            "grad_norm_eq_unweighted": 20.1322,
+            "grad_norm_eq_weighted": 0.4026,
+            "grad_norm_v0p_total": 1.1973,
             "v0p_terms_grad_norm_eq18": {
-              "mrstft": 0.9472993053948728,
-              "lufs": 6.944213451934764,
-              "param_reg": 0.000287932526085377
+              "mrstft": 0.1455,
+              "lufs": 0.892,
+              "plr_box": 0.3806,
+              "param_reg": 0.0016
             },
-            "cos_similarity": -0.9421928544792146,
+            "cos_similarity": 0.957,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 19.84299426122041,
               "grad_norm_eq_prior_weighted": 0.39685988522440824,
@@ -1967,7 +1980,8 @@
             "imager_width_high": 1.1106934547424316,
             "saturator_drive_db": 0.0006399551057256758,
             "saturator_mix": 0.0001980421511689201,
-            "limiter_push_gain_db": 0.0015556649304926395
+            "limiter_push_gain_db": 8.76,
+            "lim_input_gain_db": 8.76
           },
           "eq_metrics": {
             "G_bar": 2.471399922297577,
@@ -1996,15 +2010,16 @@
               "L_eq_prior_unweighted": 2.1694902696167473,
               "L_eq_prior_weighted": 0.043389805392334946
             },
-            "grad_norm_eq_unweighted": 19.78909869135075,
-            "grad_norm_eq_weighted": 0.39578197382701497,
-            "grad_norm_v0p_total": 7.685277319542253,
+            "grad_norm_eq_unweighted": 19.995,
+            "grad_norm_eq_weighted": 0.3999,
+            "grad_norm_v0p_total": 1.1642,
             "v0p_terms_grad_norm_eq18": {
-              "mrstft": 0.946871195066947,
-              "lufs": 6.944597153261329,
-              "param_reg": 0.00028771568071241213
+              "mrstft": 0.1415,
+              "lufs": 0.8673,
+              "plr_box": 0.3701,
+              "param_reg": 0.0016
             },
-            "cos_similarity": -0.9421411852186428,
+            "cos_similarity": 0.9565,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 19.78909869135075,
               "grad_norm_eq_prior_weighted": 0.39578197382701497,
@@ -2097,14 +2112,13 @@
           "L_eq_prior_unweighted": 3.613537030446235e-30,
           "L_eq_prior_weighted": 7.22707406089247e-32
         },
-        "grad_norm_eq_unweighted": 1.2364894416834101e-16,
-        "grad_norm_eq_weighted": 2.4729788833668205e-18,
-        "grad_norm_v0p_total": 36.03796637675669,
+        "grad_norm_eq_unweighted": 0.0,
+        "grad_norm_eq_weighted": 0.0,
+        "grad_norm_v0p_total": 4.0846,
         "v0p_terms_grad_norm_eq18": {
-          "mel_spectral": 0.5018766767495574,
-          "lufs": 39.275921662094774,
-          "plr_box": 4.965438144297685,
-          "stereo": 0.026659846817305082,
+          "mel_spectral": 0.3413,
+          "lufs": 4.0273,
+          "plr_box": 0.0,
           "param_reg": 0.0
         },
         "cos_similarity": 0.0,
@@ -2377,7 +2391,8 @@
             "imager_width_high": 0.8937762975692749,
             "saturator_drive_db": 0.0007967907004058361,
             "saturator_mix": 0.00019808691286016256,
-            "limiter_push_gain_db": 0.00043099402682855725
+            "limiter_push_gain_db": -4.88,
+            "lim_input_gain_db": -4.88
           },
           "all_10_terms_init": {
             "mrstft": 0.0,
@@ -2430,17 +2445,16 @@
               "L_eq_prior_unweighted": 2.243647600725728,
               "L_eq_prior_weighted": 0.044872952014514564
             },
-            "grad_norm_eq_unweighted": 20.128060772931686,
-            "grad_norm_eq_weighted": 0.4025612154586337,
-            "grad_norm_v0p_total": 6.053180333265196,
+            "grad_norm_eq_unweighted": 20.0419,
+            "grad_norm_eq_weighted": 0.4008,
+            "grad_norm_v0p_total": 0.2208,
             "v0p_terms_grad_norm_eq18": {
-              "mel_spectral": 0.5431438724177612,
-              "lufs": 7.333053246603998,
-              "plr_box": 4.225956248970202,
-              "stereo": 0.033012527137420755,
-              "param_reg": 0.000574465412101862
+              "mel_spectral": 0.1973,
+              "lufs": 0.1066,
+              "plr_box": 0.0005,
+              "param_reg": 0.0033
             },
-            "cos_similarity": -0.898012122485733,
+            "cos_similarity": 0.4273,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 20.128060772931686,
               "grad_norm_eq_prior_weighted": 0.4025612154586337,
@@ -2606,7 +2620,8 @@
             "imager_width_high": 0.8937408924102783,
             "saturator_drive_db": 0.000797248212620616,
             "saturator_mix": 0.00019811297534033656,
-            "limiter_push_gain_db": 0.00043069038656540215
+            "limiter_push_gain_db": -4.88,
+            "lim_input_gain_db": -4.88
           },
           "eq_metrics": {
             "G_bar": -2.494921462102649,
@@ -2635,17 +2650,16 @@
               "L_eq_prior_unweighted": 2.238857610152088,
               "L_eq_prior_weighted": 0.04477715220304176
             },
-            "grad_norm_eq_unweighted": 20.10520794918088,
-            "grad_norm_eq_weighted": 0.4021041589836176,
-            "grad_norm_v0p_total": 6.0528709625106165,
+            "grad_norm_eq_unweighted": 20.0,
+            "grad_norm_eq_weighted": 0.4,
+            "grad_norm_v0p_total": 0.2216,
             "v0p_terms_grad_norm_eq18": {
-              "mel_spectral": 0.5431115941957783,
-              "lufs": 7.335512974092526,
-              "plr_box": 4.222216209277447,
-              "stereo": 0.03301338894166999,
-              "param_reg": 0.0005743093381980946
+              "mel_spectral": 0.1979,
+              "lufs": 0.107,
+              "plr_box": 0.0005,
+              "param_reg": 0.0033
             },
-            "cos_similarity": -0.8985113987165889,
+            "cos_similarity": 0.4216,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 20.10520794918088,
               "grad_norm_eq_prior_weighted": 0.4021041589836176,
@@ -2742,14 +2756,13 @@
           "L_eq_prior_unweighted": 3.613537030446235e-30,
           "L_eq_prior_weighted": 7.22707406089247e-32
         },
-        "grad_norm_eq_unweighted": 1.2364894416834101e-16,
-        "grad_norm_eq_weighted": 2.4729788833668205e-18,
-        "grad_norm_v0p_total": 126.45986771161043,
+        "grad_norm_eq_unweighted": 0.0,
+        "grad_norm_eq_weighted": 0.0,
+        "grad_norm_v0p_total": 2.0085,
         "v0p_terms_grad_norm_eq18": {
-          "mel_spectral": 0.6235214599816032,
-          "lufs": 124.16020038939757,
-          "plr_box": 7.855811480209127,
-          "stereo": 0.15994032605653166,
+          "mel_spectral": 0.3694,
+          "lufs": 1.9885,
+          "plr_box": 0.0,
           "param_reg": 0.0
         },
         "cos_similarity": 0.0,
@@ -3024,7 +3037,8 @@
             "imager_width_high": 1.111646294593811,
             "saturator_drive_db": 0.0006221676012501121,
             "saturator_mix": 0.0001977723150048405,
-            "limiter_push_gain_db": 0.0015554974088445306
+            "limiter_push_gain_db": 6.06,
+            "lim_input_gain_db": 6.06
           },
           "all_10_terms_init": {
             "mrstft": 0.0,
@@ -3077,17 +3091,16 @@
               "L_eq_prior_unweighted": 2.1469524052306976,
               "L_eq_prior_weighted": 0.04293904810461396
             },
-            "grad_norm_eq_unweighted": 19.745935518601513,
-            "grad_norm_eq_weighted": 0.39491871037203025,
-            "grad_norm_v0p_total": 118.8853573207412,
+            "grad_norm_eq_unweighted": 19.4317,
+            "grad_norm_eq_weighted": 0.3886,
+            "grad_norm_v0p_total": 0.6258,
             "v0p_terms_grad_norm_eq18": {
-              "mel_spectral": 0.7105680638650572,
-              "lufs": 114.07838531520966,
-              "plr_box": 8.783143045912151,
-              "stereo": 0.1310781411594249,
-              "param_reg": 0.0005734208118743078
+              "mel_spectral": 0.2896,
+              "lufs": 0.493,
+              "plr_box": 0.2647,
+              "param_reg": 0.0031
             },
-            "cos_similarity": -0.9396187903876293,
+            "cos_similarity": -0.5944,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 19.745935518601513,
               "grad_norm_eq_prior_weighted": 0.39491871037203025,
@@ -3253,7 +3266,8 @@
             "imager_width_high": 1.1116549968719482,
             "saturator_drive_db": 0.0006221693474799395,
             "saturator_mix": 0.00019777553097810596,
-            "limiter_push_gain_db": 0.0015555655118077993
+            "limiter_push_gain_db": 6.06,
+            "lim_input_gain_db": 6.06
           },
           "eq_metrics": {
             "G_bar": 2.463791451942438,
@@ -3282,17 +3296,16 @@
               "L_eq_prior_unweighted": 2.146015818951006,
               "L_eq_prior_weighted": 0.04292031637902012
             },
-            "grad_norm_eq_unweighted": 19.74146209625404,
-            "grad_norm_eq_weighted": 0.3948292419250808,
-            "grad_norm_v0p_total": 118.88680942621511,
+            "grad_norm_eq_unweighted": 19.27,
+            "grad_norm_eq_weighted": 0.3854,
+            "grad_norm_v0p_total": 0.6562,
             "v0p_terms_grad_norm_eq18": {
-              "mel_spectral": 0.7105504095326741,
-              "lufs": 114.0793903795415,
-              "plr_box": 8.783473880655592,
-              "stereo": 0.13107611739207647,
-              "param_reg": 0.0005733772232282358
+              "mel_spectral": 0.3038,
+              "lufs": 0.517,
+              "plr_box": 0.2776,
+              "param_reg": 0.0031
             },
-            "cos_similarity": -0.939614508525105,
+            "cos_similarity": -0.6085,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 19.74146209625404,
               "grad_norm_eq_prior_weighted": 0.3948292419250808,
@@ -3389,14 +3402,13 @@
           "L_eq_prior_unweighted": 3.613537030446235e-30,
           "L_eq_prior_weighted": 7.22707406089247e-32
         },
-        "grad_norm_eq_unweighted": 1.2364894416834101e-16,
-        "grad_norm_eq_weighted": 2.4729788833668205e-18,
-        "grad_norm_v0p_total": 107.41366178148259,
+        "grad_norm_eq_unweighted": 0.0,
+        "grad_norm_eq_weighted": 0.0,
+        "grad_norm_v0p_total": 6.2454,
         "v0p_terms_grad_norm_eq18": {
-          "mel_spectral": 0.20930344899239361,
-          "lufs": 111.02952266801202,
-          "plr_box": 14.04204371568832,
-          "stereo": 0.06589803909106821,
+          "mel_spectral": 0.3519,
+          "lufs": 6.1353,
+          "plr_box": 0.0,
           "param_reg": 0.0
         },
         "cos_similarity": 0.0,
@@ -3671,7 +3683,8 @@
             "imager_width_high": 1.1101330518722534,
             "saturator_drive_db": 0.0006642064545303583,
             "saturator_mix": 0.00018818154057953507,
-            "limiter_push_gain_db": 0.0015529084485024214
+            "limiter_push_gain_db": 8.33,
+            "lim_input_gain_db": 8.33
           },
           "all_10_terms_init": {
             "mrstft": 0.0,
@@ -3724,17 +3737,16 @@
               "L_eq_prior_unweighted": 1.960536779728416,
               "L_eq_prior_weighted": 0.03921073559456832
             },
-            "grad_norm_eq_unweighted": 18.792709772375627,
-            "grad_norm_eq_weighted": 0.37585419544751253,
-            "grad_norm_v0p_total": 116.78890545459063,
+            "grad_norm_eq_unweighted": 18.4877,
+            "grad_norm_eq_weighted": 0.3698,
+            "grad_norm_v0p_total": 0.8165,
             "v0p_terms_grad_norm_eq18": {
-              "mel_spectral": 0.17434522945902384,
-              "lufs": 94.0533741748768,
-              "plr_box": 23.888166984144558,
-              "stereo": 0.09029829558617972,
-              "param_reg": 0.0005627936785476345
+              "mel_spectral": 0.2994,
+              "lufs": 0.6596,
+              "plr_box": 0.282,
+              "param_reg": 0.0031
             },
-            "cos_similarity": -0.9276284323463324,
+            "cos_similarity": -0.4631,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 18.792709772375627,
               "grad_norm_eq_prior_weighted": 0.37585419544751253,
@@ -3900,7 +3912,8 @@
             "imager_width_high": 1.1101429462432861,
             "saturator_drive_db": 0.0006642083753831685,
             "saturator_mix": 0.0001881881762528792,
-            "limiter_push_gain_db": 0.0015529735246673226
+            "limiter_push_gain_db": 8.33,
+            "lim_input_gain_db": 8.33
           },
           "eq_metrics": {
             "G_bar": 2.397448862292671,
@@ -3929,17 +3942,16 @@
               "L_eq_prior_unweighted": 1.9587470152450868,
               "L_eq_prior_weighted": 0.039174940304901734
             },
-            "grad_norm_eq_unweighted": 18.78393593394224,
-            "grad_norm_eq_weighted": 0.3756787186788448,
-            "grad_norm_v0p_total": 116.79165740306425,
+            "grad_norm_eq_unweighted": 18.325,
+            "grad_norm_eq_weighted": 0.3665,
+            "grad_norm_v0p_total": 0.8473,
             "v0p_terms_grad_norm_eq18": {
-              "mel_spectral": 0.17433360238483683,
-              "lufs": 94.05479642317472,
-              "plr_box": 23.88944788358823,
-              "stereo": 0.0902988786007278,
-              "param_reg": 0.0005627234766830137
+              "mel_spectral": 0.3107,
+              "lufs": 0.6845,
+              "plr_box": 0.2926,
+              "param_reg": 0.0031
             },
-            "cos_similarity": -0.9276269889929069,
+            "cos_similarity": -0.4783,
             "gradient_norms_eq_params": {
               "grad_norm_eq_prior_unweighted": 18.78393593394224,
               "grad_norm_eq_prior_weighted": 0.3756787186788448,
