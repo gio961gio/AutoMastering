@@ -328,3 +328,50 @@ def test_v3a_preflight_gradient_diagnostics_nonzero():
             assert norm_spec > 0.0, f"[{prefix}][{state_key}] Spectral gradient norm '{spec_key}' must be > 0.0, got {norm_spec}"
             assert norm_lufs > 0.0, f"[{prefix}][{state_key}] LUFS gradient norm must be > 0.0, got {norm_lufs}"
 
+
+def test_v3a_ablation_results_json_complete():
+    """Verify that docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json exists,
+    contains all 6 sessions with V0p and V3a variants, and that all historical
+    and harmonized artifacts have zero git diff."""
+    import json
+    import subprocess
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    res_path = repo_root / "docs" / "sprint3" / "SPRINT3_V3A_ABLATION_RESULTS.json"
+    if not res_path.exists():
+        pytest.skip("SPRINT3_V3A_ABLATION_RESULTS.json not generated yet (run --run-ablation first).")
+
+    data = json.loads(res_path.read_text(encoding="utf-8"))
+    sessions = data.get("sessions", [])
+    assert len(sessions) == 6, f"Expected 6 sessions, got {len(sessions)}"
+
+    for s in sessions:
+        prefix = s["track_prefix"]
+        assert "V0p" in s["variants"], f"[{prefix}] Missing V0p variant"
+        assert "V3a" in s["variants"], f"[{prefix}] Missing V3a variant"
+        v3a = s["variants"]["V3a"]
+        assert "normalized_z_opt" in v3a, f"[{prefix}][V3a] Missing normalized_z_opt"
+        assert len(v3a["normalized_z_opt"]) == 41, f"[{prefix}][V3a] Invalid z_opt length"
+        assert "physical_parameters_theta" in v3a, f"[{prefix}][V3a] Missing physical_parameters_theta"
+        assert "full_track_benchmark" in v3a, f"[{prefix}][V3a] Missing full_track_benchmark"
+        assert "eq_metrics" in v3a, f"[{prefix}][V3a] Missing eq_metrics"
+
+    # Verify zero git diff on historical and harmonized artifacts
+    protected_files = [
+        "docs/sprint3/SPRINT3_V0P_V1_ABLATION_RESULTS.json",
+        "docs/sprint3/SPRINT3_V0P_V1_REPORT.md",
+        "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
+        "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+        "docs/sprint3/task1_audit_data.json",
+        "docs/sprint3/task4_lufs_data.json",
+    ]
+    for rel_path in protected_files:
+        diff_out = subprocess.check_output(
+            ["git", "diff", "--name-only", "HEAD", "--", rel_path],
+            cwd=str(repo_root),
+            text=True,
+        ).strip()
+        assert not diff_out, f"Protected file {rel_path} has been modified in working tree: {diff_out}"
+
+

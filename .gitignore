@@ -34,6 +34,7 @@ dist/
 
 # Testing & Cache
 .pytest_cache/
+.cache_*/
 .coverage
 htmlcov/
 .tox/
