@@ -290,3 +290,41 @@ def test_gate7_extremes_and_multichunk_non_duplication():
     assert max_grad_diff < 1e-6, (
         f"Gradient difference max error must be < 1e-6, got {max_grad_diff:.4e}"
     )
+
+
+def test_v3a_preflight_gradient_diagnostics_nonzero():
+    """Verify that in docs/sprint3/SPRINT3_V3A_PREFLIGHT_GRADIENT_DIAGNOSTICS.json:
+    For all 6 sessions, both at_z_neutral and at_v0p_z_opt have strictly positive
+    gradient norms (> 0.0) for the spectral term (mrstft or mel_spectral) and lufs."""
+    import json
+    from pathlib import Path
+
+    p = Path(__file__).resolve().parents[1] / "docs" / "sprint3" / "SPRINT3_V3A_PREFLIGHT_GRADIENT_DIAGNOSTICS.json"
+    assert p.exists(), f"Diagnostics file not found at: {p}"
+
+    data = json.loads(p.read_text(encoding="utf-8"))
+    sessions = data.get("sessions", [])
+    assert len(sessions) == 6, f"Expected 6 sessions, found {len(sessions)}"
+
+    for s in sessions:
+        prefix = s["track_prefix"]
+        mode = s["reference_mode"]
+        spec_key = "mrstft" if mode == "same_track" else "mel_spectral"
+
+        for state_key in ["at_z_neutral", "at_v0p_z_opt"]:
+            state_data = s.get(state_key)
+            assert state_data is not None, f"[{prefix}] Missing {state_key}"
+
+            terms = state_data.get("v0p_terms_grad_norm_eq18")
+            if terms is None:
+                terms = state_data.get("gradient_norms_eq_params", {}).get("individual_terms_weighted", {})
+
+            assert spec_key in terms, f"[{prefix}][{state_key}] Missing spectral term '{spec_key}' in {terms}"
+            assert "lufs" in terms, f"[{prefix}][{state_key}] Missing 'lufs' term in {terms}"
+
+            norm_spec = float(terms[spec_key])
+            norm_lufs = float(terms["lufs"])
+
+            assert norm_spec > 0.0, f"[{prefix}][{state_key}] Spectral gradient norm '{spec_key}' must be > 0.0, got {norm_spec}"
+            assert norm_lufs > 0.0, f"[{prefix}][{state_key}] LUFS gradient norm must be > 0.0, got {norm_lufs}"
+

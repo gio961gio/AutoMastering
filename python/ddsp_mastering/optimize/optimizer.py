@@ -80,6 +80,8 @@ class AutoMasteringOptimizer:
         self.soft_peak_p = soft_peak_p
         self.soft_peak_beta = soft_peak_beta
         self.soft_peak_block_duration_sec = soft_peak_block_duration_sec
+        self.weight_param_reg = weight_param_reg
+        self.weight_reg = weight_param_reg
 
         self.chain = DifferentiableMasteringChain(sample_rate=sample_rate)
         self.eq_prior_loss = CompositeEQPriorLoss(
