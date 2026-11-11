@@ -1,0 +1,4211 @@
+{
+  "artifact_type": "AutoMastering_Sprint3_V3b_Preflight_Results",
+  "version": "1.0.0",
+  "candidate_configurations": {
+    "Candidate_A": {
+      "tau_avg": 1.5,
+      "tau_95": 3.5,
+      "delta_max": 4.0,
+      "delta_ref": 2.0,
+      "delta_m": 1.25,
+      "lambda_95": 1.0,
+      "w_lim": 0.05,
+      "w_diff": 0.02,
+      "w_conflict": 0.05
+    },
+    "Candidate_B": {
+      "tau_avg": 0.5,
+      "tau_95": 2.0,
+      "delta_max": 3.0,
+      "delta_ref": 3.0,
+      "delta_m": 1.25,
+      "lambda_95": 1.0,
+      "w_lim": 0.02,
+      "w_diff": 0.02,
+      "w_conflict": 0.02
+    }
+  },
+  "sensitivity_delta_m_values": [
+    1.0,
+    1.25,
+    1.5
+  ],
+  "sessions": [
+    {
+      "track_prefix": "track01",
+      "reference_mode": "same_track",
+      "seed": "5405783196615117109",
+      "target_lufs": -7.289486372130722,
+      "v0p_physical_parameters": {
+        "makeup_gains_db": {
+          "low": 1.3720588684082031,
+          "mid": 1.3977313041687012,
+          "high": 1.4158868789672852
+        },
+        "thresholds_db": {
+          "low": -9.984884262084961,
+          "mid": -10.067283630371094,
+          "high": -11.925472259521484
+        },
+        "ratios": {
+          "low": 1.0000832080841064,
+          "mid": 1.000078558921814,
+          "high": 1.0001648664474487
+        },
+        "limiter_push_gain_db": 0.001553484471514821
+      },
+      "v0p_loss_and_gradient": {
+        "v0p_loss": 2.8223822116851807,
+        "gradient_l2_norms": {
+          "EQ": 6.057780197908802,
+          "Crossover": 0.3264032356123831,
+          "Compressor": 4.168827648467493,
+          "Imager": 0.3940223007779525,
+          "Saturator": 0.11729460954701504,
+          "Limiter": 6.126317977905273,
+          "comp_thresholds": 1.081304741201266e-05,
+          "comp_ratios": 0.033350266041636906,
+          "makeup_gains": 4.168694246673405,
+          "limiter_push": 6.126317977905273,
+          "total_41d": 9.58556975491628
+        }
+      },
+      "empirical_stats_z_neutral": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.027945654466748238,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.5588392019271851,
+            "lim_max_db": 1.7714823484420776,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.006986412685364485,
+            "p95_atten_db": -0.0,
+            "cvar95_atten_db": 0.13972437381744385,
+            "max_atten_db": 1.7714823484420776
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 0.0,
+            "gr_low_p95_db": 0.0,
+            "gr_low_max_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_mid_p95_db": 0.0,
+            "gr_mid_max_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "gr_high_p95_db": 0.0,
+            "gr_high_max_db": 0.0
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_p95_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_p95_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        }
+      },
+      "empirical_stats_v0p_opt": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.27187418937683105,
+            "lim_p95_db": 1.2741183042526245,
+            "lim_cvar95_db": 2.028242588043213,
+            "lim_max_db": 3.5679688453674316,
+            "gr_low_mean_db": 4.869607437285595e-06,
+            "gr_mid_mean_db": 5.847372904099757e-06,
+            "gr_high_mean_db": 7.770838124088186e-07,
+            "diff_lm_mean_db": 5.7787633522821125e-06,
+            "diff_lm_max_db": 3.870845102937892e-05,
+            "diff_mh_mean_db": 5.230073384154821e-06,
+            "diff_mh_max_db": 1.4703484339406714e-05
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.2835756838321686,
+            "lim_p95_db": 1.8091952800750732,
+            "lim_cvar95_db": 3.0431058406829834,
+            "lim_max_db": 6.003366470336914,
+            "gr_low_mean_db": 8.853802683006506e-06,
+            "gr_mid_mean_db": 2.6612727310748596e-07,
+            "gr_high_mean_db": 1.7378064285367145e-06,
+            "diff_lm_mean_db": 8.815244655124843e-06,
+            "diff_lm_max_db": 9.401421993970871e-05,
+            "diff_mh_mean_db": 1.472595158702461e-06,
+            "diff_mh_max_db": 4.249914854881354e-05
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.2970806956291199,
+            "lim_p95_db": 1.7747111320495605,
+            "lim_cvar95_db": 2.384366035461426,
+            "lim_max_db": 3.3586678504943848,
+            "gr_low_mean_db": 1.2566835721372627e-05,
+            "gr_mid_mean_db": 1.3351166217034915e-06,
+            "gr_high_mean_db": 4.5164310336076596e-07,
+            "diff_lm_mean_db": 1.1401283700251952e-05,
+            "diff_lm_max_db": 0.0001199480757350102,
+            "diff_mh_mean_db": 1.3952369499747874e-06,
+            "diff_mh_max_db": 1.007748051051749e-05
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.18717516958713531,
+            "lim_p95_db": 1.0642082691192627,
+            "lim_cvar95_db": 1.4723442792892456,
+            "lim_max_db": 2.4803075790405273,
+            "gr_low_mean_db": 7.190415090008173e-06,
+            "gr_mid_mean_db": 4.574334525386803e-06,
+            "gr_high_mean_db": 1.4191818991093896e-06,
+            "diff_lm_mean_db": 8.007367796381004e-06,
+            "diff_lm_max_db": 4.647570676752366e-05,
+            "diff_mh_mean_db": 3.983765509474324e-06,
+            "diff_mh_max_db": 1.3448757272271905e-05
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.2599264085292816,
+            "p95_atten_db": 1.4012361764907837,
+            "cvar95_atten_db": 2.2939608097076416,
+            "max_atten_db": 6.003366470336914
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 8.370165232918225e-06,
+            "gr_low_p95_db": 3.795156590058468e-05,
+            "gr_low_max_db": 0.00012119513121433556,
+            "gr_mid_mean_db": 3.0057381081860512e-06,
+            "gr_mid_p95_db": 9.392440915689804e-06,
+            "gr_mid_max_db": 1.5605586668243632e-05,
+            "gr_high_mean_db": 1.0964288321702043e-06,
+            "gr_high_p95_db": 5.176185368327424e-06,
+            "gr_high_max_db": 4.451255517778918e-05
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 8.500664989696816e-06,
+            "diff_lm_p95_db": 3.514856507536024e-05,
+            "diff_lm_max_db": 0.0001199480757350102,
+            "diff_mh_mean_db": 3.020417807420017e-06,
+            "diff_mh_p95_db": 8.876515494193882e-06,
+            "diff_mh_max_db": 4.249914854881354e-05
+          }
+        }
+      },
+      "candidate_evaluations": {
+        "Candidate_A": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        },
+        "Candidate_B": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.006183023564517498,
+            "loss_lim_unweighted": 0.30915117252152413,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.006183023450430483,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": true,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0007976437918841839,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": true,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": true
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 1.0880697965621948,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": true,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": true
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.14773724973201752,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": true,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": true
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.08339521469272687,
+              "Crossover": 0.014903858606297036,
+              "Compressor": 0.054828893730573744,
+              "Imager": 0.007135376806073586,
+              "Saturator": 0.03570091727939206,
+              "Limiter": 0.0832790732383728,
+              "comp_thresholds": 1.400518341753643e-06,
+              "comp_ratios": 0.003469190199335632,
+              "makeup_gains": 0.054719030554899004,
+              "limiter_push": 0.0832790732383728,
+              "total_41d": 0.13580856953417172
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": -0.8940588203474135,
+              "active_groups_only": -0.9680488501140735,
+              "compressor_group": -0.897095452195771,
+              "limiter_group": -1.0,
+              "makeup_gains": -0.8985331428394864
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.006183023564517498,
+            "loss_lim_unweighted": 0.30915117252152413,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.006183023450430483,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": true,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0007976437918841839,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": true,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": true
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 1.0880697965621948,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": true,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": true
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.14773724973201752,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": true,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": true
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.08339521469272687,
+              "Crossover": 0.014903858606297036,
+              "Compressor": 0.054828893730573744,
+              "Imager": 0.007135376806073586,
+              "Saturator": 0.03570091727939206,
+              "Limiter": 0.0832790732383728,
+              "comp_thresholds": 1.400518341753643e-06,
+              "comp_ratios": 0.003469190199335632,
+              "makeup_gains": 0.054719030554899004,
+              "limiter_push": 0.0832790732383728,
+              "total_41d": 0.13580856953417172
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": -0.8940588203474135,
+              "active_groups_only": -0.9680488501140735,
+              "compressor_group": -0.897095452195771,
+              "limiter_group": -1.0,
+              "makeup_gains": -0.8985331428394864
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.006183023564517498,
+            "loss_lim_unweighted": 0.30915117252152413,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.006183023450430483,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": true,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0007976437918841839,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": true,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": true
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 1.0880697965621948,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": true,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": true
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.14773724973201752,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": true,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": true
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.08339521469272687,
+              "Crossover": 0.014903858606297036,
+              "Compressor": 0.054828893730573744,
+              "Imager": 0.007135376806073586,
+              "Saturator": 0.03570091727939206,
+              "Limiter": 0.0832790732383728,
+              "comp_thresholds": 1.400518341753643e-06,
+              "comp_ratios": 0.003469190199335632,
+              "makeup_gains": 0.054719030554899004,
+              "limiter_push": 0.0832790732383728,
+              "total_41d": 0.13580856953417172
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": -0.8940588203474135,
+              "active_groups_only": -0.9680488501140735,
+              "compressor_group": -0.897095452195771,
+              "limiter_group": -1.0,
+              "makeup_gains": -0.8985331428394864
+            }
+          }
+        }
+      }
+    },
+    {
+      "track_prefix": "track02",
+      "reference_mode": "same_track",
+      "seed": "3048363069421082382",
+      "target_lufs": -7.222957298595639,
+      "v0p_physical_parameters": {
+        "makeup_gains_db": {
+          "low": 1.4047040939331055,
+          "mid": 1.400160312652588,
+          "high": 1.409656047821045
+        },
+        "thresholds_db": {
+          "low": -11.351919174194336,
+          "mid": -11.203634262084961,
+          "high": -11.827526092529297
+        },
+        "ratios": {
+          "low": 1.0000739097595215,
+          "mid": 1.0000773668289185,
+          "high": 1.000093698501587
+        },
+        "limiter_push_gain_db": 0.001558897434733808
+      },
+      "v0p_loss_and_gradient": {
+        "v0p_loss": 10.355216979980469,
+        "gradient_l2_norms": {
+          "EQ": 6.846623068329538,
+          "Crossover": 0.7437339051473977,
+          "Compressor": 5.084226156967574,
+          "Imager": 0.4077233252710023,
+          "Saturator": 0.4712726901972459,
+          "Limiter": 7.293511390686035,
+          "comp_thresholds": 6.938337436978505e-07,
+          "comp_ratios": 0.014297526787142988,
+          "makeup_gains": 5.08420605364496,
+          "limiter_push": 7.293511390686035,
+          "total_41d": 11.263320462510332
+        }
+      },
+      "empirical_stats_z_neutral": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.0,
+            "p95_atten_db": -0.0,
+            "cvar95_atten_db": 0.0,
+            "max_atten_db": -0.0
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 0.0,
+            "gr_low_p95_db": 0.0,
+            "gr_low_max_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_mid_p95_db": 0.0,
+            "gr_mid_max_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "gr_high_p95_db": 0.0,
+            "gr_high_max_db": 0.0
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_p95_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_p95_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        }
+      },
+      "empirical_stats_v0p_opt": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 2.329771405129577e-06,
+            "gr_mid_mean_db": 2.7555617787555775e-09,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 2.3270158635568805e-06,
+            "diff_lm_max_db": 1.5899615391390398e-05,
+            "diff_mh_mean_db": 2.7555617787555775e-09,
+            "diff_mh_max_db": 4.7649418633000096e-08
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 2.4689004618494437e-08,
+            "gr_mid_mean_db": 3.4176670737906534e-07,
+            "gr_high_mean_db": 2.585395009191416e-07,
+            "diff_lm_mean_db": 3.423358521104092e-07,
+            "diff_lm_max_db": 4.9636851144896355e-06,
+            "diff_mh_mean_db": 1.9710695653429866e-07,
+            "diff_mh_max_db": 3.192755684722215e-06
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 6.312146183518053e-08,
+            "gr_mid_mean_db": 8.03013847416878e-07,
+            "gr_high_mean_db": 4.1303505327050516e-07,
+            "diff_lm_mean_db": 8.387813181798265e-07,
+            "diff_lm_max_db": 1.0055289749288931e-05,
+            "diff_mh_mean_db": 4.839288294533617e-07,
+            "diff_mh_max_db": 4.946283297613263e-06
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 2.8737764168340618e-08,
+            "gr_mid_mean_db": 3.5784594842880324e-07,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 3.3066874038922833e-07,
+            "diff_lm_max_db": 2.067401965177851e-06,
+            "diff_mh_mean_db": 3.5784594842880324e-07,
+            "diff_mh_max_db": 2.067401965177851e-06
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.0,
+            "p95_atten_db": -0.0,
+            "cvar95_atten_db": 0.0,
+            "max_atten_db": -0.0
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 6.115799351391615e-07,
+            "gr_low_p95_db": 3.7130330383661203e-06,
+            "gr_low_max_db": 1.5899639038252644e-05,
+            "gr_mid_mean_db": 3.763455538319249e-07,
+            "gr_mid_p95_db": 1.7573356672073714e-06,
+            "gr_mid_max_db": 1.0058903171739075e-05,
+            "gr_high_mean_db": 1.6789363144198433e-07,
+            "gr_high_p95_db": 1.0109049526363378e-06,
+            "gr_high_max_db": 6.968183697608765e-06
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 9.59700400926522e-07,
+            "diff_lm_p95_db": 4.523507868725574e-06,
+            "diff_lm_max_db": 1.5899615391390398e-05,
+            "diff_mh_mean_db": 2.604093367608584e-07,
+            "diff_mh_p95_db": 1.422583181920345e-06,
+            "diff_mh_max_db": 4.946283297613263e-06
+          }
+        }
+      },
+      "candidate_evaluations": {
+        "Candidate_A": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        },
+        "Candidate_B": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "track_prefix": "track03",
+      "reference_mode": "same_track",
+      "seed": "12990700764526553868",
+      "target_lufs": -6.896129906076174,
+      "v0p_physical_parameters": {
+        "makeup_gains_db": {
+          "low": 1.3913116455078125,
+          "mid": 1.3975152969360352,
+          "high": 1.3930482864379883
+        },
+        "thresholds_db": {
+          "low": -11.624227523803711,
+          "mid": -11.3614501953125,
+          "high": -11.990848541259766
+        },
+        "ratios": {
+          "low": 1.0000977516174316,
+          "mid": 1.0000742673873901,
+          "high": 1.0001440048217773
+        },
+        "limiter_push_gain_db": 0.00155449949670583
+      },
+      "v0p_loss_and_gradient": {
+        "v0p_loss": 6.23495626449585,
+        "gradient_l2_norms": {
+          "EQ": 7.685666234140258,
+          "Crossover": 0.09170610481215395,
+          "Compressor": 4.990206766948012,
+          "Imager": 0.6355233248245777,
+          "Saturator": 0.43267114336344586,
+          "Limiter": 7.324995994567871,
+          "comp_thresholds": 2.1639607689905828e-07,
+          "comp_ratios": 0.010333860375489163,
+          "makeup_gains": 4.990196067112314,
+          "limiter_push": 7.324995994567871,
+          "total_41d": 11.756985140089618
+        }
+      },
+      "empirical_stats_z_neutral": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.0,
+            "p95_atten_db": -0.0,
+            "cvar95_atten_db": 0.0,
+            "max_atten_db": -0.0
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 0.0,
+            "gr_low_p95_db": 0.0,
+            "gr_low_max_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_mid_p95_db": 0.0,
+            "gr_mid_max_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "gr_high_p95_db": 0.0,
+            "gr_high_max_db": 0.0
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_p95_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_p95_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        }
+      },
+      "empirical_stats_v0p_opt": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 1.5257948859925818e-07,
+            "gr_mid_mean_db": 1.222777655129903e-06,
+            "gr_high_mean_db": 2.8368610571760655e-08,
+            "diff_lm_mean_db": 1.0859987469302723e-06,
+            "diff_lm_max_db": 6.266448508540634e-06,
+            "diff_mh_mean_db": 1.194409037452715e-06,
+            "diff_mh_max_db": 6.132856015028665e-06
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0401550717651844,
+            "lim_p95_db": 0.22740516066551208,
+            "lim_cvar95_db": 0.6820878982543945,
+            "lim_max_db": 1.4960365295410156,
+            "gr_low_mean_db": 1.4719715579758486e-07,
+            "gr_mid_mean_db": 1.5090082570168306e-06,
+            "gr_high_mean_db": 2.6217428228392237e-08,
+            "diff_lm_mean_db": 1.4192032722348813e-06,
+            "diff_lm_max_db": 1.5667224943172187e-05,
+            "diff_mh_mean_db": 1.482790821683011e-06,
+            "diff_mh_max_db": 1.5098913536348846e-05
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 9.798898190638283e-07,
+            "gr_mid_mean_db": 4.511881002144946e-07,
+            "gr_high_mean_db": 3.133623494022686e-08,
+            "diff_lm_mean_db": 1.002721319309785e-06,
+            "diff_lm_max_db": 8.754653208598029e-06,
+            "diff_mh_mean_db": 4.2739267769320577e-07,
+            "diff_mh_max_db": 4.392699793243082e-06
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.03762059286236763,
+            "lim_p95_db": 0.21334156394004822,
+            "lim_cvar95_db": 0.6387816667556763,
+            "lim_max_db": 1.4132732152938843,
+            "gr_low_mean_db": 3.218920312519913e-07,
+            "gr_mid_mean_db": 7.176737426561886e-07,
+            "gr_high_mean_db": 3.295226846944388e-08,
+            "diff_lm_mean_db": 9.176096114060783e-07,
+            "diff_lm_max_db": 6.542349638039013e-06,
+            "diff_mh_mean_db": 7.040302989480551e-07,
+            "diff_mh_max_db": 6.497939466498792e-06
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.019443918019533157,
+            "p95_atten_db": 0.033662449568510056,
+            "cvar95_atten_db": 0.37990105152130127,
+            "max_atten_db": 1.4960365295410156
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 4.003896378890204e-07,
+            "gr_low_p95_db": 1.7679869870335096e-06,
+            "gr_low_max_db": 8.770999556872994e-06,
+            "gr_mid_mean_db": 9.751620382303372e-07,
+            "gr_mid_p95_db": 4.159808213444194e-06,
+            "gr_mid_max_db": 1.5673405869165435e-05,
+            "gr_high_mean_db": 2.9718636440634327e-08,
+            "gr_high_p95_db": 1.6043907180574024e-07,
+            "gr_high_max_db": 7.663487622266985e-07
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 1.1063831379942712e-06,
+            "diff_lm_p95_db": 4.4538837755681016e-06,
+            "diff_lm_max_db": 1.5667224943172187e-05,
+            "diff_mh_mean_db": 9.521557444713835e-07,
+            "diff_mh_p95_db": 4.04167485612561e-06,
+            "diff_mh_max_db": 1.5098913536348846e-05
+          }
+        }
+      },
+      "candidate_evaluations": {
+        "Candidate_A": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        },
+        "Candidate_B": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "track_prefix": "track01_style",
+      "reference_mode": "stylistic",
+      "seed": "14887125631601849244",
+      "target_lufs": -17.987558831888595,
+      "v0p_physical_parameters": {
+        "makeup_gains_db": {
+          "low": -1.1058001518249512,
+          "mid": -1.1185132265090942,
+          "high": -1.124574899673462
+        },
+        "thresholds_db": {
+          "low": -17.049287796020508,
+          "mid": -17.057876586914062,
+          "high": -12.491474151611328
+        },
+        "ratios": {
+          "low": 1.000270962715149,
+          "mid": 1.0002727508544922,
+          "high": 1.0001450777053833
+        },
+        "limiter_push_gain_db": 0.00043099402682855725
+      },
+      "v0p_loss_and_gradient": {
+        "v0p_loss": 6.9089274406433105,
+        "gradient_l2_norms": {
+          "EQ": 6.053180333265196,
+          "Crossover": 2.302067504174076,
+          "Compressor": 4.799603400608703,
+          "Imager": 0.4655186697548238,
+          "Saturator": 2.2505102789034646,
+          "Limiter": 6.811686992645264,
+          "comp_thresholds": 0.0012689631587561396,
+          "comp_ratios": 0.8520142140188216,
+          "makeup_gains": 4.723374105075622,
+          "limiter_push": 6.811686992645264,
+          "total_41d": 10.800800135964492
+        }
+      },
+      "empirical_stats_z_neutral": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.027785105630755424,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.5556287169456482,
+            "lim_max_db": 1.7714823484420776,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.006946275942027569,
+            "p95_atten_db": -0.0,
+            "cvar95_atten_db": 0.13892166316509247,
+            "max_atten_db": 1.7714823484420776
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 0.0,
+            "gr_low_p95_db": 0.0,
+            "gr_low_max_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_mid_p95_db": 0.0,
+            "gr_mid_max_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "gr_high_p95_db": 0.0,
+            "gr_high_max_db": 0.0
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_p95_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_p95_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        }
+      },
+      "empirical_stats_v0p_opt": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.00010452869173604995,
+            "gr_mid_mean_db": 0.00018090901721734554,
+            "gr_high_mean_db": 2.348693239895283e-09,
+            "diff_lm_mean_db": 0.000103098907857202,
+            "diff_lm_max_db": 0.0002485634759068489,
+            "diff_mh_mean_db": 0.00018090667435899377,
+            "diff_mh_max_db": 0.00032911839662119746
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.00016491582209710032,
+            "gr_mid_mean_db": 2.5911369448294863e-05,
+            "gr_high_mean_db": 1.3443882096453308e-07,
+            "diff_lm_mean_db": 0.0001424259680788964,
+            "diff_lm_max_db": 0.000665724219288677,
+            "diff_mh_mean_db": 2.5776929760468192e-05,
+            "diff_mh_max_db": 9.866643085842952e-05
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.00021226826356723905,
+            "gr_mid_mean_db": 8.453711780020967e-05,
+            "gr_high_mean_db": 7.391226519715133e-10,
+            "diff_lm_mean_db": 0.00013775566185358912,
+            "diff_lm_max_db": 0.0008051065378822386,
+            "diff_mh_mean_db": 8.453637565253302e-05,
+            "diff_mh_max_db": 0.0002107287000399083
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0001501637598266825,
+            "gr_mid_mean_db": 0.00017408041458111256,
+            "gr_high_mean_db": 3.3470513471911545e-08,
+            "diff_lm_mean_db": 0.00011488317250041291,
+            "diff_lm_max_db": 0.0004479597555473447,
+            "diff_mh_mean_db": 0.00017404694517608732,
+            "diff_mh_max_db": 0.00029528376762755215
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.0,
+            "p95_atten_db": -0.0,
+            "cvar95_atten_db": 0.0,
+            "max_atten_db": -0.0
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 0.00015796914522070438,
+            "gr_low_p95_db": 0.00045307984692044556,
+            "gr_low_max_db": 0.0009050379157997668,
+            "gr_mid_mean_db": 0.00011635947157628834,
+            "gr_mid_p95_db": 0.0002339325874345377,
+            "gr_mid_max_db": 0.0003291184257250279,
+            "gr_high_mean_db": 4.274928500080932e-08,
+            "gr_high_p95_db": 4.060886027446031e-08,
+            "gr_high_max_db": 8.36105209600646e-06
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 0.00012454093666747212,
+            "diff_lm_p95_db": 0.0003598494513425976,
+            "diff_lm_max_db": 0.0008051065378822386,
+            "diff_mh_mean_db": 0.00011631673260126263,
+            "diff_mh_p95_db": 0.00023393069568555802,
+            "diff_mh_max_db": 0.00032911839662119746
+          }
+        }
+      },
+      "candidate_evaluations": {
+        "Candidate_A": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        },
+        "Candidate_B": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "track_prefix": "track02_style",
+      "reference_mode": "stylistic",
+      "seed": "3606996967096283602",
+      "target_lufs": -9.036983959989,
+      "v0p_physical_parameters": {
+        "makeup_gains_db": {
+          "low": 1.3920211791992188,
+          "mid": 1.398880958557129,
+          "high": 1.3979597091674805
+        },
+        "thresholds_db": {
+          "low": -9.22197151184082,
+          "mid": -9.378942489624023,
+          "high": -10.703025817871094
+        },
+        "ratios": {
+          "low": 1.0000872611999512,
+          "mid": 1.0000882148742676,
+          "high": 1.000099539756775
+        },
+        "limiter_push_gain_db": 0.0015554974088445306
+      },
+      "v0p_loss_and_gradient": {
+        "v0p_loss": 77.8123779296875,
+        "gradient_l2_norms": {
+          "EQ": 118.88535765492051,
+          "Crossover": 16.30185422777359,
+          "Compressor": 83.72327392628979,
+          "Imager": 6.142158052926,
+          "Saturator": 2.588169382166805,
+          "Limiter": 114.81971740722656,
+          "comp_thresholds": 5.767638576986816e-05,
+          "comp_ratios": 0.0361826139198328,
+          "makeup_gains": 83.72326610776481,
+          "limiter_push": 114.81971740722656,
+          "total_41d": 186.11033701735047
+        }
+      },
+      "empirical_stats_z_neutral": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.0,
+            "p95_atten_db": -0.0,
+            "cvar95_atten_db": 0.0,
+            "max_atten_db": -0.0
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 0.0,
+            "gr_low_p95_db": 0.0,
+            "gr_low_max_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_mid_p95_db": 0.0,
+            "gr_mid_max_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "gr_high_p95_db": 0.0,
+            "gr_high_max_db": 0.0
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_p95_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_p95_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        }
+      },
+      "empirical_stats_v0p_opt": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 5.095835149404593e-07,
+            "gr_mid_mean_db": 5.086463002634996e-14,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 5.095834580970404e-07,
+            "diff_lm_max_db": 6.073240911064204e-06,
+            "diff_mh_mean_db": 5.086463002634996e-14,
+            "diff_mh_max_db": 1.5700616804933953e-12
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 6.020012932594909e-08,
+            "gr_high_mean_db": 9.317559346300186e-08,
+            "diff_lm_mean_db": 6.020012932594909e-08,
+            "diff_lm_max_db": 1.0304972875019303e-06,
+            "diff_mh_mean_db": 6.062462176714689e-08,
+            "diff_mh_max_db": 1.6011952084227232e-06
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 1.3504343199244317e-09,
+            "gr_mid_mean_db": 1.9766568470913626e-07,
+            "gr_high_mean_db": 1.6479124553825386e-07,
+            "diff_lm_mean_db": 1.984200252991286e-07,
+            "diff_lm_max_db": 2.948281007775222e-06,
+            "diff_mh_mean_db": 8.329005396490174e-08,
+            "diff_mh_max_db": 2.289876647409983e-06
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 3.47753861262845e-08,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 3.47753861262845e-08,
+            "diff_lm_max_db": 2.2922552034287946e-07,
+            "diff_mh_mean_db": 3.47753861262845e-08,
+            "diff_mh_max_db": 2.2922552034287946e-07
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.0,
+            "p95_atten_db": -0.0,
+            "cvar95_atten_db": 0.0,
+            "max_atten_db": -0.0
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 1.2773348601058387e-07,
+            "gr_low_p95_db": 4.864685934080626e-07,
+            "gr_low_max_db": 6.073240911064204e-06,
+            "gr_mid_mean_db": 7.316030803394824e-08,
+            "gr_mid_p95_db": 3.1686474244452256e-07,
+            "gr_mid_max_db": 2.948281007775222e-06,
+            "gr_high_mean_db": 6.449170086852973e-08,
+            "gr_high_p95_db": 3.601751643600437e-07,
+            "gr_high_max_db": 3.0665410122310277e-06
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 2.0074475060027908e-07,
+            "diff_lm_p95_db": 9.82395818027726e-07,
+            "diff_lm_max_db": 6.073240911064204e-06,
+            "diff_mh_mean_db": 4.46725252345459e-08,
+            "diff_mh_p95_db": 2.2230449303606292e-07,
+            "diff_mh_max_db": 2.289876647409983e-06
+          }
+        }
+      },
+      "candidate_evaluations": {
+        "Candidate_A": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        },
+        "Candidate_B": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "track_prefix": "track03_style",
+      "reference_mode": "stylistic",
+      "seed": "15136152743686100324",
+      "target_lufs": -6.46330829542832,
+      "v0p_physical_parameters": {
+        "makeup_gains_db": {
+          "low": 1.378657341003418,
+          "mid": 1.3961257934570312,
+          "high": 1.4054970741271973
+        },
+        "thresholds_db": {
+          "low": -10.373151779174805,
+          "mid": -9.482772827148438,
+          "high": -11.935304641723633
+        },
+        "ratios": {
+          "low": 1.0001099109649658,
+          "mid": 1.0001068115234375,
+          "high": 1.0001758337020874
+        },
+        "limiter_push_gain_db": 0.0015529084485024214
+      },
+      "v0p_loss_and_gradient": {
+        "v0p_loss": 51.905372619628906,
+        "gradient_l2_norms": {
+          "EQ": 116.78890545459063,
+          "Crossover": 2.5176697234236043,
+          "Compressor": 73.0238882760998,
+          "Imager": 9.638061571225641,
+          "Saturator": 2.4157452761695706,
+          "Limiter": 105.36903381347656,
+          "comp_thresholds": 4.320874029980264e-05,
+          "comp_ratios": 0.024530232871783752,
+          "makeup_gains": 73.02388415598047,
+          "limiter_push": 105.36903381347656,
+          "total_41d": 173.72344890645448
+        }
+      },
+      "empirical_stats_z_neutral": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.0,
+            "p95_atten_db": -0.0,
+            "cvar95_atten_db": 0.0,
+            "max_atten_db": -0.0
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 0.0,
+            "gr_low_p95_db": 0.0,
+            "gr_low_max_db": 0.0,
+            "gr_mid_mean_db": 0.0,
+            "gr_mid_p95_db": 0.0,
+            "gr_mid_max_db": 0.0,
+            "gr_high_mean_db": 0.0,
+            "gr_high_p95_db": 0.0,
+            "gr_high_max_db": 0.0
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 0.0,
+            "diff_lm_p95_db": 0.0,
+            "diff_lm_max_db": 0.0,
+            "diff_mh_mean_db": 0.0,
+            "diff_mh_p95_db": 0.0,
+            "diff_mh_max_db": 0.0
+          }
+        }
+      },
+      "empirical_stats_v0p_opt": {
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 1.5005339193407963e-08,
+            "gr_mid_mean_db": 4.93182199079456e-07,
+            "gr_high_mean_db": 3.567542705695814e-08,
+            "diff_lm_mean_db": 4.781769007422554e-07,
+            "diff_lm_max_db": 3.3831747714430094e-06,
+            "diff_mh_mean_db": 4.5750681465506204e-07,
+            "diff_mh_max_db": 2.973059508803999e-06
+          },
+          {
+            "chunk_index": 1,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.035604238510131836,
+            "lim_p95_db": 0.20239117741584778,
+            "lim_cvar95_db": 0.6043127179145813,
+            "lim_max_db": 1.3152625560760498,
+            "gr_low_mean_db": 6.030666632739212e-09,
+            "gr_mid_mean_db": 5.224557071414893e-07,
+            "gr_high_mean_db": 3.155963668177719e-08,
+            "diff_lm_mean_db": 5.194461891733226e-07,
+            "diff_lm_max_db": 8.717900527699385e-06,
+            "diff_mh_mean_db": 4.908960704597121e-07,
+            "diff_mh_max_db": 8.031282959564123e-06
+          },
+          {
+            "chunk_index": 2,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.0,
+            "lim_p95_db": 0.0,
+            "lim_cvar95_db": 0.0,
+            "lim_max_db": -0.0,
+            "gr_low_mean_db": 1.7198198065671022e-07,
+            "gr_mid_mean_db": 1.6805837788069766e-07,
+            "gr_high_mean_db": 3.01827753901307e-08,
+            "diff_lm_mean_db": 2.456559968777583e-07,
+            "diff_lm_max_db": 2.6034745133074466e-06,
+            "diff_mh_mean_db": 1.5466349623238784e-07,
+            "diff_mh_max_db": 2.1962150640320033e-06
+          },
+          {
+            "chunk_index": 3,
+            "n_active_samples": 143841,
+            "t_eval_samples": 143841,
+            "active_ratio": 1.0,
+            "is_silent": false,
+            "lim_mean_db": 0.03730543330311775,
+            "lim_p95_db": 0.2116072177886963,
+            "lim_cvar95_db": 0.6333971619606018,
+            "lim_max_db": 1.400887370109558,
+            "gr_low_mean_db": 4.62017872848719e-08,
+            "gr_mid_mean_db": 3.5630904449135414e-07,
+            "gr_high_mean_db": 4.173848822119908e-08,
+            "diff_lm_mean_db": 3.833845880762965e-07,
+            "diff_lm_max_db": 4.363967491372023e-06,
+            "diff_mh_mean_db": 3.387879985439213e-07,
+            "diff_mh_max_db": 4.2252286220900714e-06
+          }
+        ],
+        "session_summary": {
+          "total_active_samples": 575364,
+          "total_eval_samples": 575364,
+          "overall_active_ratio": 1.0,
+          "limiter": {
+            "mean_atten_db": 0.018227417021989822,
+            "p95_atten_db": 0.031651001423597336,
+            "cvar95_atten_db": 0.35610735416412354,
+            "max_atten_db": 1.400887370109558
+          },
+          "compressor_gr": {
+            "gr_low_mean_db": 5.98049467726014e-08,
+            "gr_low_p95_db": 2.5852179419416643e-07,
+            "gr_low_max_db": 2.6074922061525285e-06,
+            "gr_mid_mean_db": 3.850013285955356e-07,
+            "gr_mid_p95_db": 1.9743160919460934e-06,
+            "gr_mid_max_db": 8.717905075172894e-06,
+            "gr_high_mean_db": 3.478908183751628e-08,
+            "gr_high_p95_db": 1.8243115107452468e-07,
+            "gr_high_max_db": 9.194180847771349e-07
+          },
+          "interband_diff": {
+            "diff_lm_mean_db": 4.0666594713911763e-07,
+            "diff_lm_p95_db": 2.0057016172359e-06,
+            "diff_lm_max_db": 8.717900527699385e-06,
+            "diff_mh_mean_db": 3.6046358786734345e-07,
+            "diff_mh_p95_db": 1.808112756407354e-06,
+            "diff_mh_max_db": 8.031282959564123e-06
+          }
+        }
+      },
+      "candidate_evaluations": {
+        "Candidate_A": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        },
+        "Candidate_B": {
+          "delta_m_1.00": {
+            "delta_m": 1.0,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.25": {
+            "delta_m": 1.25,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          },
+          "delta_m_1.50": {
+            "delta_m": 1.5,
+            "loss_weighted": 0.0,
+            "loss_lim_unweighted": 0.0,
+            "loss_diff_unweighted": 0.0,
+            "loss_conflict_unweighted": 0.0,
+            "loss_lim_weighted": 0.0,
+            "loss_diff_weighted": 0.0,
+            "loss_conflict_weighted": 0.0,
+            "is_active": false,
+            "chunk_activations": [
+              {
+                "chunk_index": 0,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 1,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 2,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              },
+              {
+                "chunk_index": 3,
+                "loss_lim": 0.0,
+                "loss_diff": 0.0,
+                "loss_conflict": 0.0,
+                "is_lim_active": false,
+                "is_diff_active": false,
+                "is_conflict_active": false,
+                "is_any_active": false
+              }
+            ],
+            "gradient_l2_norms": {
+              "EQ": 0.0,
+              "Crossover": 0.0,
+              "Compressor": 0.0,
+              "Imager": 0.0,
+              "Saturator": 0.0,
+              "Limiter": 0.0,
+              "comp_thresholds": 0.0,
+              "comp_ratios": 0.0,
+              "makeup_gains": 0.0,
+              "limiter_push": 0.0,
+              "total_41d": 0.0
+            },
+            "cosine_similarities_wrt_v0p": {
+              "total_41d": 0.0,
+              "active_groups_only": 0.0,
+              "compressor_group": 0.0,
+              "limiter_group": 0.0,
+              "makeup_gains": 0.0
+            }
+          }
+        }
+      }
+    }
+  ]
+}
