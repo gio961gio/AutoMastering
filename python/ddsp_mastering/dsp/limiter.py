@@ -78,13 +78,22 @@ class DifferentiableLookaheadLimiter(nn.Module):
         tau_sec = RELEASE_MS * 0.001
         self.alpha_rel = math.exp(-1.0 / (tau_sec * self.sample_rate))
 
-    def forward(self, x: torch.Tensor, push_gain_db: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        push_gain_db: torch.Tensor = None,
+        release_ms: float = None,
+        return_gain: bool = False,
+    ):
         """
         Args:
             x: [..., 2, N] Segnale audio stereo in ingresso
             push_gain_db: [..., 1] o [..., ] Guadagno di push in dB [0.0, 12.0]
+            release_ms: Costante di tempo del release in ms (opzionale, default 80.0 ms)
+            return_gain: Se True restituisce (y_out, {"g_smooth": g_smooth, "a_lim_db": a_lim_db})
         Returns:
             y_out: [..., 2, N] Segnale limitato a ceiling -0.3 dBFS, ritardato di 144 campioni
+            oppure tupla (y_out, {"g_smooth": ..., "a_lim_db": ...}) se return_gain=True
         """
         orig_shape = x.shape
         orig_dtype = x.dtype
@@ -93,7 +102,10 @@ class DifferentiableLookaheadLimiter(nn.Module):
         B = x_f64.shape[0]
 
         # 1. Gain Push in float64
-        push_db = push_gain_db.reshape(B, 1, 1).to(torch.float64)
+        if push_gain_db is None:
+            push_db = torch.zeros((B, 1, 1), dtype=torch.float64, device=x.device)
+        else:
+            push_db = push_gain_db.reshape(B, 1, 1).to(torch.float64)
         push_lin = torch.pow(10.0, push_db / 20.0)
         u = x_f64 * push_lin # [B, 2, N]
 
@@ -109,7 +121,12 @@ class DifferentiableLookaheadLimiter(nn.Module):
         g_min = -F.max_pool1d(-g_target_padded, kernel_size=self.lookahead, stride=1).squeeze(1) # [B, N]
 
         # 4. Stadio 2: One-Pole Release Envelope (C++ Fast Autograd Scan)
-        g_rel = FastLimiterReleaseFunction.apply(g_min, self.alpha_rel)
+        if release_ms is not None:
+            tau_sec = float(release_ms) * 0.001
+            alpha_rel = math.exp(-1.0 / (tau_sec * self.sample_rate))
+        else:
+            alpha_rel = self.alpha_rel
+        g_rel = FastLimiterReleaseFunction.apply(g_min, alpha_rel)
 
         # 5. Stadio 3: Boxcar Moving Average Smoothing di lunghezza NL=144
         g_rel_padded = F.pad(g_rel.unsqueeze(1), (self.lookahead - 1, 0), mode='constant', value=1.0)
@@ -119,4 +136,11 @@ class DifferentiableLookaheadLimiter(nn.Module):
         u_delayed = F.pad(u, (self.lookahead, 0))[..., :N] # [B, 2, N]
         y_out = u_delayed * g_smooth.unsqueeze(1) # [B, 2, N]
 
-        return y_out.reshape(orig_shape).to(orig_dtype)
+        y_out_res = y_out.reshape(orig_shape).to(orig_dtype)
+        if return_gain:
+            batch_shape = orig_shape[:-2]
+            g_smooth_2d = g_smooth.reshape(batch_shape + (N,)).to(orig_dtype)
+            a_lim_db = -20.0 * torch.log10(torch.clamp(g_smooth_2d, min=1e-12))
+            return y_out_res, {"g_smooth": g_smooth_2d, "a_lim_db": a_lim_db}
+
+        return y_out_res

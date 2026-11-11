@@ -111,15 +111,15 @@ class DifferentiableSingleBandCompressorFunction(torch.autograd.Function):
         ctx.m_shape = makeup_db.shape
         ctx.m_dtype = makeup_db.dtype
 
-        return y_out.reshape(x.shape).to(orig_dtype)
+        return y_out.reshape(x.shape).to(orig_dtype), yg.reshape(batch_shape + (N,)).to(orig_dtype)
 
     @staticmethod
-    def backward(ctx, grad_output: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+    def backward(ctx, grad_output: torch.Tensor, grad_yg_ext: torch.Tensor = None) -> Tuple[torch.Tensor, ...]:
         (x_flat, T, R, tau_a, tau_r, M, alpha_a, alpha_r, energy, delta, gc, yg, mask_attack, glin) = ctx.saved_tensors
         sample_rate = ctx.sample_rate
         B, _, N = x_flat.shape
 
-        grad_out = grad_output.to(torch.float64).reshape(B, 2, N)
+        grad_out = grad_output.to(torch.float64).reshape(B, 2, N) if grad_output is not None else torch.zeros((B, 2, N), dtype=torch.float64, device=x_flat.device)
 
         # 1. Gradiente rispetto a glin e contributo diretto a x
         # y_out = x * glin -> dL/dglin = sum_c (grad_out_c * x_c)
@@ -130,7 +130,11 @@ class DifferentiableSingleBandCompressorFunction(torch.autograd.Function):
         # glin = exp(C_LN * (M - yg))
         d_exponent = d_glin * glin * C_LN # [B, N]
         d_M = torch.sum(d_exponent, dim=-1) # [B]
-        d_yg_direct = -d_exponent # [B, N]
+
+        if grad_yg_ext is not None:
+            d_yg_direct = -d_exponent + grad_yg_ext.to(torch.float64).reshape(B, N)
+        else:
+            d_yg_direct = -d_exponent
 
         # 3. Scansione all'indietro per ballistics (psi[n])
         can_use_fast_comp = _HAS_PY_CORE_DSP and not x_flat.is_cuda and (
@@ -216,6 +220,32 @@ class DifferentiableSingleBandCompressorFunction(torch.autograd.Function):
         )
 
 
+class DifferentiableSingleBandCompressor(nn.Module):
+    """
+    Compressore a singola banda differenziabile (nn.Module).
+    """
+    def __init__(self, sample_rate: float = 48000.0):
+        super().__init__()
+        self.sample_rate = float(sample_rate)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        threshold_db: torch.Tensor,
+        ratio: torch.Tensor,
+        attack_ms: torch.Tensor,
+        release_ms: torch.Tensor,
+        makeup_db: torch.Tensor,
+        return_gr: bool = False,
+    ):
+        y_out, yg = DifferentiableSingleBandCompressorFunction.apply(
+            x, threshold_db, ratio, attack_ms, release_ms, makeup_db, self.sample_rate
+        )
+        if return_gr:
+            return y_out, yg
+        return y_out
+
+
 class DifferentiableMultibandCompressor(nn.Module):
     """
     Compressore Dinamico a 3 Bande Differenziabile (Low, Mid, High).
@@ -235,17 +265,24 @@ class DifferentiableMultibandCompressor(nn.Module):
         attack_ms: torch.Tensor,    # [..., 3]
         release_ms: torch.Tensor,   # [..., 3]
         makeup_db: torch.Tensor,    # [..., 3]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return_gr: bool = False,
+    ):
         """
         Elabora le 3 bande in parallelo con parametri differenziabili.
         """
-        out_low = DifferentiableSingleBandCompressorFunction.apply(
+        out_low, yg_low = DifferentiableSingleBandCompressorFunction.apply(
             low, threshold_db[..., 0], ratio[..., 0], attack_ms[..., 0], release_ms[..., 0], makeup_db[..., 0], self.sample_rate
         )
-        out_mid = DifferentiableSingleBandCompressorFunction.apply(
+        out_mid, yg_mid = DifferentiableSingleBandCompressorFunction.apply(
             mid, threshold_db[..., 1], ratio[..., 1], attack_ms[..., 1], release_ms[..., 1], makeup_db[..., 1], self.sample_rate
         )
-        out_high = DifferentiableSingleBandCompressorFunction.apply(
+        out_high, yg_high = DifferentiableSingleBandCompressorFunction.apply(
             high, threshold_db[..., 2], ratio[..., 2], attack_ms[..., 2], release_ms[..., 2], makeup_db[..., 2], self.sample_rate
         )
+        if return_gr:
+            return (out_low, out_mid, out_high), {
+                "gr_low_db": yg_low,
+                "gr_mid_db": yg_mid,
+                "gr_high_db": yg_high,
+            }
         return out_low, out_mid, out_high

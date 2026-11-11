@@ -256,7 +256,7 @@ def test_f06_compressor_and_limiter_cpu_batching_parity():
         x = torch.randn(B, 2, 24000, generator=rng, dtype=torch.float32) * 0.2
 
         # 1. Compressor batch forward
-        out_comp = DifferentiableSingleBandCompressorFunction.apply(
+        out_comp, _ = DifferentiableSingleBandCompressorFunction.apply(
             x,
             torch.full((B,), -15.0),
             torch.full((B,), 3.0),
@@ -270,7 +270,7 @@ def test_f06_compressor_and_limiter_cpu_batching_parity():
         # Compare item by item
         for b in range(B):
             x_b = x[b:b+1]
-            out_b = DifferentiableSingleBandCompressorFunction.apply(
+            out_b, _ = DifferentiableSingleBandCompressorFunction.apply(
                 x_b,
                 torch.tensor([-15.0]),
                 torch.tensor([3.0]),

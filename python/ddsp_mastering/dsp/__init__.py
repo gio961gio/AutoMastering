@@ -4,6 +4,7 @@ from .imager import DifferentiableMidSideImager
 from .saturator import DifferentiableHarmonicSaturator
 from .compressor import (
     DifferentiableSingleBandCompressorFunction,
+    DifferentiableSingleBandCompressor,
     DifferentiableMultibandCompressor,
 )
 from .fast_biquad import (
@@ -18,6 +19,7 @@ __all__ = [
     "DifferentiableMidSideImager",
     "DifferentiableHarmonicSaturator",
     "DifferentiableSingleBandCompressorFunction",
+    "DifferentiableSingleBandCompressor",
     "DifferentiableMultibandCompressor",
     "_FastCPUAnalyticalBiquad",
     "enable_fast_cpu_biquad",

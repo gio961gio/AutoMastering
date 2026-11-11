@@ -59,7 +59,7 @@ def test_compressor_ratio_one_identity():
     release_ms = torch.tensor([100.0], dtype=torch.float64)
     makeup_db = torch.tensor([0.0], dtype=torch.float64)
 
-    out = DifferentiableSingleBandCompressorFunction.apply(
+    out, _ = DifferentiableSingleBandCompressorFunction.apply(
         x, threshold_db, ratio, attack_ms, release_ms, makeup_db, 48000.0
     )
 

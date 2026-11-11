@@ -46,8 +46,9 @@ class DifferentiableMasteringChain(nn.Module):
         x: torch.Tensor,
         z: Optional[torch.Tensor] = None,
         theta: Optional[torch.Tensor] = None,
-        eq_mode: Optional[str] = None
-    ) -> torch.Tensor:
+        eq_mode: Optional[str] = None,
+        return_diagnostics: bool = False,
+    ):
         """
         Elabora l'audio attraverso l'intera catena di mastering.
 
@@ -56,8 +57,10 @@ class DifferentiableMasteringChain(nn.Module):
             z: [..., 41] Vettore parametri normalizzati in (0, 1) (opzionale se passato theta)
             theta: [..., 41] Vettore parametri fisici reali (opzionale se passato z)
             eq_mode: 'iir' (numerical parity with C++ reference within tested tolerances) o 'fft' (fast training approximation)
+            return_diagnostics: Se True restituisce (y_out, diagnostics_dict)
         Returns:
             y_out: [..., 2, N] Audio masterizzato finale
+            oppure tupla (y_out, diagnostics_dict) se return_diagnostics=True
         """
         if z is None and theta is None:
             raise ValueError("Must provide either normalized parameters 'z' or physical parameters 'theta'")
@@ -85,14 +88,19 @@ class DifferentiableMasteringChain(nn.Module):
         )
 
         # 3. Multiband Compressor (3 bande parallele)
-        comp_low, comp_mid, comp_high = self.compressor(
+        comp_res = self.compressor(
             low, mid, high,
             params["comp_threshold_db"],
             params["comp_ratio"],
             params["comp_attack_ms"],
             params["comp_release_ms"],
-            params["comp_makeup_db"]
+            params["comp_makeup_db"],
+            return_gr=return_diagnostics,
         )
+        if return_diagnostics:
+            (comp_low, comp_mid, comp_high), comp_diag = comp_res
+        else:
+            comp_low, comp_mid, comp_high = comp_res
 
         # 4. Stereo Imager & 3-Band Summing
         w = params["imager_width"] # [..., 3]
@@ -109,9 +117,21 @@ class DifferentiableMasteringChain(nn.Module):
         )
 
         # 6. Lookahead Brickwall Limiter (144 campioni lookahead)
-        lim_out = self.limiter(
+        lim_res = self.limiter(
             sat_out,
-            params["limiter_push_gain_db"]
+            params["limiter_push_gain_db"],
+            return_gain=return_diagnostics,
         )
 
-        return lim_out
+        if return_diagnostics:
+            lim_out, lim_diag = lim_res
+            diagnostics = {
+                "gr_low_db": comp_diag["gr_low_db"],
+                "gr_mid_db": comp_diag["gr_mid_db"],
+                "gr_high_db": comp_diag["gr_high_db"],
+                "lim_g_smooth": lim_diag["g_smooth"],
+                "lim_atten_db": lim_diag["a_lim_db"],
+            }
+            return lim_out, diagnostics
+
+        return lim_res

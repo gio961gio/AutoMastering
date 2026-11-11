@@ -40,9 +40,10 @@ def test_single_band_compressor_parity(sig_pink_music, thresh, ratio, att, rel, 
     t_rel = torch.tensor(rel, dtype=torch.float32)
     t_makeup = torch.tensor(makeup, dtype=torch.float32)
 
-    y_torch = DifferentiableSingleBandCompressorFunction.apply(
+    y_torch, _ = DifferentiableSingleBandCompressorFunction.apply(
         x_torch, t_thresh, t_ratio, t_att, t_rel, t_makeup, 48000.0
-    ).numpy()
+    )
+    y_torch = y_torch.numpy()
 
     null_db = compute_null_dbfs(y_cpp, y_torch)
     max_err_db = compute_max_abs_err_dbfs(y_cpp, y_torch)

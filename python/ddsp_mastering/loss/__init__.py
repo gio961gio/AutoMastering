@@ -23,6 +23,11 @@ from .transient import (
     compute_transient_active_mask,
 )
 from .eq_prior import CompositeEQPriorLoss
+from .dynamic_prior import (
+    V3bDynamicPriorLoss,
+    compute_active_sample_mask as compute_dynamic_active_sample_mask,
+    TOTAL_DSP_DELAY_SAMPLES,
+)
 
 __all__ = [
     "DifferentiableKWeighting",
@@ -40,4 +45,7 @@ __all__ = [
     "TransientEnvelopeLoss",
     "compute_transient_active_mask",
     "CompositeEQPriorLoss",
+    "V3bDynamicPriorLoss",
+    "compute_dynamic_active_sample_mask",
+    "TOTAL_DSP_DELAY_SAMPLES",
 ]
