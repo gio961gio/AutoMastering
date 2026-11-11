@@ -17,7 +17,7 @@
 Lo Step **`V3b`** della roadmap di Sprint 3 si prefigge di analizzare e regolarizzare il comportamento dinamico della catena di mastering differenziabile, affrontando la configurazione degenere riscontrata nelle varianti `V0p`, `V1`, `V1b`, `V2` e `V3a`. Come evidenziato nell'ispezione dei parametri:
 1. I ratio del compressore multibanda si attestano costantemente su valori nominali vicini a $1.00:1$;
 2. I makeup gain $M_c$ si collocano stabilmente nella regione positiva ($+1.37 \dots +1.42\text{ dB}$ in *same_track* e fino a $+1.41\text{ dB}$ in *stylistic*, a fronte di un intervallo ammesso $[-3.0, +6.0]\text{ dB}$);
-3. La limitazione di picco e il contenimento finale della loudness vengono assorbiti dal limiter lookahead finale, producendo elevati sforamenti del True Peak delivery nel rendering full-track (fino a $+1.77\text{ dBTP}$).
+3. Nelle sessioni armonizzate `V0p/V1/V1b/V2`, i rapporti di compressione ottimizzati restano prossimi a $1:1$ e nel rendering full-track si osservano sforamenti del guardrail di delivery True Peak ($\le -0.30\text{ dBTP}$) in 5 sessioni su 6. Tuttavia, il reale comportamento dinamico del compressore e del limiter è ancora da caratterizzare quantitativamente mediante la misurazione diretta delle serie temporali $y_{g,c}[n]$, $g_{\text{smooth}}[n]$ e $A_{\text{lim}}[n]$ nel futuro preflight; un nesso causale diretto tra tali fenomeni non è ancora formalmente dimostrato prima di tali rilievi strumentali (fermo restando che il contenimento True Peak $\le -0.30\text{ dBTP}$ costituisce un requisito separato di delivery/export a valle).
 
 L'obiettivo di `V3b` è implementare in **puro isolamento** la combinazione:
 $$V_{3b} = V_{0p} + \mathcal{L}_{\text{dyn\_priors}}$$
@@ -35,7 +35,7 @@ L'ispezione analitica in sola lettura ha chiarito l'esatta catena di trasformazi
 2. **Coerenza Rigorosa sulle Dimensioni 0..39:** Per tutte le prime 40 dimensioni (EQ biquad 0..5, frequenze di crossover, compressore multibanda, stereo imager e saturatore), $\text{map\_z\_to\_theta}(z_{\text{JSON}})$ coincide con `physical_parameters_theta` salvato nel JSON entro la precisione di macchina ($< 10^{-5}$).
 3. **Isolamento della Discrepanza sul Limiter (Dimensione 40):** In `SPRINT3_V2_ABLATION_RESULTS.json`, la dimensione 40 rispetta esattamente $\theta_{40} = 8.0 \cdot z_{40}$ ($\approx 0.0015\text{ dB}$). In `SPRINT3_V3A_ABLATION_RESULTS.json`, per entrambe le varianti (`V0p` e `V3a`), la chiave `physical_parameters_theta["limiter_push_gain_db"]` contiene invece valori coincidenti con `lim_input_gain_db` (livello RMS empirico di ingresso, es. $+8.63\text{ dB}$).
    - **Nota di Rigore Metodologico:** Nel codice committato di `scripts/sprint3/evaluate_v3a_ablation.py` al commit `5267a6d`, la mappatura è `theta_v3a = map_z_to_theta(z_opt_v3a)`. La sovrascrittura di `"limiter_push_gain_db"` con `lim_input_gain_db` nei JSON committati non risulta da alcuna riga presente in `evaluate_v3a_ablation.py` ed è pertanto dichiarata formalmente come **non tracciata nella cronologia Git del runner**.
-4. **Validità Matematica di `CompositeEQPriorLoss`:** Il modulo `eq_prior.py` riceve direttamente $z \in (0, 1)^{41}$ e chiama `map_z_to_theta(z)`. Tutti i calcoli di risposta in frequenza dell'EQ, offset $\bar{G}$, deviazioni di forma e loss di prior in `SPRINT3_V3A_ABLATION_RESULTS.json` sono **validi ed esatti al 100%**.
+4. **Coerenza e Validità Verificata di `CompositeEQPriorLoss`:** La catena di trasformazione $u \to z = \text{sigmoid}(u) \to \theta = \text{map\_z\_to\_theta}(z)$ è pienamente coerente con il codice verificato in `param_space.py`, `optimizer.py` ed `eq_prior.py`. La discrepanza osservata sul parametro 40 nei metadati JSON di `V3a` non invalida il calcolo del prior EQ sui primi 18 parametri (frequenze, guadagni e Q dei 6 biquad). La correttezza di `CompositeEQPriorLoss` va riferita specificamente ai controlli analitici e ai test unitari della test suite di Gate Tecnico effettivamente svolti e superati con successo (`freqz` analitico vs SciPy, `gradcheck` in `float64`, isolamento rispetto ai parametri non-EQ, dead-zone ed estremi).
 
 ### 1.3 Sintesi delle Scelte Architetturali Approvate per V3b
 1. **Latenza di catena compensata esattamente a 159 campioni:** Il budget di latenza della catena DSP differenziabile è di $15$ campioni per il saturatore e $144$ campioni per il lookahead limiter ($0$ per EQ, crossover, compressore e imager). Il tracciamento temporale delle serie temporali di gain reduction del compressore ($GR_c[n]$) e del limiter ($A_{\text{lim}}[n]$) richiede una traslazione esatta di $159$ campioni per garantire che entrambi i rilevatori valutino la medesima porzione fisica del segnale audio.
@@ -328,14 +328,15 @@ L'applicazione di `detach(\bar{GR}_c^{\text{act}})` elimina matematicamente ques
 
 ### 6.2 Ispezione Empirica dei Parametri V0p e Sensibilità di $\delta_M$
 Nelle 6 sessioni armonizzate di V0p:
-- Ratio: tutti vicini a $1.00:1$;
-- Gain reduction media reale: $\bar{GR}_c^{\text{act}} \approx 0.0\text{ dB}$;
+- Ratio: tutti prossimi a $1.00:1$ (mediamente $\approx 1.015:1$);
+- Gain reduction effettiva $\bar{GR}_c^{\text{act}}$: **non ancora misurata** (poiché l'attuale implementazione DSP non espone la serie temporale interna $y_{g,c}[n]$ prima del preflight strumentale);
+- Ipotesi preliminare: i ratio ottimizzati prossimi a $1.015:1$ costituiscono un indizio parametrico di compressione dinamica probabilmente debole/contenuta, ma non sostituiscono la quantificazione diretta tramite $y_{g,c}[n]$;
 - Makeup gain fisici $M_c$: si collocano nell'intervallo $[+1.37,\, +1.42]\text{ dB}$ (in *same_track*) e $[-1.11,\, +1.41]\text{ dB}$ (in *stylistic*).
 
-#### Considerazione Cruciale su $\delta_M$:
-Se $\delta_M = 1.5\text{ dB}$, poiché i makeup gain $M_c$ in V0p sono $\approx 1.4\text{ dB} < 1.5\text{ dB}$, la differenza $M_c - 0.0 - 1.5 = -0.1\text{ dB} \le 0$.  
-Di conseguenza, il termine $\text{ReLU}(M_c - \bar{GR}_c - \delta_M)$ risulterebbe **completamente spento ($\mathcal{L}_{\text{conflict}} = 0.0$) a partire dal punto operativo di V0p**!  
-Per questo motivo, il piano di preflight include obbligatoriamente un'ispezione diagnostica di sensibilità su:
+#### Considerazione Cruciale sull'Attivazione di $\mathcal{L}_{\text{conflict}}$ e sulla Sensibilità di $\delta_M$:
+Qualora l'ipotesi preliminare di $\bar{GR}_c^{\text{act}} \approx 0.0\text{ dB}$ trovasse conferma strumentale nel preflight, con un valore di soglia $\delta_M = 1.5\text{ dB}$ e con i makeup gain fisici di V0p pari a $M_c \approx +1.4\text{ dB}$, la differenza risulterebbe $M_c - \bar{GR}_c^{\text{act}} - \delta_M \approx 1.4 - 0.0 - 1.5 = -0.1\text{ dB} \le 0$.  
+In tale eventualità, il termine quadratico $\text{ReLU}(M_c - \bar{GR}_c^{\text{act}} - \delta_M)^2$ rimarrebbe **completamente spento ($\mathcal{L}_{\text{conflict}} = 0.0$)** a partire dal punto operativo di V0p.  
+Senza assumere aprioristicamente $\bar{GR}_c^{\text{act}} = 0\text{ dB}$ come fatto acquisito, le reali conseguenze sull'attivazione di $\mathcal{L}_{\text{conflict}}$ e la scelta finale del parametro $\delta_M$ andranno determinate empiricamente tramite le misurazioni dirette di preflight su una griglia di sensitivity diagnostica:
 $$\delta_M \in \{1.00\text{ dB},\; 1.25\text{ dB},\; 1.50\text{ dB}\}$$
 
 ### 6.3 Criteri di Valutazione dei Gradienti nel Preflight
