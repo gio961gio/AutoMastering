@@ -328,9 +328,9 @@ L'applicazione di `detach(\bar{GR}_c^{\text{act}})` elimina matematicamente ques
 
 ### 6.2 Ispezione Empirica dei Parametri V0p e Sensibilità di $\delta_M$
 Nelle 6 sessioni armonizzate di V0p:
-- Ratio: tutti prossimi a $1.00:1$ (mediamente $\approx 1.015:1$);
+- Ratio parametrici salvati nei JSON (`physical_parameters_theta`): tutti prossimi a $1.00:1$ (media $\approx 1.000125:1$, intervallo osservato $\approx [1.000074,\, 1.000273]:1$ sui 18 valori);
 - Gain reduction effettiva $\bar{GR}_c^{\text{act}}$: **non ancora misurata** (poiché l'attuale implementazione DSP non espone la serie temporale interna $y_{g,c}[n]$ prima del preflight strumentale);
-- Ipotesi preliminare: i ratio ottimizzati prossimi a $1.015:1$ costituiscono un indizio parametrico di compressione dinamica probabilmente debole/contenuta, ma non sostituiscono la quantificazione diretta tramite $y_{g,c}[n]$;
+- Ipotesi preliminare: i ratio parametrici ottimizzati prossimi a $1.000125:1$ costituiscono un indizio parametrico di compressione dinamica probabilmente debole/contenuta, ma non sostituiscono la quantificazione diretta tramite la misura della serie temporale $y_{g,c}[n]$ nel preflight;
 - Makeup gain fisici $M_c$: si collocano nell'intervallo $[+1.37,\, +1.42]\text{ dB}$ (in *same_track*) e $[-1.11,\, +1.41]\text{ dB}$ (in *stylistic*).
 
 #### Considerazione Cruciale sull'Attivazione di $\mathcal{L}_{\text{conflict}}$ e sulla Sensibilità di $\delta_M$:
