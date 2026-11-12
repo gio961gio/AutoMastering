@@ -240,8 +240,10 @@ def test_gate_6_active_mask_and_partial_block():
 # ==============================================================================
 # Gate 7: Exact 159-sample delay alignment
 # ==============================================================================
-def test_gate_7_temporal_alignment_159_samples():
-    """Verify Gate 7: Total DSP delay is 159 samples and limiter attenuation aligns with input pulse."""
+def test_07_temporal_alignment_159_samples():
+    """Verify Gate 7: Total DSP delay is 159 samples, limiter attenuation aligns with input pulse,
+    and exact sample-by-sample multiplicative identity holds over evaluation window T_eval = T - 159 = 143841.
+    """
     sr = 48000.0
     N_pre = 4800
     T = 144000
@@ -266,14 +268,22 @@ def test_gate_7_temporal_alignment_159_samples():
     atten_at_pulse = a_lim_eval[0, k_impulse].item()
     assert atten_at_pulse > 0.5, f"Limiter attenuation at pulse index should be active, got {atten_at_pulse} dB"
 
-    # Exact sample-by-sample multiplicative identity check for all n_mix in [0, T - 160]
+    # Exact sample-by-sample multiplicative identity check over evaluation window T_eval = T - 159 = 143841
+    # n_mix in [N_pre, N_pre + T_eval - 1], length T_eval = T - 159 = 143841
+    T_eval = T - 159
     g_push = 10.0 ** (4.0 / 20.0)
     g_smooth = lim_diag["g_smooth"]
-    n_mix_range = torch.arange(0, T - 160)
-    expected_y = sat_out[:, :, n_mix_range + 15] * g_push * g_smooth[:, None, n_mix_range + 159]
-    actual_y = y_out[:, :, n_mix_range + 159]
-    max_sample_err = torch.max(torch.abs(actual_y - expected_y)).item()
-    assert max_sample_err < 1e-6, f"Max sample discrepancy {max_sample_err} >= 1e-6"
+    expected_y = (
+        sat_out[:, :, N_pre + 15 : N_pre + 15 + T_eval]
+        * g_push
+        * g_smooth[:, None, N_pre + 159 : N_pre + 159 + T_eval]
+    )
+    actual_y = y_out[:, :, N_pre + 159 : N_pre + 159 + T_eval]
+    assert actual_y.shape[-1] == 143841
+    assert torch.max(torch.abs(actual_y - expected_y)).item() < 1e-6
+
+
+test_gate_7_temporal_alignment_159_samples = test_07_temporal_alignment_159_samples
 
 
 # ==============================================================================
@@ -374,11 +384,18 @@ def test_gate_8_compressor_backward_and_conflict_gradient_isolation():
 
 
 # ==============================================================================
-# Gate 9: C++/Python parity for LookaheadLimiter
+# Gate 9: C++/Python parity for LookaheadLimiter and MultibandCompressor audio output
 # ==============================================================================
 @pytest.mark.skipif(not _HAS_PY_CORE_DSP, reason="py_core_dsp required for C++ parity")
-def test_gate_9_limiter_cpp_python_parity():
-    """Verify Gate 9: Bit-accurate C++/Python parity for LookaheadLimiter audio and attenuation (< -100 dBFS RMS)."""
+def test_09_cpp_python_limiter_and_compressor_parity():
+    """Verify Gate 9: Bit-accurate C++/Python parity for processed audio outputs (< -100 dBFS RMS).
+    
+    NOTE: The C++ bindings in py_core_dsp (e.g., LookaheadLimiter, SingleBandComp,
+    MultibandCompressor3Band) expose exclusively processed audio output arrays and do NOT
+    expose internal yg[n] trace buffers directly. Verification confirms exact mathematical parity
+    of the processed audio output (null_rms_dbfs < -100.0 dBFS), confirming exact DSP equivalence
+    without direct yg buffer inspection.
+    """
     sr = 48000.0
     torch.manual_seed(42)
     x_torch = torch.randn(1, 2, 48000, dtype=torch.float32) * 0.5
@@ -412,9 +429,10 @@ def test_gate_9_limiter_cpp_python_parity():
     assert null_y_db <= -100.0, f"Limiter audio null {null_y_db} dBFS > -100 dBFS"
     assert null_g_db <= -100.0, f"Limiter gain factor null {null_g_db} dBFS > -100 dBFS"
 
-    # Compressor C++ vs Python parity on audio output:
-    # Note: The C++ binding py_core_dsp.SingleBandComp does not expose internal yg[n] trace buffer directly.
-    # We verify bit-level parity of the compressed audio output, which proves exact equivalence of internal gain reduction.
+    # Compressor C++ vs Python parity on processed audio output:
+    # Explicit declaration: The C++ binding py_core_dsp.SingleBandComp exposes exclusively the audio
+    # output and does not expose internal yg[n] trace buffers. We verify bit-level parity of the
+    # compressed audio output (null < -100 dBFS).
     cpp_comp = py_core_dsp.SingleBandComp()
     cpp_comp.set_parameters(-15.0, 3.0, 10.0, 50.0, 2.0, 6.0, sr)
     y_cpp_comp = cpp_comp.process(x_np)
@@ -432,6 +450,9 @@ def test_gate_9_limiter_cpp_python_parity():
     diff_comp = y_cpp_comp - y_py_comp
     null_comp_db = 10.0 * np.log10(np.mean(diff_comp ** 2) + 1e-16)
     assert null_comp_db <= -100.0, f"Compressor audio null {null_comp_db} dBFS > -100 dBFS"
+
+
+test_gate_9_limiter_cpp_python_parity = test_09_cpp_python_limiter_and_compressor_parity
 
 
 # ==============================================================================
