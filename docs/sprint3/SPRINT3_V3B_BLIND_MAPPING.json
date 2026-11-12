@@ -1,0 +1,74 @@
+{
+  "track01": {
+    "session": "track01",
+    "seed": "5405783196615117109",
+    "files": {
+      "track01_variant_A.wav": "Control_V0p",
+      "track01_variant_B.wav": "Treatment_V3b_B05"
+    },
+    "variant_mapping": {
+      "Control_V0p": "variant_A",
+      "Treatment_V3b_B05": "variant_B"
+    }
+  },
+  "track02": {
+    "session": "track02",
+    "seed": "3048363069421082382",
+    "files": {
+      "track02_variant_A.wav": "Treatment_V3b_B05",
+      "track02_variant_B.wav": "Control_V0p"
+    },
+    "variant_mapping": {
+      "Control_V0p": "variant_B",
+      "Treatment_V3b_B05": "variant_A"
+    }
+  },
+  "track03": {
+    "session": "track03",
+    "seed": "12990700764526553868",
+    "files": {
+      "track03_variant_A.wav": "Treatment_V3b_B05",
+      "track03_variant_B.wav": "Control_V0p"
+    },
+    "variant_mapping": {
+      "Control_V0p": "variant_B",
+      "Treatment_V3b_B05": "variant_A"
+    }
+  },
+  "track01_style": {
+    "session": "track01_style",
+    "seed": "14887125631601849244",
+    "files": {
+      "track01_style_variant_A.wav": "Treatment_V3b_B05",
+      "track01_style_variant_B.wav": "Control_V0p"
+    },
+    "variant_mapping": {
+      "Control_V0p": "variant_B",
+      "Treatment_V3b_B05": "variant_A"
+    }
+  },
+  "track02_style": {
+    "session": "track02_style",
+    "seed": "3606996967096283602",
+    "files": {
+      "track02_style_variant_A.wav": "Treatment_V3b_B05",
+      "track02_style_variant_B.wav": "Control_V0p"
+    },
+    "variant_mapping": {
+      "Control_V0p": "variant_B",
+      "Treatment_V3b_B05": "variant_A"
+    }
+  },
+  "track03_style": {
+    "session": "track03_style",
+    "seed": "15136152743686100324",
+    "files": {
+      "track03_style_variant_A.wav": "Control_V0p",
+      "track03_style_variant_B.wav": "Treatment_V3b_B05"
+    },
+    "variant_mapping": {
+      "Control_V0p": "variant_A",
+      "Treatment_V3b_B05": "variant_B"
+    }
+  }
+}
