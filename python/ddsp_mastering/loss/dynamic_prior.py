@@ -210,8 +210,14 @@ class V3bDynamicPriorLoss(nn.Module):
         if is_silent:
             metrics = {
                 "loss_lim": 0.0,
+                "loss_lim_raw": 0.0,
+                "loss_lim_weighted": 0.0,
                 "loss_diff": 0.0,
+                "loss_diff_raw": 0.0,
+                "loss_diff_weighted": 0.0,
                 "loss_conflict": 0.0,
+                "loss_conflict_raw": 0.0,
+                "loss_conflict_weighted": 0.0,
                 "loss_dyn": 0.0,
                 "bar_a_lim_db": 0.0,
                 "p95_a_lim_db": 0.0,
@@ -280,8 +286,14 @@ class V3bDynamicPriorLoss(nn.Module):
 
         metrics = {
             "loss_lim": float(loss_lim.item()),
+            "loss_lim_raw": float(loss_lim.item()),
+            "loss_lim_weighted": float((self.w_lim * loss_lim).item()),
             "loss_diff": float(loss_diff.item()),
+            "loss_diff_raw": float(loss_diff.item()),
+            "loss_diff_weighted": float((self.w_diff * loss_diff).item()),
             "loss_conflict": float(loss_conflict.item()),
+            "loss_conflict_raw": float(loss_conflict.item()),
+            "loss_conflict_weighted": float((self.w_conflict * loss_conflict).item()),
             "loss_dyn": float(loss_dyn.item()),
             "bar_a_lim_db": float(bar_a_lim.item()),
             "p95_a_lim_db": p95_val,

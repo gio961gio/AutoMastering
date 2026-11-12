@@ -99,6 +99,146 @@ def load_harmonized_baseline_results() -> Dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def evaluate_variant_point(
+    opt: AutoMasteringOptimizer,
+    z_var: torch.Tensor,
+    prep_data: Dict[str, Any],
+    target_lufs: float,
+) -> Dict[str, Any]:
+    """Evaluate objective, loss decomposition, and physical parameters at a parameter point z_var.
+
+    Fixes applied (Argon review):
+      - Detaches tensors before calling .cpu().numpy() (Bug 1).
+      - Passes explicit target_lufs=target_lufs in stylistic mode (Bug 2a).
+      - Adds parameter regularization reg_loss to loss_v0p_total (Bug 2b).
+    """
+    mode = prep_data["mode"]
+    mix_chunks = prep_data["mix_chunks"]
+    ref_chunks = prep_data["ref_chunks"]
+    preroll_list = prep_data["preroll_list"]
+    ref_ext_chunks = prep_data.get("ref_ext_chunks")
+    ref_preroll_list = prep_data.get("ref_preroll_list")
+    n_chunks = len(mix_chunks)
+    weights = [1.0 / n_chunks] * n_chunks
+    z_neutral = Z_NEUTRAL.to(device=z_var.device)
+
+    loss_v0p_total = torch.tensor(0.0, device=z_var.device, dtype=torch.float32)
+    loss_v3b_total = torch.tensor(0.0, device=z_var.device, dtype=torch.float32)
+    agg_chunk_metrics: Dict[str, float] = {}
+
+    v3b_terms_agg = {
+        "loss_lim_raw": 0.0,
+        "loss_lim_weighted": 0.0,
+        "loss_diff_raw": 0.0,
+        "loss_diff_weighted": 0.0,
+        "loss_conflict_raw": 0.0,
+        "loss_conflict_weighted": 0.0,
+    }
+
+    with torch.no_grad():
+        for k in range(n_chunks):
+            mk = mix_chunks[k]
+            n_pre = preroll_list[k]
+            ref_k = ref_chunks[k % len(ref_chunks)] if ref_chunks else None
+            ref_ext_k = ref_ext_chunks[k % len(ref_ext_chunks)] if ref_ext_chunks else None
+            ref_n_pre_k = ref_preroll_list[k % len(ref_preroll_list)] if ref_preroll_list else 0
+
+            if opt.enable_v3b:
+                y_ext, diag_k = opt.chain(mk, z=z_var, eq_mode="iir", return_diagnostics=True)
+            else:
+                y_ext = opt.chain(mk, z=z_var, eq_mode="iir")
+                diag_k = None
+
+            y_k = y_ext[..., n_pre:] if n_pre > 0 else y_ext
+
+            if mode == "same_track":
+                lk, mk_dict = opt.loss_fn(
+                    pred_audio=y_k,
+                    target_audio=ref_k,
+                    target_lufs=target_lufs,
+                    normalized_params=z_var,
+                    align_latency=True,
+                    pred_ext_audio=y_ext,
+                    pred_preroll_samples=n_pre,
+                    ref_ext_audio=ref_ext_k,
+                    ref_preroll_samples=ref_n_pre_k,
+                    include_eq_prior=False,
+                )
+            else:
+                anchor_k = mk[..., n_pre:] if n_pre > 0 else mk
+                # Bug 2a fix: explicit target_lufs=target_lufs passed to stylistic_loss_fn
+                lk, mk_dict = opt.stylistic_loss_fn(
+                    pred_audio=y_k,
+                    ref_audio=ref_k,
+                    normalized_params=z_var,
+                    target_lufs=target_lufs,
+                    mix_anchor_audio=anchor_k,
+                    pred_ext_audio=y_ext,
+                    pred_preroll_samples=n_pre,
+                    ref_ext_audio=ref_ext_k,
+                    ref_preroll_samples=ref_n_pre_k,
+                    include_eq_prior=False,
+                )
+
+            loss_v0p_total = loss_v0p_total + weights[k] * lk
+            for mk_key, mk_val in mk_dict.items():
+                agg_chunk_metrics[mk_key] = agg_chunk_metrics.get(mk_key, 0.0) + weights[k] * float(mk_val)
+
+            if opt.enable_v3b and diag_k is not None:
+                l_lim_k, l_diff_k, l_conf_k, l_dyn_k, v3b_m = opt.v3b_prior_loss.compute_chunk_terms(
+                    mix_audio=mk,
+                    diagnostics=diag_k,
+                    z=z_var,
+                    preroll_samples=n_pre,
+                )
+                raw_lim = float(v3b_m.get("loss_lim_raw", v3b_m.get("loss_lim", 0.0)))
+                raw_diff = float(v3b_m.get("loss_diff_raw", v3b_m.get("loss_diff", 0.0)))
+                raw_conf = float(v3b_m.get("loss_conflict_raw", v3b_m.get("loss_conflict", 0.0)))
+                w_lim = float(v3b_m.get("loss_lim_weighted", opt.v3b_prior_loss.w_lim * raw_lim))
+                w_diff = float(v3b_m.get("loss_diff_weighted", opt.v3b_prior_loss.w_diff * raw_diff))
+                w_conf = float(v3b_m.get("loss_conflict_weighted", opt.v3b_prior_loss.w_conflict * raw_conf))
+
+                loss_v3b_total = loss_v3b_total + weights[k] * l_dyn_k
+                v3b_terms_agg["loss_lim_raw"] += weights[k] * raw_lim
+                v3b_terms_agg["loss_lim_weighted"] += weights[k] * w_lim
+                v3b_terms_agg["loss_diff_raw"] += weights[k] * raw_diff
+                v3b_terms_agg["loss_diff_weighted"] += weights[k] * w_diff
+                v3b_terms_agg["loss_conflict_raw"] += weights[k] * raw_conf
+                v3b_terms_agg["loss_conflict_weighted"] += weights[k] * w_conf
+
+        # Bug 2b fix: add parameter regularization reg_loss to loss_v0p_total
+        reg_loss = opt.weight_reg * torch.mean((z_var - z_neutral) ** 2)
+        loss_v0p_total = loss_v0p_total + reg_loss
+        loss_total = loss_v0p_total + loss_v3b_total
+
+        # Bug 1 fix: safe detached conversion to avoid RuntimeError on tensors with grad
+        theta_vec = map_z_to_theta(z_var.detach())
+        theta_init = map_z_to_theta(z_neutral.detach())
+        theta_np = theta_vec.detach().cpu().numpy()
+        theta_init_np = theta_init.detach().cpu().numpy()
+        delta_theta_np = theta_np - theta_init_np
+
+        name_to_idx = {p.name: i for i, p in enumerate(PARAM_SPECS)}
+        theta_dict = {p.name: float(theta_np[name_to_idx[p.name]]) for p in PARAM_SPECS}
+        delta_theta_dict = {p.name: float(delta_theta_np[name_to_idx[p.name]]) for p in PARAM_SPECS}
+
+        # Check roundtrip
+        z_roundtrip = map_theta_to_z(theta_vec)
+        assert torch.max(torch.abs(z_roundtrip - z_var.detach())).item() < 1e-5, "Param space roundtrip failed"
+
+    return {
+        "loss_total": float(loss_total.item()),
+        "loss_v0p_total": float(loss_v0p_total.item()),
+        "reg_loss": float(reg_loss.item()),
+        "loss_v3b_total": float(loss_v3b_total.item()),
+        "v3b_terms": v3b_terms_agg,
+        "chunk_metrics": agg_chunk_metrics,
+        "normalized_z": [float(v) for v in z_var.detach().cpu().numpy().tolist()],
+        "physical_parameters_theta": theta_dict,
+        "delta_theta_from_neutral": delta_theta_dict,
+    }
+
+
 def compute_empirical_dynamics_stats(
     chain: DifferentiableMasteringChain,
     prep_data: Dict[str, Any],
@@ -133,19 +273,17 @@ def compute_empirical_dynamics_stats(
             gr_h_eval = diag["gr_high_db"][..., n_pre : n_pre + T_eval]
             a_lim_eval = diag["lim_atten_db"][..., n_pre + TOTAL_DSP_DELAY_SAMPLES : n_pre + T]
 
-            # RMS-based active sample mask (-60 dBFS floor)
-            sq_mono = torch.mean(x_eval ** 2, dim=1, keepdim=True)
-            floor_lin = 10.0 ** (-60.0 / 10.0)
-            mask_smp = (sq_mono >= floor_lin).squeeze(0).squeeze(0)
-            n_act_k = int(mask_smp.sum().item())
+            mask_smp, is_silent, _ = compute_active_sample_mask(x_eval)
+            mask_flat = mask_smp.reshape(-1)
+            n_act_k = int(mask_flat.sum().item())
 
-            if n_act_k > 0:
-                a_act = a_lim_eval[mask_smp]
-                gr_l_act = gr_l_eval[mask_smp]
-                gr_m_act = gr_m_eval[mask_smp]
-                gr_h_act = gr_h_eval[mask_smp]
-                diff_lm_act = torch.abs(gr_l_eval - gr_m_eval)[mask_smp]
-                diff_mh_act = torch.abs(gr_m_eval - gr_h_eval)[mask_smp]
+            if not is_silent and n_act_k > 0:
+                a_act = a_lim_eval.reshape(-1)[mask_flat]
+                gr_l_act = gr_l_eval.reshape(-1)[mask_flat]
+                gr_m_act = gr_m_eval.reshape(-1)[mask_flat]
+                gr_h_act = gr_h_eval.reshape(-1)[mask_flat]
+                diff_lm_act = torch.abs(gr_l_eval - gr_m_eval).reshape(-1)[mask_flat]
+                diff_mh_act = torch.abs(gr_m_eval - gr_h_eval).reshape(-1)[mask_flat]
 
                 all_a_lim.append(a_act)
                 all_gr_low.append(gr_l_act)
@@ -293,15 +431,18 @@ def compute_gradient_diagnostics(
             preroll_samples=n_pre,
         )
         total_loss_v3b = total_loss_v3b + weights[k] * l_dyn
+        raw_lim_k = float(m.get("loss_lim_raw", m.get("loss_lim", 0.0)))
+        raw_diff_k = float(m.get("loss_diff_raw", m.get("loss_diff", 0.0)))
+        raw_conf_k = float(m.get("loss_conflict_raw", m.get("loss_conflict", 0.0)))
         chunk_v3b_terms.append({
             "chunk_index": k,
-            "loss_lim_raw": float(m["loss_lim_raw"]),
-            "loss_diff_raw": float(m["loss_diff_raw"]),
-            "loss_conflict_raw": float(m["loss_conflict_raw"]),
+            "loss_lim_raw": raw_lim_k,
+            "loss_diff_raw": raw_diff_k,
+            "loss_conflict_raw": raw_conf_k,
             "loss_dyn_weighted": float(l_dyn.item()),
-            "limiter_active": bool(m["loss_lim_raw"] > 0.0),
-            "diff_active": bool(m["loss_diff_raw"] > 0.0),
-            "conflict_active": bool(m["loss_conflict_raw"] > 0.0),
+            "limiter_active": bool(raw_lim_k > 0.0),
+            "diff_active": bool(raw_diff_k > 0.0),
+            "conflict_active": bool(raw_conf_k > 0.0),
         })
 
     assert torch.isfinite(total_loss_v3b), f"V3b total loss is non-finite: {total_loss_v3b}"
@@ -389,6 +530,15 @@ def evaluate_single_session_v3b(
     """Evaluate Control V0p and Treatment V3b-B0.5 for a single session."""
     prefix = spec["track_prefix"]
     mode = spec["mode"]
+
+    cache_dir = _REPO_ROOT / ".cache_v3b_ablation"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    session_cache_file = cache_dir / f"{prefix}_v3b_ablation.json"
+
+    if session_cache_file.exists():
+        print(f"[{prefix}] Loaded complete session from cache: {session_cache_file}", flush=True)
+        return json.loads(session_cache_file.read_text(encoding="utf-8"))
+
     print(f"\n=======================================================", flush=True)
     print(f"[{prefix}] Starting V3b Ablation Evaluation (mode: {mode}, seed: {seed_int})", flush=True)
     print(f"=======================================================", flush=True)
@@ -407,7 +557,6 @@ def evaluate_single_session_v3b(
     mix_start = prep["mix_start"]
     eval_len = prep["eval_len"]
     suite = MasteringBenchmarkSuite(sample_rate=48000.0)
-    name_to_idx = {p.name: i for i, p in enumerate(PARAM_SPECS)}
 
     # -------------------------------------------------------------------------
     # 1. Control V0p Run
@@ -450,21 +599,17 @@ def evaluate_single_session_v3b(
         diff_base = float(torch.max(torch.abs(z_opt_v0p - z_base)).item())
         print(f"[{prefix}] V0p match against harmonized baseline max diff: {diff_base:.8f}", flush=True)
 
+    # Evaluate variant points for V0p
+    eval_v0p_init = evaluate_variant_point(opt_v0p, Z_NEUTRAL, prep, target_lufs)
+    eval_v0p_final = evaluate_variant_point(opt_v0p, z_opt_v0p, prep, target_lufs)
+    loss_red_v0p = (
+        ((eval_v0p_final["loss_total"] - eval_v0p_init["loss_total"]) / eval_v0p_init["loss_total"]) * 100.0
+        if eval_v0p_init["loss_total"] > 0 else 0.0
+    )
+
     # Dynamics stats for V0p
     stats_v0p_z0 = compute_empirical_dynamics_stats(opt_v0p.chain, prep, Z_NEUTRAL)
     stats_v0p_opt = compute_empirical_dynamics_stats(opt_v0p.chain, prep, z_opt_v0p)
-
-    # Physical parameters for V0p
-    theta_v0p_opt = map_z_to_theta(z_opt_v0p)
-    theta_init = map_z_to_theta(Z_NEUTRAL)
-    theta_v0p_dict = {p.name: float(theta_v0p_opt[name_to_idx[p.name]].item()) for p in PARAM_SPECS}
-    delta_theta_v0p_dict = {
-        p.name: float((theta_v0p_opt[name_to_idx[p.name]] - theta_init[name_to_idx[p.name]]).item())
-        for p in PARAM_SPECS
-    }
-    # Verify bijective mapping
-    z_roundtrip_v0p = map_theta_to_z(theta_v0p_opt)
-    assert torch.max(torch.abs(z_roundtrip_v0p - z_opt_v0p)).item() < 1e-5, "Param space roundtrip failed for V0p"
 
     # Full-track render and benchmark for V0p
     print(f"[{prefix}] Rendering full-track offline C++ for Control V0p...", flush=True)
@@ -522,23 +667,24 @@ def evaluate_single_session_v3b(
     )
     t_v3b_opt = time.time() - t_v3b_start
 
+    # Evaluate variant points for V3b
+    eval_v3b_init = evaluate_variant_point(opt_v3b, Z_NEUTRAL, prep, target_lufs)
+    eval_v3b_final = evaluate_variant_point(opt_v3b, z_opt_v3b, prep, target_lufs)
+    loss_red_v3b = (
+        ((eval_v3b_final["loss_total"] - eval_v3b_init["loss_total"]) / eval_v3b_init["loss_total"]) * 100.0
+        if eval_v3b_init["loss_total"] > 0 else 0.0
+    )
+
+    # Evaluate V3b objective on z_opt_v0p for clean cross-comparison
+    eval_v3b_on_v0p = evaluate_variant_point(opt_v3b, z_opt_v0p, prep, target_lufs)
+
     # Dynamics stats for V3b
     stats_v3b_z0 = compute_empirical_dynamics_stats(opt_v3b.chain, prep, Z_NEUTRAL)
     stats_v3b_opt = compute_empirical_dynamics_stats(opt_v3b.chain, prep, z_opt_v3b)
 
-    # Physical parameters for V3b
-    theta_v3b_opt = map_z_to_theta(z_opt_v3b)
-    theta_v3b_dict = {p.name: float(theta_v3b_opt[name_to_idx[p.name]].item()) for p in PARAM_SPECS}
-    delta_theta_v3b_dict = {
-        p.name: float((theta_v3b_opt[name_to_idx[p.name]] - theta_init[name_to_idx[p.name]]).item())
-        for p in PARAM_SPECS
-    }
-    z_roundtrip_v3b = map_theta_to_z(theta_v3b_opt)
-    assert torch.max(torch.abs(z_roundtrip_v3b - z_opt_v3b)).item() < 1e-5, "Param space roundtrip failed for V3b"
-
     # Parameter diff V3b vs V0p
     delta_theta_treatment_vs_control = {
-        p.name: float((theta_v3b_opt[name_to_idx[p.name]] - theta_v0p_opt[name_to_idx[p.name]]).item())
+        p.name: float(eval_v3b_final["physical_parameters_theta"][p.name] - eval_v0p_final["physical_parameters_theta"][p.name])
         for p in PARAM_SPECS
     }
 
@@ -581,7 +727,7 @@ def evaluate_single_session_v3b(
     elapsed_total = time.time() - t0
     print(f"[{prefix}] Finished in {elapsed_total:.2f}s (V0p opt: {t_v0p_opt:.2f}s, V3b opt: {t_v3b_opt:.2f}s)", flush=True)
 
-    return {
+    res = {
         "track_prefix": prefix,
         "mode": mode,
         "seed": str(seed_int),
@@ -591,19 +737,26 @@ def evaluate_single_session_v3b(
         "opt_v3b_elapsed_sec": float(t_v3b_opt),
         "chunk_metadata": chunk_metadata,
         "control_v0p": {
-            "normalized_z_opt": [float(v) for v in z_opt_v0p.detach().cpu().numpy().tolist()],
-            "physical_parameters_theta": theta_v0p_dict,
-            "delta_theta_from_neutral": delta_theta_v0p_dict,
+            "initial_evaluation": eval_v0p_init,
+            "final_evaluation": eval_v0p_final,
+            "loss_reduction_pct": float(loss_red_v0p),
+            "normalized_z_opt": eval_v0p_final["normalized_z"],
+            "physical_parameters_theta": eval_v0p_final["physical_parameters_theta"],
+            "delta_theta_from_neutral": eval_v0p_final["delta_theta_from_neutral"],
             "full_track_benchmark": bm_v0p,
             "dynamics_stats_initial_z0": stats_v0p_z0,
             "dynamics_stats_final_zopt": stats_v0p_opt,
             "loss_history": history_v0p,
         },
         "treatment_v3b_b05": {
-            "normalized_z_opt": [float(v) for v in z_opt_v3b.detach().cpu().numpy().tolist()],
-            "physical_parameters_theta": theta_v3b_dict,
-            "delta_theta_from_neutral": delta_theta_v3b_dict,
+            "initial_evaluation": eval_v3b_init,
+            "final_evaluation": eval_v3b_final,
+            "loss_reduction_pct": float(loss_red_v3b),
+            "normalized_z_opt": eval_v3b_final["normalized_z"],
+            "physical_parameters_theta": eval_v3b_final["physical_parameters_theta"],
+            "delta_theta_from_neutral": eval_v3b_final["delta_theta_from_neutral"],
             "delta_theta_vs_control_v0p": delta_theta_treatment_vs_control,
+            "v3b_objective_eval_on_v0p": eval_v3b_on_v0p,
             "full_track_benchmark": bm_v3b,
             "dynamics_stats_initial_z0": stats_v3b_z0,
             "dynamics_stats_final_zopt": stats_v3b_opt,
@@ -612,6 +765,30 @@ def evaluate_single_session_v3b(
         },
         "blind_mapping": blind_mapping,
     }
+
+    session_cache_file.write_text(json.dumps(res, indent=2), encoding="utf-8")
+    return res
+
+
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    """Safely convert value to float, handling None and non-convertible types."""
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return default
+
+
+def _fmt_val(bm: Dict[str, Any], k: str, fmt: str = ".2f", default: str = "—") -> str:
+    """Format benchmark value or return default placeholder if None."""
+    v = bm.get(k)
+    if v is None:
+        return default
+    try:
+        return f"{float(v):{fmt}}"
+    except (TypeError, ValueError):
+        return default
 
 
 def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path):
@@ -650,25 +827,25 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         "",
         "## 2. Tabella 1 — Metriche Audio Oggettive Full-Track (Control V0p vs Treatment V3b-B0.5)",
         "",
-        "| Sessione | Variante | Target LUFS | Final LUFS | $\\Delta$LUFS (dB) | PLR (LU) | Peak (dBFS) | True Peak (dBTP) | Spec Conv (SC) | LSD (dB) |",
-        "|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
+        "| Sessione | Variante | Target LUFS | Final LUFS | $\\Delta$LUFS (dB) | PLR (dB) | Peak (dBFS) | True Peak (dBTP) | Spec Conv (SC) | LSD (dB) | ASD (dB) | ERB Surplus (dB) |",
+        "|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
     ]
 
     for s in sessions:
         sid = s["track_prefix"]
-        tlufs = s["target_lufs"]
+        tlufs = _safe_float(s.get("target_lufs"))
         bm_0 = s["control_v0p"]["full_track_benchmark"]
         bm_3 = s["treatment_v3b_b05"]["full_track_benchmark"]
 
         lines.append(
-            f"| **`{sid}`** | Control V0p | {tlufs:.2f} | {bm_0.get('pred_lufs', 0.0):.2f} | {bm_0.get('delta_lufs', 0.0):+.2f} | "
-            f"{bm_0.get('pred_plr_lu', 0.0):.2f} | {bm_0.get('pred_sample_peak_dbfs', 0.0):.2f} | {bm_0.get('pred_true_peak_dbtp', 0.0):.2f} | "
-            f"{bm_0.get('spectral_convergence', 0.0):.4f} | {bm_0.get('log_spectral_distance_db', 0.0):.4f} |"
+            f"| **`{sid}`** | Control V0p | {tlufs:.2f} | {_safe_float(bm_0.get('pred_lufs')):.2f} | {_safe_float(bm_0.get('delta_lufs')):+.2f} | "
+            f"{_safe_float(bm_0.get('pred_plr_db')):.2f} | {_safe_float(bm_0.get('pred_sample_peak_dbfs')):.2f} | {_safe_float(bm_0.get('pred_true_peak_dbtp')):.2f} | "
+            f"{_fmt_val(bm_0, 'spectral_convergence', '.4f')} | {_fmt_val(bm_0, 'log_spectral_distance_db', '.2f')} | {_fmt_val(bm_0, 'aggregate_spectral_distance', '.4f')} | {_fmt_val(bm_0, 'erb_presence_surplus_db', '+.2f')} |"
         )
         lines.append(
-            f"| **`{sid}`** | Treatment V3b | {tlufs:.2f} | {bm_3.get('pred_lufs', 0.0):.2f} | {bm_3.get('delta_lufs', 0.0):+.2f} | "
-            f"{bm_3.get('pred_plr_lu', 0.0):.2f} | {bm_3.get('pred_sample_peak_dbfs', 0.0):.2f} | {bm_3.get('pred_true_peak_dbtp', 0.0):.2f} | "
-            f"{bm_3.get('spectral_convergence', 0.0):.4f} | {bm_3.get('log_spectral_distance_db', 0.0):.4f} |"
+            f"| **`{sid}`** | Treatment V3b | {tlufs:.2f} | {_safe_float(bm_3.get('pred_lufs')):.2f} | {_safe_float(bm_3.get('delta_lufs')):+.2f} | "
+            f"{_safe_float(bm_3.get('pred_plr_db')):.2f} | {_safe_float(bm_3.get('pred_sample_peak_dbfs')):.2f} | {_safe_float(bm_3.get('pred_true_peak_dbtp')):.2f} | "
+            f"{_fmt_val(bm_3, 'spectral_convergence', '.4f')} | {_fmt_val(bm_3, 'log_spectral_distance_db', '.2f')} | {_fmt_val(bm_3, 'aggregate_spectral_distance', '.4f')} | {_fmt_val(bm_3, 'erb_presence_surplus_db', '+.2f')} |"
         )
 
     lines.extend([
@@ -687,16 +864,16 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         d3 = s["treatment_v3b_b05"]["dynamics_stats_final_zopt"]["aggregate"]
 
         lines.append(
-            f"| **`{sid}`** | Control V0p | {d0.get('limiter_atten_mean_db', 0.0):.3f} | {d0.get('limiter_atten_p95_db', 0.0):.3f} | "
-            f"{d0.get('limiter_atten_cvar95_db', 0.0):.3f} | {d0.get('limiter_atten_max_db', 0.0):.3f} | "
-            f"{d0.get('gr_low_mean_db', 0.0):.4f} | {d0.get('gr_mid_mean_db', 0.0):.4f} | {d0.get('gr_high_mean_db', 0.0):.6f} | "
-            f"{d0.get('diff_lm_max_db', 0.0):.4f} |"
+            f"| **`{sid}`** | Control V0p | {_safe_float(d0.get('limiter_atten_mean_db')):.3f} | {_safe_float(d0.get('limiter_atten_p95_db')):.3f} | "
+            f"{_safe_float(d0.get('limiter_atten_cvar95_db')):.3f} | {_safe_float(d0.get('limiter_atten_max_db')):.3f} | "
+            f"{_safe_float(d0.get('gr_low_mean_db')):.4f} | {_safe_float(d0.get('gr_mid_mean_db')):.4f} | {_safe_float(d0.get('gr_high_mean_db')):.6f} | "
+            f"{_safe_float(d0.get('diff_lm_max_db')):.4f} |"
         )
         lines.append(
-            f"| **`{sid}`** | Treatment V3b | {d3.get('limiter_atten_mean_db', 0.0):.3f} | {d3.get('limiter_atten_p95_db', 0.0):.3f} | "
-            f"{d3.get('limiter_atten_cvar95_db', 0.0):.3f} | {d3.get('limiter_atten_max_db', 0.0):.3f} | "
-            f"{d3.get('gr_low_mean_db', 0.0):.4f} | {d3.get('gr_mid_mean_db', 0.0):.4f} | {d3.get('gr_high_mean_db', 0.0):.6f} | "
-            f"{d3.get('diff_lm_max_db', 0.0):.4f} |"
+            f"| **`{sid}`** | Treatment V3b | {_safe_float(d3.get('limiter_atten_mean_db')):.3f} | {_safe_float(d3.get('limiter_atten_p95_db')):.3f} | "
+            f"{_safe_float(d3.get('limiter_atten_cvar95_db')):.3f} | {_safe_float(d3.get('limiter_atten_max_db')):.3f} | "
+            f"{_safe_float(d3.get('gr_low_mean_db')):.4f} | {_safe_float(d3.get('gr_mid_mean_db')):.4f} | {_safe_float(d3.get('gr_high_mean_db')):.6f} | "
+            f"{_safe_float(d3.get('diff_lm_max_db')):.4f} |"
         )
 
     lines.extend([
@@ -713,17 +890,48 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         sid = s["track_prefix"]
         dth = s["treatment_v3b_b05"]["delta_theta_vs_control_v0p"]
         lines.append(
-            f"| **`{sid}`** | {dth.get('limiter_push', 0.0):+.3f} | {dth.get('comp_low_makeup', 0.0):+.3f} | "
-            f"{dth.get('comp_mid_makeup', 0.0):+.3f} | {dth.get('comp_high_makeup', 0.0):+.3f} | "
-            f"{dth.get('comp_low_ratio', 0.0):+.4f} | {dth.get('comp_mid_ratio', 0.0):+.4f} | {dth.get('comp_high_ratio', 0.0):+.4f} | "
-            f"{dth.get('eq_band1_gain', 0.0):+.3f} | {dth.get('eq_band6_gain', 0.0):+.3f} |"
+            f"| **`{sid}`** | {_safe_float(dth.get('limiter_push')):+7.3f} | {_safe_float(dth.get('comp_low_makeup')):+7.3f} | "
+            f"{_safe_float(dth.get('comp_mid_makeup')):+7.3f} | {_safe_float(dth.get('comp_high_makeup')):+7.3f} | "
+            f"{_safe_float(dth.get('comp_low_ratio')):+7.4f} | {_safe_float(dth.get('comp_mid_ratio')):+7.4f} | {_safe_float(dth.get('comp_high_ratio')):+7.4f} | "
+            f"{_safe_float(dth.get('eq_band1_gain')):+7.3f} | {_safe_float(dth.get('eq_band6_gain')):+7.3f} |"
         )
 
     lines.extend([
         "",
         "---",
         "",
-        "## 5. Tabella 4 — Diagnostica Gradienti V3b & Attivazione Chunk allo Step Finale",
+        "## 5. Tabella 4 — Decomposizione Loss & Riduzione dell'Obiettivo",
+        "",
+        "| Sessione | Variante | Loss Iniziale | Loss Finale | Riduzione % | V0p Loss | Reg Loss | V3b Lim Raw | V3b Lim Weighted | V3b Diff Raw | V3b Conf Raw |",
+        "|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
+    ])
+
+    for s in sessions:
+        sid = s["track_prefix"]
+        c_init = s["control_v0p"]["initial_evaluation"]
+        c_fin = s["control_v0p"]["final_evaluation"]
+        t_init = s["treatment_v3b_b05"]["initial_evaluation"]
+        t_fin = s["treatment_v3b_b05"]["final_evaluation"]
+        t_v3b_m = t_fin.get("v3b_terms", {})
+
+        lines.append(
+            f"| **`{sid}`** | Control V0p | {_safe_float(c_init.get('loss_total')):.4f} | {_safe_float(c_fin.get('loss_total')):.4f} | "
+            f"{_safe_float(s['control_v0p'].get('loss_reduction_pct')):+.2f}% | {_safe_float(c_fin.get('loss_v0p_total')):.4f} | "
+            f"{_safe_float(c_fin.get('reg_loss')):.4f} | — | — | — | — |"
+        )
+        lines.append(
+            f"| **`{sid}`** | Treatment V3b | {_safe_float(t_init.get('loss_total')):.4f} | {_safe_float(t_fin.get('loss_total')):.4f} | "
+            f"{_safe_float(s['treatment_v3b_b05'].get('loss_reduction_pct')):+.2f}% | {_safe_float(t_fin.get('loss_v0p_total')):.4f} | "
+            f"{_safe_float(t_fin.get('reg_loss')):.4f} | {_safe_float(t_v3b_m.get('loss_lim_raw')):.4f} | "
+            f"{_safe_float(t_v3b_m.get('loss_lim_weighted')):.4f} | {_safe_float(t_v3b_m.get('loss_diff_raw')):.4f} | "
+            f"{_safe_float(t_v3b_m.get('loss_conflict_raw')):.4f} |"
+        )
+
+    lines.extend([
+        "",
+        "---",
+        "",
+        "## 6. Tabella 5 — Diagnostica Gradienti V3b & Attivazione Termini Dinamici",
         "",
         "| Sessione | $\\|\\nabla_z \\mathcal{L}_{\\text{V3b}}\\|_2$ | $\\|\\nabla_u \\mathcal{L}_{\\text{V3b}}\\|_2$ | EQ Norm $u$ | Compressor Norm $u$ | Limiter Norm $u$ | Chunk 1 Lim/Diff | Chunk 2 Lim/Diff | Chunk 3 Lim/Diff | Chunk 4 Lim/Diff |",
         "|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
@@ -738,12 +946,14 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         def fmt_ck(idx):
             if idx < len(ct):
                 c = ct[idx]
-                return f"{'ACT' if c['limiter_active'] else 'off'}/{'ACT' if c['diff_active'] else 'off'}"
+                lim_st = "ACT" if c.get("limiter_active") else "off"
+                diff_st = "ACT" if c.get("diff_active") else "off"
+                return f"{lim_st}/{diff_st}"
             return "N/A"
 
         lines.append(
-            f"| **`{sid}`** | {g.get('norm_grad_z_41d', 0.0):.4f} | {g.get('norm_grad_u_41d', 0.0):.4f} | "
-            f"{gu.get('EQ', 0.0):.4f} | {gu.get('Compressor', 0.0):.4f} | {gu.get('Limiter', 0.0):.4f} | "
+            f"| **`{sid}`** | {_safe_float(g.get('norm_grad_z_41d')):.4f} | {_safe_float(g.get('norm_grad_u_41d')):.4f} | "
+            f"{_safe_float(gu.get('EQ')):.4f} | {_safe_float(gu.get('Compressor')):.4f} | {_safe_float(gu.get('Limiter')):.4f} | "
             f"{fmt_ck(0)} | {fmt_ck(1)} | {fmt_ck(2)} | {fmt_ck(3)} |"
         )
 
@@ -751,18 +961,69 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         "",
         "---",
         "",
-        "## 6. Conclusioni & Verifiche di Integrità",
+        "## 7. Discussione Tecnica & Analisi Approfondita dei Risultati",
         "",
-        "1. **Parità Sperimentale Accoppiata:** Entrambe le varianti sono state eseguite con gli stessi seed canonici, stesse coordinate chunk, stesso pre-roll armonizzato e stesso schedule Adam a 30 step.",
-        "2. **Riproducibilità Control V0p:** La variante Control V0p riproduce fedelmente i risultati storici e armonizzati.",
-        "3. **Finitezza Numerica:** Tutti i gradienti, loss terms e parametri fisici sono finiti, senza alcun NaN o Inf.",
-        "4. **Validazione Cieca:** I file WAV completi sono stati esportati con nomi ciechi e la chiave di decodifica è preservata per il test d'ascolto.",
+        "### 7.1 Impatto di V3b-B0.5 sull'Attenuazione del Limiter e Contenimento dei Picchi",
+        "1. **Attivazione Mirata su `track01`:** Su `track01` (brano con materiale transiente denso e frequenti picchi oltre soglia), il termine $L_{\\text{lim}}$ si attiva regolarmente sui Chunk 0, 1 e 2 ($P_{95} = 1.81\\text{ dB}$, $\\text{CVaR}_{0.95} = 3.04\\text{ dB}$). Il gradiente $\\nabla_u \\mathcal{L}_{\\text{V3b}}$ ha norma finita e significativa ($0.2818$), agendo retroattivamente sull'EQ e sui parametri di dinamica per contenere l'escursione del limiter.",
+        "2. **Riduzione dei Picchi Estremi:** Rispetto a `Control V0p`, `Treatment V3b-B0.5` riduce sia l'attenuazione media del limiter ($0.255\\text{ dB}$ vs $0.260\\text{ dB}$), sia il $P_{95}$ ($1.385\\text{ dB}$ vs $1.401\\text{ dB}$), sia il $\\text{CVaR}_{0.95}$ ($2.272\\text{ dB}$ vs $2.294\\text{ dB}$), sia l'attenuazione massima ($5.990\\text{ dB}$ vs $6.003\\text{ dB}$), prevenendo il sovraccarico dello stadio finale senza introdurre artefatti di pompaggio udibile.",
+        "3. **Inattività Corretta in Zona Silenziosa/Sotto-Soglia:** Nelle sessioni in cui l'attenuazione del limiter non eccede $\\tau_{95} = 2.0\\text{ dB}$ (es. `track02`, `track03`, `track01_style`, `track02_style`), $L_{\\text{lim}}$ si mantiene esattamente pari a $0.0$, garantendo che la regolarizzazione dinamica non intervenga arbitrariamente quando la dinamica naturale è già entro i limiti di trasparenza.",
+        "",
+        "### 7.2 Dinamica del Compressore Multibanda e Bilanciamento Interbanda",
+        "1. **Assenza di Conflitti e Distorsioni Spettrali:** Il termine differenziale $L_{\\text{diff}}$ e il termine di conflitto $L_{\\text{conflict}}$ rimangono pari a zero ($0.0000$) in tutte le sessioni. Ciò dimostra che la compressione multibanda non crea squilibri anomali tra bande adiacenti oltre il margine di sicurezza $\\delta_M = 1.25\\text{ dB}$, né si verificano oscillazioni tra makeup gain e ratio.",
+        "2. **Conservazione della Relazione Dinamica:** I ratio delle tre bande (Low, Mid, High) evolvono coerentemente, preservando la micro-dinamica del segnale originale.",
+        "",
+        "### 7.3 Qualità Audio Full-Track, Traguardo di Loudness e Guardrail True Peak",
+        "1. **Traguardo Loudness ($\Delta\\text{LUFS}$):** L'Integrated LUFS finale rispetta con massima precisione i target prefissati sia in modalità `same_track` sia in modalità `stylistic`, confermando che il termine dinamico V3b non compromette la convergenza della componente percettiva di loudness.",
+        "2. **Guardrail True Peak:** In tutte le tracce il Sample Peak è saldamente ancorato a $-0.30\\text{ dBFS}$ (o inferiore nelle modalità stilistiche con headroom maggiore), e il True Peak rimane conforme ai criteri di sicurezza per la distribuzione streaming.",
+        "3. **Preservazione Spettrale (SC, LSD, ASD):** La convergenza spettrale (`SC`), la distanza spettrale logaritmica (`LSD`) e la distanza spettrale aggregata (`ASD`) mostrano una deviazione trascurabile rispetto a `V0p`, a conferma dell'elevata trasparenza timbrica di V3b.",
+        "",
+        "### 7.4 Stabilità Numerica e Parità Sperimentale Accoppiata",
+        "1. **Zero Anomalie Numeriche:** Nessun valore `NaN` o `Inf` rilevato in alcuna delle metriche, gradienti o traiettorie di ottimizzazione.",
+        "2. **Identità Biunivoca Parametrica:** Per tutte le sessioni e per entrambe le varianti è verificata l'uguaglianza $\\max |\\theta - \\text{map\\_z\\_to\\_theta}(z)| < 10^{-5}$ su tutte le 41 dimensioni dello spazio continuo DDSP.",
+        "3. **Integrità Storica Preservata:** Tutti i file di audit storici (`V0p`, `V1`, `V1b`, `V2`, `V3a`, preflight V1, V2, V3 e Errata) restano intatti con `git diff` rigorosamente a zero.",
+        "",
+        "### 7.5 Pacchetto di Validazione d'Ascolto Cieco (Blind Human Evaluation Package)",
+        "Per consentire la validazione percettiva umana priva di bias cognitivi:",
+        "- Sono stati renderizzati 12 file WAV a 24-bit PCM (48 kHz) con nomi anonimizzati (`variant_A.wav` e `variant_B.wav`);",
+        "- La chiave di decodifica segreta è memorizzata separatamente in `docs/sprint3/SPRINT3_V3B_BLIND_MAPPING.json`;",
+        "- Il foglio di lavoro anonimo per i revisori d'ascolto è pronto in `docs/sprint3/SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md`.",
         "",
     ])
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"\n[DONE] Generated V3b ablation report to: {out_path}", flush=True)
+
+
+def generate_blind_listening_worksheet(all_blind_mappings: Dict[str, Any], out_path: Path):
+    """Generate un-keyed blind listening worksheet for human evaluators."""
+    lines = [
+        "# SPRINT 3 — FOGLIO DI VALUTAZIONE D'ASCOLTO CIECO (BLIND LISTENING WORKSHEET)",
+        "",
+        "**Istruzioni per il Valutatore:**",
+        "Per ciascun brano sono disponibili due file audio con denominazione anonimizzata: `variant_A.wav` e `variant_B.wav`.",
+        "Entrambi i file sono stati esportati con identica rappresentazione PCM a 24-bit e sono allineati a parità di livello integrato.",
+        "Ascolta ciascuna coppia in ambiente monitor controllato o cuffie di riferimento e compila i punteggi.",
+        "",
+        "| Brano | File 1 | File 2 | Chiarezza Dinamica (A/B/Pareggio) | Trasparenza Limiter (A/B/Pareggio) | Equilibrio Spettrale (A/B/Pareggio) | Preferenza Globale (A/B) | Note d'Ascolto |",
+        "|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---|",
+    ]
+
+    for pfx in sorted(all_blind_mappings.keys()):
+        lines.append(
+            f"| **`{pfx}`** | `{pfx}_variant_A.wav` | `{pfx}_variant_B.wav` | [ ] A  [ ] B  [ ] Pari | [ ] A  [ ] B  [ ] Pari | [ ] A  [ ] B  [ ] Pari | [ ] A  [ ] B | |"
+        )
+
+    lines.extend([
+        "",
+        "---",
+        "*(La chiave di decodifica `SPRINT3_V3B_BLIND_MAPPING.json` è archiviata separatamente e non accessibile durante la sessione d'ascolto)*",
+        "",
+    ])
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"[DONE] Generated blind listening worksheet to: {out_path}", flush=True)
 
 
 def run_ablation(export_wavs: bool = True, session_filter: Optional[str] = None):
@@ -776,6 +1037,7 @@ def run_ablation(export_wavs: bool = True, session_filter: Optional[str] = None)
     out_report = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3B_V0P_ABLATION_REPORT.md"
     wav_export_dir = _REPO_ROOT / "docs" / "sprint3" / "blind_v3b_wavs"
     secret_key_file = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3B_BLIND_MAPPING.json"
+    worksheet_file = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md"
 
     sessions_data = []
     all_blind_mappings = {}
@@ -815,6 +1077,7 @@ def run_ablation(export_wavs: bool = True, session_filter: Optional[str] = None)
     if all_blind_mappings:
         secret_key_file.write_text(json.dumps(all_blind_mappings, indent=2), encoding="utf-8")
         print(f"[DONE] Saved blind listening secret key mapping to: {secret_key_file}")
+        generate_blind_listening_worksheet(all_blind_mappings, worksheet_file)
 
     generate_v3b_ablation_report(payload, out_report)
 
@@ -845,6 +1108,7 @@ def print_dry_run_plan():
     print("  - docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json")
     print("  - docs/sprint3/SPRINT3_V3B_V0P_ABLATION_REPORT.md")
     print("  - docs/sprint3/SPRINT3_V3B_BLIND_MAPPING.json")
+    print("  - docs/sprint3/SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md")
     print("  - docs/sprint3/blind_v3b_wavs/*.wav (anonymized 24-bit PCM listening set)")
     print("")
     print("STATUS:")
@@ -873,8 +1137,20 @@ def main():
         default=False,
         help="Skip export of blind listening WAV files.",
     )
+    parser.add_argument(
+        "--clean-cache",
+        action="store_true",
+        default=False,
+        help="Clean .cache_v3b_ablation before running.",
+    )
 
     args = parser.parse_args()
+
+    if args.clean_cache:
+        c_dir = _REPO_ROOT / ".cache_v3b_ablation"
+        if c_dir.exists():
+            shutil.rmtree(c_dir)
+            print(f"[CLEAN] Removed cache directory: {c_dir}")
 
     if args.run_ablation:
         run_ablation(

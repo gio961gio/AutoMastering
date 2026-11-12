@@ -835,3 +835,81 @@ test_gate_13_v0p_path_bit_identical_when_v3b_disabled = test_13_v0p_path_bit_ide
 test_gate_14_v3b_b05_optimizer_config_and_single_chunk_evaluation = test_14_v3b_b05_optimizer_config_and_single_chunk_evaluation
 test_gate_15_preserved_artifacts_zero_diff = test_15_preserved_artifacts_zero_diff
 
+
+# ==============================================================================
+# Gate 16: V3b Ablation Results Complete Integrity and Historical Preservation
+# ==============================================================================
+def test_16_v3b_ablation_results_integrity():
+    """Verify completeness of 6 sessions in SPRINT3_V3B_V0P_ABLATION_RESULTS.json, roundtrip theta, and zero diff."""
+    repo_root = Path(__file__).resolve().parents[1]
+    results_path = repo_root / "docs" / "sprint3" / "SPRINT3_V3B_V0P_ABLATION_RESULTS.json"
+    assert results_path.exists(), f"Ablation results missing: {results_path}"
+    assert results_path.stat().st_size > 0, f"Ablation results file is empty: {results_path}"
+
+    data = json.loads(results_path.read_text(encoding="utf-8"))
+    sessions = data.get("sessions", [])
+    assert len(sessions) == 6, f"Expected 6 sessions, got {len(sessions)}"
+
+    expected_prefixes = {"track01", "track02", "track03", "track01_style", "track02_style", "track03_style"}
+    found_prefixes = {s["track_prefix"] for s in sessions}
+    assert found_prefixes == expected_prefixes, f"Mismatched session prefixes: {found_prefixes}"
+
+    name_to_idx = {p.name: i for i, p in enumerate(PARAM_SPECS)}
+
+    for s in sessions:
+        sid = s["track_prefix"]
+        # Control V0p check
+        ctrl = s.get("control_v0p", {})
+        z_v0p = torch.tensor(ctrl["normalized_z_opt"], dtype=torch.float32)
+        theta_v0p_stored = ctrl["physical_parameters_theta"]
+        theta_v0p_calc = map_z_to_theta(z_v0p)
+        for p in PARAM_SPECS:
+            stored_val = theta_v0p_stored[p.name]
+            calc_val = float(theta_v0p_calc[name_to_idx[p.name]].item())
+            diff = abs(stored_val - calc_val)
+            assert diff < 1e-5, f"[{sid}] V0p theta mismatch on {p.name}: {stored_val} vs {calc_val} (diff: {diff})"
+
+        # Treatment V3b-B0.5 check
+        trt = s.get("treatment_v3b_b05", {})
+        z_v3b = torch.tensor(trt["normalized_z_opt"], dtype=torch.float32)
+        theta_v3b_stored = trt["physical_parameters_theta"]
+        theta_v3b_calc = map_z_to_theta(z_v3b)
+        for p in PARAM_SPECS:
+            stored_val = theta_v3b_stored[p.name]
+            calc_val = float(theta_v3b_calc[name_to_idx[p.name]].item())
+            diff = abs(stored_val - calc_val)
+            assert diff < 1e-5, f"[{sid}] V3b theta mismatch on {p.name}: {stored_val} vs {calc_val} (diff: {diff})"
+
+    # Verify zero diff on historical/preflight artifacts
+    historical_files = [
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_REPORT.md",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V2_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V2_REPORT.md",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_REPORT.md",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md",
+        "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
+        "docs/sprint3/SPRINT3_V2_REPORT.md",
+        "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+        "docs/sprint3/SPRINT3_V0P_V1_ABLATION_RESULTS.json",
+        "docs/sprint3/SPRINT3_V0P_V1_REPORT.md",
+        "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3A_ABLATION_REPORT.md",
+        "docs/sprint3/SPRINT3_V3A_PREFLIGHT_GRADIENT_DIAGNOSTICS.json",
+    ]
+    for rel_path in historical_files:
+        p = repo_root / rel_path
+        assert p.exists() and p.stat().st_size > 0
+        res = subprocess.run(
+            ["git", "status", "--porcelain", str(p)],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=str(repo_root),
+        )
+        assert res.stdout.strip() == "", f"Uncommitted modification in historical artifact: {rel_path}"
+
+
+test_gate_16_v3b_ablation_results_integrity = test_16_v3b_ablation_results_integrity
+
