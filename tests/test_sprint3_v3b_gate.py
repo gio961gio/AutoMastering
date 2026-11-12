@@ -910,6 +910,21 @@ def test_16_v3b_ablation_results_integrity():
         )
         assert res.stdout.strip() == "", f"Uncommitted modification in historical artifact: {rel_path}"
 
+    # Verify ablation report has non-zero Table 3 variation for eq_b4_gain_db on track01
+    report_path = repo_root / "docs" / "sprint3" / "SPRINT3_V3B_V0P_ABLATION_REPORT.md"
+    assert report_path.exists() and report_path.stat().st_size > 0, f"Report missing: {report_path}"
+    report_text = report_path.read_text(encoding="utf-8")
+    assert "eq_b4_gain_db" in report_text, "Expected eq_b4_gain_db column in Tabella 3"
+    t3_start = report_text.find("## 4. Tabella 3")
+    assert t3_start != -1, "Tabella 3 section missing in report"
+    t3_section = report_text[t3_start : t3_start + 3000]
+    assert "-0.0149" in t3_section or "-0.015" in t3_section, (
+        "Expected non-zero eq_b4_gain_db delta (-0.0149 or -0.015) on track01 in Tabella 3"
+    )
+    assert "-0.1051" in t3_section and "-0.2062" in t3_section, (
+        "Expected non-zero comp_low_threshold_db (-0.1051) and comp_high_threshold_db (-0.2062) on track01"
+    )
+
 
 test_gate_16_v3b_ablation_results_integrity = test_16_v3b_ablation_results_integrity
 

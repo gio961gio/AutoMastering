@@ -813,15 +813,15 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         "### Parametri Congelati V3b-B0.5",
         "| Parametro | Descrizione | Valore Congelato |",
         "|:---|:---|:---:|",
-        f"| $\\tau_{{\\text{{avg}}}}$ | Soglia tolleranza attenuazione media limiter | `{FROZEN_V3B_B05_PARAMS['tau_avg']} dB` |",
-        f"| $\\tau_{{95}}$ | Soglia tolleranza picchi estremi limiter ($P_{{95}}$ / $\\text{{CVaR}}_{{0.95}}$) | `{FROZEN_V3B_B05_PARAMS['tau_95']} dB` |",
-        f"| $\\lambda_{{95}}$ | Peso convesso tra $P_{{95}}$ e $\\text{{CVaR}}_{{0.95}}$ | `{FROZEN_V3B_B05_PARAMS['lambda_95']}` |",
-        f"| $\\Delta_{{\\max}}$ | Massima attenuazione limiter di normalizzazione | `{FROZEN_V3B_B05_PARAMS['delta_max']} dB` |",
-        f"| $\\delta_M$ | Margine di sicurezza differenziale bande Low/Mid/High | `{FROZEN_V3B_B05_PARAMS['delta_m']} dB` |",
-        f"| $\\Delta_{{\\text{{ref}}}}$ | Scala di normalizzazione differential loss | `{FROZEN_V3B_B05_PARAMS['delta_ref']} dB` |",
-        f"| $w_{{\\text{{lim}}}}$ | Peso di regolarizzazione limiter | `{FROZEN_V3B_B05_PARAMS['w_lim']}` |",
-        f"| $w_{{\\text{{diff}}}}$ | Peso di regolarizzazione differenziale multibanda | `{FROZEN_V3B_B05_PARAMS['w_diff']}` |",
-        f"| $w_{{\\text{{conflict}}}}$ | Peso di isolamento conflitti makeup gain vs compressione | `{FROZEN_V3B_B05_PARAMS['w_conflict']}` |",
+        f"| $\\tau_{{\\text{{avg}}}}$ | Soglia tolleranza attenuazione media limiter $\\bar{{A}}_{{\\text{{lim}}}}^{{\\text{{act}}}}$ in $\\mathcal{{L}}_{{\\text{{lim}}}}$ | `{FROZEN_V3B_B05_PARAMS['tau_avg']} dB` |",
+        f"| $\\tau_{{95}}$ | Soglia tolleranza picchi estremi limiter ($P_{{95}}$ / $\\text{{CVaR}}_{{0.95}}$) in $\\mathcal{{L}}_{{\\text{{lim}}}}$ | `{FROZEN_V3B_B05_PARAMS['tau_95']} dB` |",
+        f"| $\\lambda_{{95}}$ | Peso moltiplicativo della penalità di coda $\\text{{CVaR}}_{{0.95}}$ rispetto alla penalità media $\\bar{{A}}_{{\\text{{lim}}}}^{{\\text{{act}}}}$ in $\\mathcal{{L}}_{{\\text{{lim}}}}$ | `{FROZEN_V3B_B05_PARAMS['lambda_95']}` |",
+        f"| $\\Delta_{{\\max}}$ | Soglia di tolleranza per la Gain Reduction differenziale inter-banda ($|GR_L - GR_M|, |GR_M - GR_H|$) in $\\mathcal{{L}}_{{\\text{{diff}}}}$ | `{FROZEN_V3B_B05_PARAMS['delta_max']} dB` |",
+        f"| $\\delta_M$ | Margine di headroom consentito tra makeup gain $M_c$ e attenuazione media $\\bar{{GR}}_c^{{\\text{{act}}}}$ in $\\mathcal{{L}}_{{\\text{{conflict}}}}$ | `{FROZEN_V3B_B05_PARAMS['delta_m']} dB` |",
+        f"| $\\Delta_{{\\text{{ref}}}}$ | Scala di normalizzazione in dB del rational soft-gate $h_{{\\text{{lim}}}} = \\text{{detach}}(r / (r + \\Delta_{{\\text{{ref}}}}))$ in $\\mathcal{{L}}_{{\\text{{conflict}}}}$ | `{FROZEN_V3B_B05_PARAMS['delta_ref']} dB` |",
+        f"| $w_{{\\text{{lim}}}}$ | Peso di regolarizzazione limiter ($\\mathcal{{L}}_{{\\text{{lim}}}}$) | `{FROZEN_V3B_B05_PARAMS['w_lim']}` |",
+        f"| $w_{{\\text{{diff}}}}$ | Peso di regolarizzazione differenziale multibanda ($\\mathcal{{L}}_{{\\text{{diff}}}}$) | `{FROZEN_V3B_B05_PARAMS['w_diff']}` |",
+        f"| $w_{{\\text{{conflict}}}}$ | Peso di isolamento conflitti makeup gain vs compressione ($\\mathcal{{L}}_{{\\text{{conflict}}}}$) | `{FROZEN_V3B_B05_PARAMS['w_conflict']}` |",
         "",
         "---",
         "",
@@ -882,18 +882,54 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         "",
         "## 4. Tabella 3 — Variazione Parametri Fisici Chiave ($\\Delta\\theta$ Treatment V3b vs Control V0p)",
         "",
-        "| Sessione | Limiter Push $\\Delta$ (dB) | Comp Low Makeup $\\Delta$ (dB) | Comp Mid Makeup $\\Delta$ (dB) | Comp High Makeup $\\Delta$ (dB) | Comp Low Ratio $\\Delta$ | Comp Mid Ratio $\\Delta$ | Comp High Ratio $\\Delta$ | EQ Band1 Gain $\\Delta$ (dB) | EQ Band6 Gain $\\Delta$ (dB) |",
-        "|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
+        "| Sessione | `limiter_push_gain_db` $\\Delta$ | `comp_low_makeup_db` $\\Delta$ | `comp_mid_makeup_db` $\\Delta$ | `comp_high_makeup_db` $\\Delta$ | `comp_low_threshold_db` $\\Delta$ | `comp_high_threshold_db` $\\Delta$ | `comp_low_ratio` $\\Delta$ | `comp_mid_ratio` $\\Delta$ | `comp_high_ratio` $\\Delta$ | `eq_b0_gain_db` $\\Delta$ | `eq_b4_gain_db` $\\Delta$ | `eq_b5_gain_db` $\\Delta$ |",
+        "|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
     ])
 
     for s in sessions:
         sid = s["track_prefix"]
         dth = s["treatment_v3b_b05"]["delta_theta_vs_control_v0p"]
         lines.append(
-            f"| **`{sid}`** | {_safe_float(dth.get('limiter_push')):+7.3f} | {_safe_float(dth.get('comp_low_makeup')):+7.3f} | "
-            f"{_safe_float(dth.get('comp_mid_makeup')):+7.3f} | {_safe_float(dth.get('comp_high_makeup')):+7.3f} | "
-            f"{_safe_float(dth.get('comp_low_ratio')):+7.4f} | {_safe_float(dth.get('comp_mid_ratio')):+7.4f} | {_safe_float(dth.get('comp_high_ratio')):+7.4f} | "
-            f"{_safe_float(dth.get('eq_band1_gain')):+7.3f} | {_safe_float(dth.get('eq_band6_gain')):+7.3f} |"
+            f"| **`{sid}`** | {_safe_float(dth.get('limiter_push_gain_db')):+7.6f} | "
+            f"{_safe_float(dth.get('comp_low_makeup_db')):+7.4f} | {_safe_float(dth.get('comp_mid_makeup_db')):+7.4f} | {_safe_float(dth.get('comp_high_makeup_db')):+7.4f} | "
+            f"{_safe_float(dth.get('comp_low_threshold_db')):+7.4f} | {_safe_float(dth.get('comp_high_threshold_db')):+7.4f} | "
+            f"{_safe_float(dth.get('comp_low_ratio')):+7.6f} | {_safe_float(dth.get('comp_mid_ratio')):+7.6f} | {_safe_float(dth.get('comp_high_ratio')):+7.6f} | "
+            f"{_safe_float(dth.get('eq_b0_gain_db')):+7.4f} | {_safe_float(dth.get('eq_b4_gain_db')):+7.4f} | {_safe_float(dth.get('eq_b5_gain_db')):+7.4f} |"
+        )
+
+    lines.extend([
+        "",
+        "### Tabella 3B — Valori Fisici Assoluti Finali e Scarto dall'Inizializzazione Neutra (`delta_theta_from_neutral`)",
+        "",
+        "| Sessione | Variante | `limiter_push_gain_db` (vs neut) | `comp_low_makeup_db` (vs neut) | `comp_mid_makeup_db` (vs neut) | `comp_high_makeup_db` (vs neut) | `comp_low_threshold_db` (vs neut) | `comp_high_threshold_db` (vs neut) | `comp_low_ratio` (vs neut) | `comp_mid_ratio` (vs neut) | `comp_high_ratio` (vs neut) | `eq_b0_gain_db` (vs neut) | `eq_b4_gain_db` (vs neut) | `eq_b5_gain_db` (vs neut) |",
+        "|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
+    ])
+
+    def _fmt_abs_neu(th_d: Dict[str, Any], neu_d: Dict[str, Any], k: str, fmt: str = ".4f") -> str:
+        av = _safe_float(th_d.get(k))
+        nv = _safe_float(neu_d.get(k))
+        return f"{av:{fmt}} ({nv:+{fmt}})"
+
+    for s in sessions:
+        sid = s["track_prefix"]
+        c_th = s["control_v0p"]["physical_parameters_theta"]
+        c_neu = s["control_v0p"]["delta_theta_from_neutral"]
+        t_th = s["treatment_v3b_b05"]["physical_parameters_theta"]
+        t_neu = s["treatment_v3b_b05"]["delta_theta_from_neutral"]
+
+        lines.append(
+            f"| **`{sid}`** | Control V0p | {_fmt_abs_neu(c_th, c_neu, 'limiter_push_gain_db', '.6f')} | "
+            f"{_fmt_abs_neu(c_th, c_neu, 'comp_low_makeup_db')} | {_fmt_abs_neu(c_th, c_neu, 'comp_mid_makeup_db')} | {_fmt_abs_neu(c_th, c_neu, 'comp_high_makeup_db')} | "
+            f"{_fmt_abs_neu(c_th, c_neu, 'comp_low_threshold_db')} | {_fmt_abs_neu(c_th, c_neu, 'comp_high_threshold_db')} | "
+            f"{_fmt_abs_neu(c_th, c_neu, 'comp_low_ratio', '.6f')} | {_fmt_abs_neu(c_th, c_neu, 'comp_mid_ratio', '.6f')} | {_fmt_abs_neu(c_th, c_neu, 'comp_high_ratio', '.6f')} | "
+            f"{_fmt_abs_neu(c_th, c_neu, 'eq_b0_gain_db')} | {_fmt_abs_neu(c_th, c_neu, 'eq_b4_gain_db')} | {_fmt_abs_neu(c_th, c_neu, 'eq_b5_gain_db')} |"
+        )
+        lines.append(
+            f"| **`{sid}`** | Treatment V3b | {_fmt_abs_neu(t_th, t_neu, 'limiter_push_gain_db', '.6f')} | "
+            f"{_fmt_abs_neu(t_th, t_neu, 'comp_low_makeup_db')} | {_fmt_abs_neu(t_th, t_neu, 'comp_mid_makeup_db')} | {_fmt_abs_neu(t_th, t_neu, 'comp_high_makeup_db')} | "
+            f"{_fmt_abs_neu(t_th, t_neu, 'comp_low_threshold_db')} | {_fmt_abs_neu(t_th, t_neu, 'comp_high_threshold_db')} | "
+            f"{_fmt_abs_neu(t_th, t_neu, 'comp_low_ratio', '.6f')} | {_fmt_abs_neu(t_th, t_neu, 'comp_mid_ratio', '.6f')} | {_fmt_abs_neu(t_th, t_neu, 'comp_high_ratio', '.6f')} | "
+            f"{_fmt_abs_neu(t_th, t_neu, 'eq_b0_gain_db')} | {_fmt_abs_neu(t_th, t_neu, 'eq_b4_gain_db')} | {_fmt_abs_neu(t_th, t_neu, 'eq_b5_gain_db')} |"
         )
 
     lines.extend([
@@ -957,6 +993,62 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
             f"{fmt_ck(0)} | {fmt_ck(1)} | {fmt_ck(2)} | {fmt_ck(3)} |"
         )
 
+    # Compute exact summary metrics from JSON payload for technical discussion
+    s_by_id = {s["track_prefix"]: s for s in sessions}
+    t01 = s_by_id.get("track01")
+    t01_c1_p95 = 0.0
+    t01_c1_cvar = 0.0
+    t01_agg_0_mean = 0.0
+    t01_agg_3_mean = 0.0
+    t01_agg_0_p95 = 0.0
+    t01_agg_3_p95 = 0.0
+    t01_agg_0_cvar = 0.0
+    t01_agg_3_cvar = 0.0
+    t01_agg_0_max = 0.0
+    t01_agg_3_max = 0.0
+    t01_grad_u = 0.0
+    t01_lufs_0 = 0.0
+    t01_lufs_3 = 0.0
+    t01_tp_0 = 0.0
+    t01_tp_3 = 0.0
+    if t01 is not None:
+        per_c = t01["treatment_v3b_b05"]["dynamics_stats_final_zopt"].get("per_chunk", [])
+        if len(per_c) > 1:
+            t01_c1_p95 = _safe_float(per_c[1].get("limiter_atten_p95_db"))
+            t01_c1_cvar = _safe_float(per_c[1].get("limiter_atten_cvar95_db"))
+        agg0 = t01["control_v0p"]["dynamics_stats_final_zopt"]["aggregate"]
+        agg3 = t01["treatment_v3b_b05"]["dynamics_stats_final_zopt"]["aggregate"]
+        t01_agg_0_mean = _safe_float(agg0.get("limiter_atten_mean_db"))
+        t01_agg_3_mean = _safe_float(agg3.get("limiter_atten_mean_db"))
+        t01_agg_0_p95 = _safe_float(agg0.get("limiter_atten_p95_db"))
+        t01_agg_3_p95 = _safe_float(agg3.get("limiter_atten_p95_db"))
+        t01_agg_0_cvar = _safe_float(agg0.get("limiter_atten_cvar95_db"))
+        t01_agg_3_cvar = _safe_float(agg3.get("limiter_atten_cvar95_db"))
+        t01_agg_0_max = _safe_float(agg0.get("limiter_atten_max_db"))
+        t01_agg_3_max = _safe_float(agg3.get("limiter_atten_max_db"))
+        t01_grad_u = _safe_float(t01["treatment_v3b_b05"]["gradient_diagnostics_final"].get("norm_grad_u_41d"))
+        t01_lufs_0 = _safe_float(t01["control_v0p"]["full_track_benchmark"].get("pred_lufs"))
+        t01_lufs_3 = _safe_float(t01["treatment_v3b_b05"]["full_track_benchmark"].get("pred_lufs"))
+        t01_tp_0 = _safe_float(t01["control_v0p"]["full_track_benchmark"].get("pred_true_peak_dbtp"))
+        t01_tp_3 = _safe_float(t01["treatment_v3b_b05"]["full_track_benchmark"].get("pred_true_peak_dbtp"))
+
+    tp_violations = [
+        s["track_prefix"]
+        for s in sessions
+        if _safe_float(s["treatment_v3b_b05"]["full_track_benchmark"].get("pred_true_peak_dbtp")) > -0.30
+    ]
+    tp_all_vals = [
+        _safe_float(s["treatment_v3b_b05"]["full_track_benchmark"].get("pred_true_peak_dbtp"))
+        for s in sessions
+    ]
+    tp_viol_vals = [
+        _safe_float(s["treatment_v3b_b05"]["full_track_benchmark"].get("pred_true_peak_dbtp"))
+        for s in sessions
+        if _safe_float(s["treatment_v3b_b05"]["full_track_benchmark"].get("pred_true_peak_dbtp")) > -0.30
+    ]
+    tp_min_viol = min(tp_viol_vals) if tp_viol_vals else 0.0
+    tp_max_viol = max(tp_viol_vals) if tp_viol_vals else 0.0
+
     lines.extend([
         "",
         "---",
@@ -964,18 +1056,18 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         "## 7. Discussione Tecnica & Analisi Approfondita dei Risultati",
         "",
         "### 7.1 Impatto di V3b-B0.5 sull'Attenuazione del Limiter e Contenimento dei Picchi",
-        "1. **Attivazione Mirata su `track01`:** Su `track01` (brano con materiale transiente denso e frequenti picchi oltre soglia), il termine $L_{\\text{lim}}$ si attiva regolarmente sui Chunk 0, 1 e 2 ($P_{95} = 1.81\\text{ dB}$, $\\text{CVaR}_{0.95} = 3.04\\text{ dB}$). Il gradiente $\\nabla_u \\mathcal{L}_{\\text{V3b}}$ ha norma finita e significativa ($0.2818$), agendo retroattivamente sull'EQ e sui parametri di dinamica per contenere l'escursione del limiter.",
-        "2. **Riduzione dei Picchi Estremi:** Rispetto a `Control V0p`, `Treatment V3b-B0.5` riduce sia l'attenuazione media del limiter ($0.255\\text{ dB}$ vs $0.260\\text{ dB}$), sia il $P_{95}$ ($1.385\\text{ dB}$ vs $1.401\\text{ dB}$), sia il $\\text{CVaR}_{0.95}$ ($2.272\\text{ dB}$ vs $2.294\\text{ dB}$), sia l'attenuazione massima ($5.990\\text{ dB}$ vs $6.003\\text{ dB}$), prevenendo il sovraccarico dello stadio finale senza introdurre artefatti di pompaggio udibile.",
-        "3. **Inattività Corretta in Zona Silenziosa/Sotto-Soglia:** Nelle sessioni in cui l'attenuazione del limiter non eccede $\\tau_{95} = 2.0\\text{ dB}$ (es. `track02`, `track03`, `track01_style`, `track02_style`), $L_{\\text{lim}}$ si mantiene esattamente pari a $0.0$, garantendo che la regolarizzazione dinamica non intervenga arbitrariamente quando la dinamica naturale è già entro i limiti di trasparenza.",
+        f"1. **Attivazione Mirata su `track01`:** Su `track01` (brano con materiale transiente denso e picchi oltre soglia), il termine $L_{{\\text{{lim}}}}$ si attiva sui Chunk 0, 1 e 2 (sul Chunk 1 allo step finale: $P_{{95}} = {t01_c1_p95:.3f}\\text{{ dB}}$, $\\text{{CVaR}}_{{0.95}} = {t01_c1_cvar:.3f}\\text{{ dB}}$; aggregato sui 4 chunk: $P_{{95}} = {t01_agg_3_p95:.3f}\\text{{ dB}}$, $\\text{{CVaR}}_{{0.95}} = {t01_agg_3_cvar:.3f}\\text{{ dB}}$). Il gradiente $\\nabla_u \\mathcal{{L}}_{{\\text{{V3b}}}}$ ha norma finita ($\\|\\nabla_u \\mathcal{{L}}_{{\\text{{V3b}}}}\\|_2 = {t01_grad_u:.4f}$), modulando principalmente le soglie di compressione (`comp_low_threshold_db` $-0.1051\\text{{ dB}}$, `comp_high_threshold_db` $-0.2062\\text{{ dB}}$) e il guadagno EQ in banda 4 (`eq_b4_gain_db` $-0.0149\\text{{ dB}}$) per attenuare l'impatto dei picchi sullo stadio finale.",
+        f"2. **Riduzione dei Picchi Estremi:** Rispetto a `Control V0p`, `Treatment V3b-B0.5` riduce l'attenuazione media aggregata del limiter (${t01_agg_3_mean:.3f}\\text{{ dB}}$ vs ${t01_agg_0_mean:.3f}\\text{{ dB}}$), il $P_{{95}}$ (${t01_agg_3_p95:.3f}\\text{{ dB}}$ vs ${t01_agg_0_p95:.3f}\\text{{ dB}}$), il $\\text{{CVaR}}_{{0.95}}$ (${t01_agg_3_cvar:.3f}\\text{{ dB}}$ vs ${t01_agg_0_cvar:.3f}\\text{{ dB}}$) e il massimo assoluto (${t01_agg_3_max:.3f}\\text{{ dB}}$ vs ${t01_agg_0_max:.3f}\\text{{ dB}}$), senza introdurre pompaggio udibile.",
+        "3. **Inattività Corretta in Zona Sotto-Soglia:** Nelle altre 5 sessioni (`track02`, `track03`, `track01_style`, `track02_style`, `track03_style`), in cui l'attenuazione di picco del limiter resta sotto la soglia $\\tau_{95} = 2.0\\text{ dB}$, $L_{\\text{lim}}$ si mantiene esattamente pari a $0.0000$, evitando interventi spuri e preservando la bit-identità rispetto a `Control V0p`.",
         "",
         "### 7.2 Dinamica del Compressore Multibanda e Bilanciamento Interbanda",
-        "1. **Assenza di Conflitti e Distorsioni Spettrali:** Il termine differenziale $L_{\\text{diff}}$ e il termine di conflitto $L_{\\text{conflict}}$ rimangono pari a zero ($0.0000$) in tutte le sessioni. Ciò dimostra che la compressione multibanda non crea squilibri anomali tra bande adiacenti oltre il margine di sicurezza $\\delta_M = 1.25\\text{ dB}$, né si verificano oscillazioni tra makeup gain e ratio.",
-        "2. **Conservazione della Relazione Dinamica:** I ratio delle tre bande (Low, Mid, High) evolvono coerentemente, preservando la micro-dinamica del segnale originale.",
+        "1. **Assenza di Squilibri Interbanda oltre Soglia:** Il termine differenziale $L_{\\text{diff}}$ e il termine di conflitto $L_{\\text{conflict}}$ rimangono pari a zero ($0.0000$) in tutte le 6 sessioni, poiché $|GR_L - GR_M|$ e $|GR_M - GR_H|$ restano ampiamente entro la tolleranza $\\Delta_{\\max} = 3.0\\text{ dB}$ e non insorgono conflitti tra makeup gain e compressione.",
+        "2. **Adattamento delle Soglie su `track01`:** Su `track01`, la retroazione di $L_{\\text{lim}}$ abbassa leggermente le soglie dei compressori Low ($-0.1051\\text{ dB}$) e High ($-0.2062\\text{ dB}$) rispetto a `V0p`, ridistribuendo marginalmente il controllo dei picchi a monte del limiter.",
         "",
         "### 7.3 Qualità Audio Full-Track, Traguardo di Loudness e Guardrail True Peak",
-        "1. **Traguardo Loudness ($\Delta\\text{LUFS}$):** L'Integrated LUFS finale rispetta con massima precisione i target prefissati sia in modalità `same_track` sia in modalità `stylistic`, confermando che il termine dinamico V3b non compromette la convergenza della componente percettiva di loudness.",
-        "2. **Guardrail True Peak:** In tutte le tracce il Sample Peak è saldamente ancorato a $-0.30\\text{ dBFS}$ (o inferiore nelle modalità stilistiche con headroom maggiore), e il True Peak rimane conforme ai criteri di sicurezza per la distribuzione streaming.",
-        "3. **Preservazione Spettrale (SC, LSD, ASD):** La convergenza spettrale (`SC`), la distanza spettrale logaritmica (`LSD`) e la distanza spettrale aggregata (`ASD`) mostrano una deviazione trascurabile rispetto a `V0p`, a conferma dell'elevata trasparenza timbrica di V3b.",
+        f"1. **Loudness Full-Track ($\\Delta\\text{{LUFS}}$):** `Treatment V3b-B0.5` mantiene sostanzialmente invariato l'Integrated LUFS full-track raggiunto da `Control V0p`: su `track01` si registra ${t01_lufs_3:.4f}\\text{{ LUFS}}$ in `V3b-B0.5` contro ${t01_lufs_0:.4f}\\text{{ LUFS}}$ in `V0p` (scarto di soli ${t01_lufs_3 - t01_lufs_0:+.4f}\\text{{ LU}}$), mentre sulle altre 5 sessioni (dove i termini V3b restano a zero) il livello integrato è esattamente identico tra le due varianti.",
+        f"2. **Guardrail Indipendente True Peak ($\\le -0.30\\text{{ dBTP}}$):** Mentre il **Sample Peak discreto a $1\\times$** rispetta il ceiling di $-0.30\\text{{ dBFS}}$ su tutte le 6 sessioni (`-0.3000 dBFS` su 5 tracce, `-2.4192 dBFS` su `track01_style`), il **guardrail indipendente True Peak ($\\le -0.30\\text{{ dBTP}}$)** continua a essere superato in **{len(tp_violations)} sessioni su {len(sessions)}** sia in `Control V0p` sia in `Treatment V3b-B0.5` (con valori tra ${tp_min_viol:+.4f}\\text{{ dBTP}}$ e ${tp_max_viol:+.4f}\\text{{ dBTP}}$ a causa dell'inter-sample overshoot, e con una variazione su `track01` da ${t01_tp_0:+.4f}\\text{{ dBTP}}$ in `V0p` a ${t01_tp_3:+.4f}\\text{{ dBTP}}$ in `V3b-B0.5`). Ciò conferma che `V3b` non sostituisce né garantisce di per sé la conformità True Peak.",
+        "3. **Preservazione Spettrale (SC, LSD, ASD):** La convergenza spettrale (`SC`), la distanza spettrale logaritmica (`LSD`) e la distanza spettrale aggregata (`ASD`) rimangono pressoché identiche tra `V0p` e `V3b-B0.5`, confermando l'assenza di regressioni timbriche.",
         "",
         "### 7.4 Stabilità Numerica e Parità Sperimentale Accoppiata",
         "1. **Zero Anomalie Numeriche:** Nessun valore `NaN` o `Inf` rilevato in alcuna delle metriche, gradienti o traiettorie di ottimizzazione.",
@@ -1143,6 +1235,12 @@ def main():
         default=False,
         help="Clean .cache_v3b_ablation before running.",
     )
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        default=False,
+        help="Regenerate SPRINT3_V3B_V0P_ABLATION_REPORT.md directly from existing JSON without optimization.",
+    )
 
     args = parser.parse_args()
 
@@ -1152,7 +1250,12 @@ def main():
             shutil.rmtree(c_dir)
             print(f"[CLEAN] Removed cache directory: {c_dir}")
 
-    if args.run_ablation:
+    if args.report_only:
+        out_json = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3B_V0P_ABLATION_RESULTS.json"
+        out_report = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3B_V0P_ABLATION_REPORT.md"
+        payload = json.loads(out_json.read_text(encoding="utf-8"))
+        generate_v3b_ablation_report(payload, out_report)
+    elif args.run_ablation:
         run_ablation(
             export_wavs=not args.no_export_wavs,
             session_filter=args.session,
