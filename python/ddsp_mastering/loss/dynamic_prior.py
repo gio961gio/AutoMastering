@@ -121,7 +121,7 @@ class V3bDynamicPriorLoss(nn.Module):
         delta_max: float = 4.0,
         delta_ref: float = 2.0,
         delta_m: float = 1.25,
-        lambda_95: float = 1.0,
+        lambda_95: float = 0.5,
         w_lim: float = 0.05,
         w_diff: float = 0.02,
         w_conflict: float = 0.05,
@@ -147,14 +147,14 @@ class V3bDynamicPriorLoss(nn.Module):
         self.min_active_blocks = int(min_active_blocks)
         self.delay_dsp_samples = int(delay_dsp_samples)
 
-    def forward(
+    def compute_chunk_terms(
         self,
         mix_ext: torch.Tensor,
         diagnostics: Dict[str, torch.Tensor],
         makeup_db: torch.Tensor,
         n_pre: int = 0,
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
-        """Compute aligned dynamic prior losses over common evaluation window T_eval = T - 159.
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Dict[str, Any]]:
+        """Compute differentiable individual component tensors L_lim, L_diff, and L_conflict.
 
         Args:
             mix_ext: Audio input before mastering chain [..., 2, N_pre + T]
@@ -164,8 +164,7 @@ class V3bDynamicPriorLoss(nn.Module):
             n_pre: Pre-roll sample count
 
         Returns:
-            loss_dyn: Scalar weighted dynamic prior loss tensor.
-            metrics: Dictionary containing individual losses, statistics, and flags.
+            Tuple of (loss_lim_tensor, loss_diff_tensor, loss_conflict_tensor, metrics_dict).
         """
         N_tot = mix_ext.shape[-1]
         T = N_tot - n_pre
@@ -212,7 +211,7 @@ class V3bDynamicPriorLoss(nn.Module):
                 "n_active_samples": 0,
                 "active_ratio": 0.0,
             }
-            return dummy_zero, metrics
+            return dummy_zero, dummy_zero, dummy_zero, metrics
 
         n_act = float(mask_smp.sum().item())
         act_mask = mask_smp
@@ -253,8 +252,6 @@ class V3bDynamicPriorLoss(nn.Module):
         conf_h = torch.relu(m_h - bar_gr_high.detach() - self.delta_m) ** 2
         loss_conflict = h_lim * (1.0 / 3.0) * (conf_l + conf_m + conf_h)
 
-        loss_dyn = self.w_lim * loss_lim + self.w_diff * loss_diff + self.w_conflict * loss_conflict
-
         # Diagnostic metadata
         with torch.no_grad():
             p95_val = float(torch.quantile(a_lim_act.float(), 0.95).item()) if a_lim_act.numel() > 0 else 0.0
@@ -266,7 +263,7 @@ class V3bDynamicPriorLoss(nn.Module):
             "loss_lim": float(loss_lim.item()),
             "loss_diff": float(loss_diff.item()),
             "loss_conflict": float(loss_conflict.item()),
-            "loss_dyn": float(loss_dyn.item()),
+            "loss_dyn": 0.0,
             "bar_a_lim_db": float(bar_a_lim.item()),
             "p95_a_lim_db": p95_val,
             "cvar95_a_lim_db": float(cvar_95.item()),
@@ -282,4 +279,19 @@ class V3bDynamicPriorLoss(nn.Module):
             "active_ratio": float(n_act / T_eval),
         }
 
+        return loss_lim, loss_diff, loss_conflict, metrics
+
+    def forward(
+        self,
+        mix_ext: torch.Tensor,
+        diagnostics: Dict[str, torch.Tensor],
+        makeup_db: torch.Tensor,
+        n_pre: int = 0,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """Compute aligned dynamic prior losses over common evaluation window T_eval = T - 159."""
+        loss_lim, loss_diff, loss_conflict, metrics = self.compute_chunk_terms(
+            mix_ext, diagnostics, makeup_db, n_pre=n_pre
+        )
+        loss_dyn = self.w_lim * loss_lim + self.w_diff * loss_diff + self.w_conflict * loss_conflict
+        metrics["loss_dyn"] = float(loss_dyn.item())
         return loss_dyn, metrics
