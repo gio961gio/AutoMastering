@@ -14,13 +14,18 @@ Verifies the 11 Technical Gate Requirements:
 11. Full parameter space integrity theta_JSON == map_z_to_theta(z_JSON) across all 41 dimensions.
 """
 
+import copy
 import json
 import math
 import os
+from pathlib import Path
+import subprocess
 import pytest
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 
 from ddsp_mastering.dsp.crossover import DifferentiableLR4Crossover
 from ddsp_mastering.dsp.compressor import (
@@ -39,10 +44,12 @@ from ddsp_mastering.loss.dynamic_prior import (
     compute_active_sample_mask,
     TOTAL_DSP_DELAY_SAMPLES,
 )
+from ddsp_mastering.optimize import AutoMasteringOptimizer
 from ddsp_mastering.param_space import (
     map_z_to_theta,
     unpack_theta_dict,
     PARAM_SPECS,
+    Z_NEUTRAL,
 )
 
 try:
@@ -589,4 +596,242 @@ def test_preflight_runner_vs_dynamic_prior_nonzero_coherence():
     expected_g_comb = cfg["w_lim"] * g_lim + cfg["w_diff"] * g_diff + cfg["w_conflict"] * g_conf
     err = torch.max(torch.abs(g_comb - expected_g_comb)).item()
     assert err < 1e-6, f"Linear gradient combination discrepancy {err} >= 1e-6"
+
+
+# ==============================================================================
+# Gate 13: Bit-identical V0p path when V3b is disabled
+# ==============================================================================
+def test_13_v0p_path_bit_identical_when_v3b_disabled():
+    """Verify 2-step optimize_multi_chunk with default V3b disabled produces bit-identical results to V0p."""
+    torch.manual_seed(42)
+    mix_k = [torch.randn(1, 2, 48000 + 4800) for _ in range(2)]
+    ref_k = [torch.randn(1, 2, 48000) for _ in range(2)]
+    prerolls = [4800, 4800]
+
+    opt_control = AutoMasteringOptimizer(
+        sample_rate=48000.0, lr=0.04, num_steps=2, target_lufs=-14.0
+    )
+    assert opt_control.enable_v3b is False
+    assert opt_control.v3b_w_lim == 0.0
+    assert opt_control.v3b_w_diff == 0.0
+    assert opt_control.v3b_w_conflict == 0.0
+
+    opt_v0p_pure = copy.deepcopy(opt_control)
+
+    z_opt_ctrl, _, hist_ctrl = opt_control.optimize_multi_chunk(
+        mix_chunks=mix_k,
+        ref_chunks=ref_k,
+        reference_mode="same_track",
+        mix_preroll_samples=prerolls,
+        target_lufs=-14.0,
+    )
+
+    z_opt_pure, _, hist_pure = opt_v0p_pure.optimize_multi_chunk(
+        mix_chunks=mix_k,
+        ref_chunks=ref_k,
+        reference_mode="same_track",
+        mix_preroll_samples=prerolls,
+        target_lufs=-14.0,
+    )
+
+    diff_z = torch.max(torch.abs(z_opt_ctrl - z_opt_pure)).item()
+    diff_l0 = abs(hist_ctrl["loss"][0] - hist_pure["loss"][0])
+    diff_l1 = abs(hist_ctrl["loss"][1] - hist_pure["loss"][1])
+
+    assert diff_z == 0.0, f"z_opt discrepancy: {diff_z} != 0.0"
+    assert diff_l0 == 0.0, f"loss step 0 discrepancy: {diff_l0} != 0.0"
+    assert diff_l1 == 0.0, f"loss step 1 discrepancy: {diff_l1} != 0.0"
+
+
+# ==============================================================================
+# Gate 14: V3b-B0.5 Optimizer Configuration and Gradient Linearity
+# ==============================================================================
+def test_14_v3b_b05_optimizer_config_and_single_chunk_evaluation():
+    """Verify V3b-B0.5 configuration, exactly 1 call per chunk with weight 1/4, and gradient linearity."""
+    opt_v3b = AutoMasteringOptimizer(
+        sample_rate=48000.0,
+        lr=0.04,
+        num_steps=1,
+        target_lufs=-14.0,
+        v3b_w_lim=0.50,
+        v3b_tau_avg=0.5,
+        v3b_tau_95=2.0,
+        v3b_lambda_95=0.5,
+        v3b_delta_max=3.0,
+        v3b_delta_m=1.25,
+        v3b_delta_ref=3.0,
+        v3b_w_diff=0.02,
+        v3b_w_conflict=0.02,
+    )
+
+    assert opt_v3b.enable_v3b is True
+    assert opt_v3b.v3b_w_lim == 0.50
+    assert opt_v3b.v3b_tau_avg == 0.5
+    assert opt_v3b.v3b_tau_95 == 2.0
+    assert opt_v3b.v3b_lambda_95 == 0.5
+    assert opt_v3b.v3b_delta_max == 3.0
+    assert opt_v3b.v3b_delta_m == 1.25
+    assert opt_v3b.v3b_delta_ref == 3.0
+    assert opt_v3b.v3b_w_diff == 0.02
+    assert opt_v3b.v3b_w_conflict == 0.02
+
+    # 4 loud chunks (amplitude 1.5) to ensure limiter attenuation > 0
+    torch.manual_seed(123)
+    mix_chunks = [torch.randn(1, 2, 48000 + 4800) * 1.5 for _ in range(4)]
+    ref_chunks = [torch.randn(1, 2, 48000) for _ in range(4)]
+    prerolls = [4800] * 4
+
+    call_count = [0]
+    orig_compute = opt_v3b.v3b_prior_loss.compute_chunk_terms
+
+    def spy_compute(*args, **kwargs):
+        call_count[0] += 1
+        return orig_compute(*args, **kwargs)
+
+    opt_v3b.v3b_prior_loss.compute_chunk_terms = spy_compute
+
+    z_opt, _, hist = opt_v3b.optimize_multi_chunk(
+        mix_chunks=mix_chunks,
+        ref_chunks=ref_chunks,
+        reference_mode="same_track",
+        mix_preroll_samples=prerolls,
+        target_lufs=-14.0,
+    )
+
+    # Exactly 1 call per chunk across 4 chunks in 1 step
+    assert call_count[0] == 4, f"Expected 4 calls to compute_chunk_terms, got {call_count[0]}"
+    assert "v3b_loss" in hist and len(hist["v3b_loss"]) == 1
+    assert hist["v3b_loss"][0] > 0.0
+    assert hist["v3b_l_lim_raw"][0] > 0.0
+    assert hist["v3b_l_lim_weighted"][0] > 0.0
+
+    # Gradient linearity check at initial parameter point
+    K = 4
+    weights = [1.0 / K] * K
+    device = mix_chunks[0].device
+    z_init = torch.clamp(Z_NEUTRAL.to(device=device), 1e-4, 1.0 - 1e-4)
+    u_init = torch.log(z_init / (1.0 - z_init))
+
+    # Total gradient
+    u_tot = nn.Parameter(u_init.clone().detach())
+    z_tot = torch.sigmoid(u_tot)
+    tot_step_loss = torch.tensor(0.0, device=device)
+    for k in range(K):
+        mk = mix_chunks[k]
+        np_k = prerolls[k]
+        pred_ext, diag_k = opt_v3b.chain(mk, z=z_tot, eq_mode="fft", return_diagnostics=True)
+        pred_k = pred_ext[..., np_k:]
+        ref_k = ref_chunks[k]
+        lk_v0p, _ = opt_v3b.loss_fn(
+            pred_audio=pred_k,
+            target_audio=ref_k,
+            target_lufs=-14.0,
+            normalized_params=z_tot,
+            align_latency=True,
+            pred_ext_audio=pred_ext,
+            pred_preroll_samples=np_k,
+            include_eq_prior=False,
+        )
+        _, _, _, l_v3b_k, _ = orig_compute(
+            mix_audio=mk,
+            diagnostics=diag_k,
+            z=z_tot,
+            preroll_samples=np_k,
+        )
+        tot_step_loss = tot_step_loss + weights[k] * (lk_v0p + l_v3b_k)
+    tot_step_loss.backward()
+    g_total = u_tot.grad.clone()
+
+    # V0p gradient
+    u_v0p = nn.Parameter(u_init.clone().detach())
+    z_v0p = torch.sigmoid(u_v0p)
+    tot_v0p = torch.tensor(0.0, device=device)
+    for k in range(K):
+        mk = mix_chunks[k]
+        np_k = prerolls[k]
+        pred_ext = opt_v3b.chain(mk, z=z_v0p, eq_mode="fft")
+        pred_k = pred_ext[..., np_k:]
+        ref_k = ref_chunks[k]
+        lk_v0p, _ = opt_v3b.loss_fn(
+            pred_audio=pred_k,
+            target_audio=ref_k,
+            target_lufs=-14.0,
+            normalized_params=z_v0p,
+            align_latency=True,
+            pred_ext_audio=pred_ext,
+            pred_preroll_samples=np_k,
+            include_eq_prior=False,
+        )
+        tot_v0p = tot_v0p + weights[k] * lk_v0p
+    tot_v0p.backward()
+    g_v0p = u_v0p.grad.clone()
+
+    # V3b gradient (1/4 sum)
+    u_v3b = nn.Parameter(u_init.clone().detach())
+    z_v3b = torch.sigmoid(u_v3b)
+    tot_v3b = torch.tensor(0.0, device=device)
+    for k in range(K):
+        mk = mix_chunks[k]
+        np_k = prerolls[k]
+        _, diag_k = opt_v3b.chain(mk, z=z_v3b, eq_mode="fft", return_diagnostics=True)
+        _, _, _, l_v3b_k, _ = orig_compute(
+            mix_audio=mk,
+            diagnostics=diag_k,
+            z=z_v3b,
+            preroll_samples=np_k,
+        )
+        tot_v3b = tot_v3b + weights[k] * l_v3b_k
+    tot_v3b.backward()
+    g_v3b = u_v3b.grad.clone()
+
+    g_expected = g_v0p + g_v3b
+    assert torch.allclose(g_total, g_expected, atol=1e-5, rtol=1e-4), (
+        f"Gradient linearity failed: max diff = {torch.max(torch.abs(g_total - g_expected)).item()}"
+    )
+    assert torch.isfinite(g_total).all(), "Gradient g_total contains NaN or Inf"
+
+
+# ==============================================================================
+# Gate 15: Integrity and zero-diff preservation of all historical artifacts
+# ==============================================================================
+def test_15_preserved_artifacts_zero_diff():
+    """Verify that all historical preflight and ablation artifacts exist, are non-empty, and unmodified in git."""
+    repo_root = Path(__file__).resolve().parents[1]
+    historical_files = [
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_REPORT.md",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V2_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V2_REPORT.md",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_REPORT.md",
+        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md",
+        "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
+        "docs/sprint3/SPRINT3_V2_REPORT.md",
+        "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+        "docs/sprint3/SPRINT3_V0P_V1_ABLATION_RESULTS.json",
+        "docs/sprint3/SPRINT3_V0P_V1_REPORT.md",
+        "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3A_ABLATION_REPORT.md",
+        "docs/sprint3/SPRINT3_V3A_PREFLIGHT_GRADIENT_DIAGNOSTICS.json",
+    ]
+
+    for rel_path in historical_files:
+        p = repo_root / rel_path
+        assert p.exists(), f"Historical artifact missing: {rel_path}"
+        assert p.stat().st_size > 0, f"Historical artifact is empty: {rel_path}"
+
+        res = subprocess.run(
+            ["git", "status", "--porcelain", str(p)],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=str(repo_root),
+        )
+        assert res.stdout.strip() == "", f"Uncommitted modification in historical artifact: {rel_path}"
+
+
+# Aliases for suite runners
+test_gate_13_v0p_path_bit_identical_when_v3b_disabled = test_13_v0p_path_bit_identical_when_v3b_disabled
+test_gate_14_v3b_b05_optimizer_config_and_single_chunk_evaluation = test_14_v3b_b05_optimizer_config_and_single_chunk_evaluation
+test_gate_15_preserved_artifacts_zero_diff = test_15_preserved_artifacts_zero_diff
 

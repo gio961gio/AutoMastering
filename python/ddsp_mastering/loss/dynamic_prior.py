@@ -149,25 +149,39 @@ class V3bDynamicPriorLoss(nn.Module):
 
     def compute_chunk_terms(
         self,
-        mix_ext: torch.Tensor,
-        diagnostics: Dict[str, torch.Tensor],
-        makeup_db: torch.Tensor,
+        mix_ext: Optional[torch.Tensor] = None,
+        diagnostics: Optional[Dict[str, torch.Tensor]] = None,
+        makeup_db: Optional[torch.Tensor] = None,
         n_pre: int = 0,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Dict[str, Any]]:
+        mix_audio: Optional[torch.Tensor] = None,
+        z: Optional[torch.Tensor] = None,
+        preroll_samples: Optional[int] = None,
+        return_total: Optional[bool] = None,
+    ) -> Any:
         """Compute differentiable individual component tensors L_lim, L_diff, and L_conflict.
 
-        Args:
-            mix_ext: Audio input before mastering chain [..., 2, N_pre + T]
-            diagnostics: Trace dictionary from chain with 'gr_low_db', 'gr_mid_db',
-                         'gr_high_db', and 'lim_atten_db'.
-            makeup_db: Multiband compressor makeup gains [..., 3]
-            n_pre: Pre-roll sample count
-
-        Returns:
-            Tuple of (loss_lim_tensor, loss_diff_tensor, loss_conflict_tensor, metrics_dict).
+        Supports both raw parameter signature (mix_ext, diagnostics, makeup_db, n_pre) returning 4 elements
+        and optimizer signature (mix_audio, diagnostics, z, preroll_samples) returning 5 elements
+        (loss_lim, loss_diff, loss_conflict, loss_dyn, metrics).
         """
-        N_tot = mix_ext.shape[-1]
-        T = N_tot - n_pre
+        audio = mix_ext if mix_ext is not None else mix_audio
+        if audio is None:
+            raise ValueError("Either mix_ext or mix_audio must be provided")
+        if diagnostics is None:
+            raise ValueError("diagnostics dictionary must be provided")
+
+        preroll = preroll_samples if preroll_samples is not None else n_pre
+
+        if makeup_db is None:
+            if z is not None:
+                from ddsp_mastering.param_space import map_z_to_theta, unpack_theta_dict
+                theta = map_z_to_theta(z)
+                makeup_db = unpack_theta_dict(theta)["comp_makeup_db"]
+            else:
+                raise ValueError("Either makeup_db or z must be provided")
+
+        N_tot = audio.shape[-1]
+        T = N_tot - preroll
         D = self.delay_dsp_samples
         if T <= D:
             raise ValueError(f"Chunk length T={T} must exceed total delay D={D}")
@@ -175,11 +189,11 @@ class V3bDynamicPriorLoss(nn.Module):
         T_eval = T - D
 
         # Temporal alignment and pre-roll slicing
-        x_mix_eval = mix_ext[..., n_pre : n_pre + T_eval]
-        gr_low_eval = diagnostics["gr_low_db"][..., n_pre : n_pre + T_eval]
-        gr_mid_eval = diagnostics["gr_mid_db"][..., n_pre : n_pre + T_eval]
-        gr_high_eval = diagnostics["gr_high_db"][..., n_pre : n_pre + T_eval]
-        a_lim_eval = diagnostics["lim_atten_db"][..., n_pre + D : n_pre + T]
+        x_mix_eval = audio[..., preroll : preroll + T_eval]
+        gr_low_eval = diagnostics["gr_low_db"][..., preroll : preroll + T_eval]
+        gr_mid_eval = diagnostics["gr_mid_db"][..., preroll : preroll + T_eval]
+        gr_high_eval = diagnostics["gr_high_db"][..., preroll : preroll + T_eval]
+        a_lim_eval = diagnostics["lim_atten_db"][..., preroll + D : preroll + T]
 
         # Active sample mask
         mask_smp, is_silent, meta = compute_active_sample_mask(
@@ -189,7 +203,9 @@ class V3bDynamicPriorLoss(nn.Module):
             min_active_blocks=self.min_active_blocks,
         )
 
-        dummy_zero = 0.0 * (mix_ext.sum() + makeup_db.sum() + a_lim_eval.sum() + gr_low_eval.sum())
+        dummy_zero = 0.0 * (audio.sum() + makeup_db.sum() + a_lim_eval.sum() + gr_low_eval.sum())
+
+        return_5 = return_total is True or (z is not None and return_total is not False)
 
         if is_silent:
             metrics = {
@@ -211,6 +227,8 @@ class V3bDynamicPriorLoss(nn.Module):
                 "n_active_samples": 0,
                 "active_ratio": 0.0,
             }
+            if return_5:
+                return dummy_zero, dummy_zero, dummy_zero, dummy_zero, metrics
             return dummy_zero, dummy_zero, dummy_zero, metrics
 
         n_act = float(mask_smp.sum().item())
@@ -219,7 +237,6 @@ class V3bDynamicPriorLoss(nn.Module):
         # 1. L_lim: mean and CVaR_0.95 of limiter attenuation on active samples
         a_lim_act = a_lim_eval[act_mask]
         bar_a_lim = torch.mean(a_lim_act)
-
         k_tail = max(1, int(math.ceil(0.05 * n_act)))
         topk_vals, _ = torch.topk(a_lim_act, k=k_tail, dim=-1)
         cvar_95 = torch.mean(topk_vals)
@@ -228,29 +245,31 @@ class V3bDynamicPriorLoss(nn.Module):
         term_95 = torch.relu(cvar_95 - self.tau_95) ** 2
         loss_lim = term_avg + self.lambda_95 * term_95
 
-        # 2. L_diff: adjacent band compressor disparity
-        diff_lm = torch.abs(gr_low_eval - gr_mid_eval)[act_mask]
-        diff_mh = torch.abs(gr_mid_eval - gr_high_eval)[act_mask]
-        term_lm = torch.relu(diff_lm - self.delta_max) ** 2
-        term_mh = torch.relu(diff_mh - self.delta_max) ** 2
-        loss_diff = torch.mean(term_lm + term_mh)
+        # 2. L_diff: pairwise interband divergence between adjacent active samples
+        gr_low_act = gr_low_eval[act_mask]
+        gr_mid_act = gr_mid_eval[act_mask]
+        gr_high_act = gr_high_eval[act_mask]
 
-        # 3. L_conflict: compressor makeup gain driving limiter
+        diff_lm = torch.abs(gr_low_act - gr_mid_act)
+        diff_mh = torch.abs(gr_mid_act - gr_high_act)
+
+        loss_diff = torch.mean(torch.relu(diff_lm - self.delta_max) ** 2 + torch.relu(diff_mh - self.delta_max) ** 2)
+
+        # 3. L_conflict: excessive makeup vs actual gain reduction gated by limiter load
+        bar_gr_low = torch.mean(gr_low_act)
+        bar_gr_mid = torch.mean(gr_mid_act)
+        bar_gr_high = torch.mean(gr_high_act)
+
         r = torch.relu(bar_a_lim - self.tau_avg)
-        h_lim = (r / (r + self.delta_ref)).detach()
+        h_lim = torch.detach(r / (r + self.delta_ref))
 
-        bar_gr_low = torch.mean(gr_low_eval[act_mask])
-        bar_gr_mid = torch.mean(gr_mid_eval[act_mask])
-        bar_gr_high = torch.mean(gr_high_eval[act_mask])
-
-        m_l = makeup_db[..., 0]
-        m_m = makeup_db[..., 1]
-        m_h = makeup_db[..., 2]
-
+        m_l, m_m, m_h = makeup_db[..., 0], makeup_db[..., 1], makeup_db[..., 2]
         conf_l = torch.relu(m_l - bar_gr_low.detach() - self.delta_m) ** 2
         conf_m = torch.relu(m_m - bar_gr_mid.detach() - self.delta_m) ** 2
         conf_h = torch.relu(m_h - bar_gr_high.detach() - self.delta_m) ** 2
         loss_conflict = h_lim * (1.0 / 3.0) * (conf_l + conf_m + conf_h)
+
+        loss_dyn = self.w_lim * loss_lim + self.w_diff * loss_diff + self.w_conflict * loss_conflict
 
         # Diagnostic metadata
         with torch.no_grad():
@@ -263,7 +282,7 @@ class V3bDynamicPriorLoss(nn.Module):
             "loss_lim": float(loss_lim.item()),
             "loss_diff": float(loss_diff.item()),
             "loss_conflict": float(loss_conflict.item()),
-            "loss_dyn": 0.0,
+            "loss_dyn": float(loss_dyn.item()),
             "bar_a_lim_db": float(bar_a_lim.item()),
             "p95_a_lim_db": p95_val,
             "cvar95_a_lim_db": float(cvar_95.item()),
@@ -279,6 +298,8 @@ class V3bDynamicPriorLoss(nn.Module):
             "active_ratio": float(n_act / T_eval),
         }
 
+        if return_5:
+            return loss_lim, loss_diff, loss_conflict, loss_dyn, metrics
         return loss_lim, loss_diff, loss_conflict, metrics
 
     def forward(

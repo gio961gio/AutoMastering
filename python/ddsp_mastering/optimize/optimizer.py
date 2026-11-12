@@ -19,6 +19,7 @@ from ddsp_mastering.dsp.chain import DifferentiableMasteringChain
 from ddsp_mastering.loss.combined import MasteringPerceptualLoss
 from ddsp_mastering.loss.stylistic import AggregatePerceptualLoss
 from ddsp_mastering.loss.eq_prior import CompositeEQPriorLoss
+from ddsp_mastering.loss.dynamic_prior import V3bDynamicPriorLoss
 from ddsp_mastering.param_space import (
     PARAM_SPECS,
     NUM_PARAMS,
@@ -58,6 +59,15 @@ class AutoMasteringOptimizer:
         soft_peak_p: int = 8,
         soft_peak_beta: float = 2.0,
         soft_peak_block_duration_sec: float = 0.010,
+        v3b_w_lim: float = 0.0,
+        v3b_w_diff: float = 0.0,
+        v3b_w_conflict: float = 0.0,
+        v3b_tau_avg: float = 0.5,
+        v3b_tau_95: float = 2.0,
+        v3b_lambda_95: float = 0.5,
+        v3b_delta_max: float = 3.0,
+        v3b_delta_m: float = 1.25,
+        v3b_delta_ref: float = 3.0,
     ):
         self.sample_rate = sample_rate
         self.lr = lr
@@ -82,6 +92,30 @@ class AutoMasteringOptimizer:
         self.soft_peak_block_duration_sec = soft_peak_block_duration_sec
         self.weight_param_reg = weight_param_reg
         self.weight_reg = weight_param_reg
+
+        self.v3b_w_lim = float(v3b_w_lim)
+        self.v3b_w_diff = float(v3b_w_diff)
+        self.v3b_w_conflict = float(v3b_w_conflict)
+        self.v3b_tau_avg = float(v3b_tau_avg)
+        self.v3b_tau_95 = float(v3b_tau_95)
+        self.v3b_lambda_95 = float(v3b_lambda_95)
+        self.v3b_delta_max = float(v3b_delta_max)
+        self.v3b_delta_m = float(v3b_delta_m)
+        self.v3b_delta_ref = float(v3b_delta_ref)
+
+        self.enable_v3b = bool(v3b_w_lim > 0.0 or v3b_w_diff > 0.0 or v3b_w_conflict > 0.0)
+        self.v3b_prior_loss = V3bDynamicPriorLoss(
+            sample_rate=sample_rate,
+            tau_avg=v3b_tau_avg,
+            tau_95=v3b_tau_95,
+            lambda_95=v3b_lambda_95,
+            delta_max=v3b_delta_max,
+            delta_m=v3b_delta_m,
+            delta_ref=v3b_delta_ref,
+            w_lim=v3b_w_lim,
+            w_diff=v3b_w_diff,
+            w_conflict=v3b_w_conflict,
+        )
 
         self.chain = DifferentiableMasteringChain(sample_rate=sample_rate)
         self.eq_prior_loss = CompositeEQPriorLoss(
@@ -236,6 +270,14 @@ class AutoMasteringOptimizer:
             "lufs": [],
             "lr": [],
         }
+        if self.enable_v3b:
+            history["v3b_loss"] = []
+            history["v3b_l_lim_raw"] = []
+            history["v3b_l_lim_weighted"] = []
+            history["v3b_l_diff_raw"] = []
+            history["v3b_l_diff_weighted"] = []
+            history["v3b_l_conflict_raw"] = []
+            history["v3b_l_conflict_weighted"] = []
 
         for step in range(self.num_steps):
             optimizer.zero_grad()
@@ -253,10 +295,24 @@ class AutoMasteringOptimizer:
             step_stft = 0.0
             step_lufs = 0.0
 
+            if self.enable_v3b:
+                step_v3b_total = 0.0
+                step_v3b_lim_raw = 0.0
+                step_v3b_lim_w = 0.0
+                step_v3b_diff_raw = 0.0
+                step_v3b_diff_w = 0.0
+                step_v3b_conf_raw = 0.0
+                step_v3b_conf_w = 0.0
+
             for k in range(K):
                 mix_k = mix_chunks[k]
                 n_pre_k = preroll_counts[k]
-                pred_ext_k = self.chain(mix_k, z=z, eq_mode=eq_mode)
+
+                if self.enable_v3b:
+                    pred_ext_k, diag_k = self.chain(mix_k, z=z, eq_mode=eq_mode, return_diagnostics=True)
+                else:
+                    pred_ext_k = self.chain(mix_k, z=z, eq_mode=eq_mode)
+
                 pred_k = pred_ext_k[..., n_pre_k:] if n_pre_k > 0 else pred_ext_k
                 mix_eval_k = mix_k[..., n_pre_k:] if n_pre_k > 0 else mix_k
 
@@ -295,6 +351,22 @@ class AutoMasteringOptimizer:
                     )
                     step_stft += weights[k] * chunk_metrics.get("stft_loss_total", 0.0)
 
+                if self.enable_v3b:
+                    l_lim_k, l_diff_k, l_conf_k, l_v3b_k, v3b_m_k = self.v3b_prior_loss.compute_chunk_terms(
+                        mix_audio=mix_k,
+                        diagnostics=diag_k,
+                        z=z,
+                        preroll_samples=n_pre_k,
+                    )
+                    chunk_loss = chunk_loss + l_v3b_k.to(chunk_loss.dtype)
+                    step_v3b_total += weights[k] * float(v3b_m_k["loss_dyn"])
+                    step_v3b_lim_raw += weights[k] * float(v3b_m_k["loss_lim"])
+                    step_v3b_lim_w += weights[k] * (self.v3b_w_lim * float(v3b_m_k["loss_lim"]))
+                    step_v3b_diff_raw += weights[k] * float(v3b_m_k["loss_diff"])
+                    step_v3b_diff_w += weights[k] * (self.v3b_w_diff * float(v3b_m_k["loss_diff"]))
+                    step_v3b_conf_raw += weights[k] * float(v3b_m_k["loss_conflict"])
+                    step_v3b_conf_w += weights[k] * (self.v3b_w_conflict * float(v3b_m_k["loss_conflict"]))
+
                 step_loss = step_loss + weights[k] * chunk_loss
                 step_lufs += weights[k] * chunk_metrics.get("lufs_pred", 0.0)
 
@@ -303,7 +375,13 @@ class AutoMasteringOptimizer:
                 eq_prior_val, eq_prior_metrics = self.eq_prior_loss(z)
                 step_loss = step_loss + self.weight_eq_prior * eq_prior_val.to(step_loss.dtype)
 
+            if not torch.isfinite(step_loss):
+                raise RuntimeError(f"Step {step}: non-finite loss encountered: {step_loss.item()}")
+
             step_loss.backward()
+
+            if not torch.isfinite(u.grad).all():
+                raise RuntimeError(f"Step {step}: non-finite gradients encountered in u.grad")
 
             # Gradient clipping to prevent sudden spikes
             torch.nn.utils.clip_grad_norm_([u], max_norm=1.0)
@@ -315,6 +393,14 @@ class AutoMasteringOptimizer:
             history["stft_loss"].append(step_stft)
             history["lufs"].append(step_lufs)
             history["lr"].append(scheduler.get_last_lr()[0])
+            if self.enable_v3b:
+                history["v3b_loss"].append(step_v3b_total)
+                history["v3b_l_lim_raw"].append(step_v3b_lim_raw)
+                history["v3b_l_lim_weighted"].append(step_v3b_lim_w)
+                history["v3b_l_diff_raw"].append(step_v3b_diff_raw)
+                history["v3b_l_diff_weighted"].append(step_v3b_diff_w)
+                history["v3b_l_conflict_raw"].append(step_v3b_conf_raw)
+                history["v3b_l_conflict_weighted"].append(step_v3b_conf_w)
 
             if verbose and (step % 5 == 0 or step == self.num_steps - 1):
                 print(
@@ -360,7 +446,10 @@ class AutoMasteringOptimizer:
         for k in range(K):
             mk = mix_chunks[k]
             n_pre = preroll_counts[k]
-            y_ext = self.chain(mk, z=z, eq_mode="iir")
+            if self.enable_v3b:
+                y_ext, diag_k = self.chain(mk, z=z, eq_mode="iir", return_diagnostics=True)
+            else:
+                y_ext = self.chain(mk, z=z, eq_mode="iir")
             y_k = y_ext[..., n_pre:] if n_pre > 0 else y_ext
             ref_k = ref_chunks[k % len(ref_chunks)] if ref_chunks else None
             ref_ext_k = ref_ext_chunks[k % len(ref_ext_chunks)] if ref_ext_chunks else None
@@ -393,6 +482,17 @@ class AutoMasteringOptimizer:
                     ref_preroll_samples=ref_n_pre_k,
                     include_eq_prior=False,
                 )
+
+            if self.enable_v3b:
+                l_lim_k, l_diff_k, l_conf_k, l_v3b_k, v3b_m_k = self.v3b_prior_loss.compute_chunk_terms(
+                    mix_audio=mk,
+                    diagnostics=diag_k,
+                    z=z,
+                    preroll_samples=n_pre,
+                )
+                lk = lk + l_v3b_k.to(lk.dtype)
+                for v_key, v_val in v3b_m_k.items():
+                    agg_metrics[f"v3b_{v_key}"] = agg_metrics.get(f"v3b_{v_key}", 0.0) + weights[k] * float(v_val)
 
             tot_loss = tot_loss + weights[k] * lk
             for mk_key, mk_val in mk_dict.items():
