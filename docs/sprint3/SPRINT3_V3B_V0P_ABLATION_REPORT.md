@@ -1,7 +1,7 @@
 # SPRINT 3 — V3B VS V0P ABLATION REPORT
 
 **Titolo:** Report Comparativo Accoppiato Control V0p vs Treatment V3b-B0.5  
-**Data di Generazione:** 2026-11-12 18:50:58  
+**Data di Generazione:** 2026-11-12 19:29:12  
 **Branch:** `human-validation-package`  
 **Variante Trattamento:** `V3b-B0.5` (Candidate B con $w_{\text{lim}} = 0.50$, $w_{\text{diff}} = 0.02$, $w_{\text{conflict}} = 0.02$)  
 **Variante Controllo:** `V0p` (Baseline Sprint 2 armonizzata con pre-roll a 2.5s)  
@@ -24,6 +24,25 @@ La presente campagna di validazione valuta in modo rigoroso e accoppiato l'effic
 | $w_{\text{lim}}$ | Peso di regolarizzazione limiter ($\mathcal{L}_{\text{lim}}$) | `0.5` |
 | $w_{\text{diff}}$ | Peso di regolarizzazione differenziale multibanda ($\mathcal{L}_{\text{diff}}$) | `0.02` |
 | $w_{\text{conflict}}$ | Peso di isolamento conflitti makeup gain vs compressione ($\mathcal{L}_{\text{conflict}}$) | `0.02` |
+
+### Manifest Verificato dei Commit (`human-validation-package`) & Audit Diff Storico
+
+Sequenza esatta e verificata dei commit su `human-validation-package` (si precisa che l'hash `f01e94717a7fd1718418c5bf978750c749e13895` non esiste nella storia Git del repository):
+
+| Ordine | SHA Commit | Messaggio | Stato Integrità Artefatti |
+|:---:|:---|:---|:---|
+| 1 | `c267de68098a551c235c769c1f02389297ffdfac` | `fix(sprint3-v3b): unify preflight and V3bDynamicPriorLoss formulas, add w_lim sensitivity and exact sample-level alignment test` | Preflight V3 runner e gate test |
+| 2 | `6afb247f249cd03684d1f42df343911928f7e8bd` | `feat(sprint3-v3b): generate preflight V3 results and report with unified formulas and w_lim sensitivity` | **Baseline storica Preflight V3 congelata** (14 file storici con `git diff 6afb247..HEAD` vuoto) |
+| 3 | `4fbc01db1ab2e0589323c06850192a3f308a73be` | `fix(sprint3-v3b): refine gate tests 7 and 9 and add preflight V3 audit errata note` | Introduce `SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md` (`git diff 4fbc01d..HEAD` vuoto) |
+| 4 | `befda910f2191b8887f1e330bc515da29639b000` | `feat(sprint3-v3b): integrate V3b-B0.5 into AutoMasteringOptimizer, add ablation runner and regression tests` | Integrazione V3b-B0.5 in `optimizer.py` |
+| 5 | `2123842f964c2d91d9163d7067385cc126eacad4` | `feat(sprint3-v3b): execute V3b-B0.5 vs V0p controlled ablation and publish results and report` | Congela `SPRINT3_V3B_V0P_ABLATION_RESULTS.json` (`git diff 2123842..HEAD` vuoto) |
+| 6 | `7f7ad10a74560f335cfde89eda9d257a5872ab12` | `feat(sprint3-v3b): generate blind listening validation package and secret key mapping` | Export dei 12 WAV anonimi, `SPRINT3_V3B_BLIND_MAPPING.json` e worksheet |
+| 7 | `58ca5258467ec429f8ead69698f3a9acd6fba892` | `fix(sprint3-v3b): fix Table 3 parameter keys, add Table 3B, and align Section 1 and 7.3 text from frozen JSON` | Sanatoria formattazione Tabella 3 / 3B e True Peak guardrail |
+
+Riepilogo `git diff --name-status 6afb247f249cd03684d1f42df343911928f7e8bd..58ca5258467ec429f8ead69698f3a9acd6fba892` (9 file prima di questo commit di chiusura audit):
+- `A`: `docs/sprint3/SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md`, `docs/sprint3/SPRINT3_V3B_BLIND_MAPPING.json`, `docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md`, `docs/sprint3/SPRINT3_V3B_V0P_ABLATION_REPORT.md`, `docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json`, `scripts/sprint3/evaluate_v3b_ablation.py`
+- `M`: `python/ddsp_mastering/loss/dynamic_prior.py`, `python/ddsp_mastering/optimize/optimizer.py`, `tests/test_sprint3_v3b_gate.py`
+- Il commit corrente aggiunge (`A`) `docs/sprint3/SPRINT3_V3B_BLIND_AUDIO_MANIFEST.json` e `docs/sprint3/SPRINT3_V3B_BLIND_AUDIO_MANIFEST.md` e aggiorna (`M`) runner, report e Gate Test 15–17 mantenendo a diff zero tutti i 15 artefatti storici protetti e `SPRINT3_V3B_V0P_ABLATION_RESULTS.json`.
 
 ---
 
@@ -131,7 +150,7 @@ La presente campagna di validazione valuta in modo rigoroso e accoppiato l'effic
 
 ### 7.1 Impatto di V3b-B0.5 sull'Attenuazione del Limiter e Contenimento dei Picchi
 1. **Attivazione Mirata su `track01`:** Su `track01` (brano con materiale transiente denso e picchi oltre soglia), il termine $L_{\text{lim}}$ si attiva sui Chunk 0, 1 e 2 (sul Chunk 1 allo step finale: $P_{95} = 1.784\text{ dB}$, $\text{CVaR}_{0.95} = 3.021\text{ dB}$; aggregato sui 4 chunk: $P_{95} = 1.385\text{ dB}$, $\text{CVaR}_{0.95} = 2.272\text{ dB}$). Il gradiente $\nabla_u \mathcal{L}_{\text{V3b}}$ ha norma finita ($\|\nabla_u \mathcal{L}_{\text{V3b}}\|_2 = 0.2818$), modulando principalmente le soglie di compressione (`comp_low_threshold_db` $-0.1051\text{ dB}$, `comp_high_threshold_db` $-0.2062\text{ dB}$) e il guadagno EQ in banda 4 (`eq_b4_gain_db` $-0.0149\text{ dB}$) per attenuare l'impatto dei picchi sullo stadio finale.
-2. **Riduzione dei Picchi Estremi:** Rispetto a `Control V0p`, `Treatment V3b-B0.5` riduce l'attenuazione media aggregata del limiter ($0.255\text{ dB}$ vs $0.260\text{ dB}$), il $P_{95}$ ($1.385\text{ dB}$ vs $1.401\text{ dB}$), il $\text{CVaR}_{0.95}$ ($2.272\text{ dB}$ vs $2.294\text{ dB}$) e il massimo assoluto ($5.990\text{ dB}$ vs $6.003\text{ dB}$), senza introdurre pompaggio udibile.
+2. **Riduzione dei Picchi Estremi (Metriche Proxy):** Rispetto a `Control V0p`, `Treatment V3b-B0.5` riduce l'attenuazione media aggregata del limiter ($0.255\text{ dB}$ vs $0.260\text{ dB}$), il $P_{95}$ ($1.385\text{ dB}$ vs $1.401\text{ dB}$), il $\text{CVaR}_{0.95}$ ($2.272\text{ dB}$ vs $2.294\text{ dB}$) e il massimo assoluto ($5.990\text{ dB}$ vs $6.003\text{ dB}$). Tali risultati riguardano esclusivamente le metriche proxy oggettive; ogni giudizio percettivo (inclusa l'eventuale presenza o assenza di pumping) è rinviato al test d'ascolto cieco umano.
 3. **Inattività Corretta in Zona Sotto-Soglia:** Nelle altre 5 sessioni (`track02`, `track03`, `track01_style`, `track02_style`, `track03_style`), in cui l'attenuazione di picco del limiter resta sotto la soglia $\tau_{95} = 2.0\text{ dB}$, $L_{\text{lim}}$ si mantiene esattamente pari a $0.0000$, evitando interventi spuri e preservando la bit-identità rispetto a `Control V0p`.
 
 ### 7.2 Dinamica del Compressore Multibanda e Bilanciamento Interbanda
@@ -141,15 +160,18 @@ La presente campagna di validazione valuta in modo rigoroso e accoppiato l'effic
 ### 7.3 Qualità Audio Full-Track, Traguardo di Loudness e Guardrail True Peak
 1. **Loudness Full-Track ($\Delta\text{LUFS}$):** `Treatment V3b-B0.5` mantiene sostanzialmente invariato l'Integrated LUFS full-track raggiunto da `Control V0p`: su `track01` si registra $-10.5119\text{ LUFS}$ in `V3b-B0.5` contro $-10.5121\text{ LUFS}$ in `V0p` (scarto di soli $+0.0001\text{ LU}$), mentre sulle altre 5 sessioni (dove i termini V3b restano a zero) il livello integrato è esattamente identico tra le due varianti.
 2. **Guardrail Indipendente True Peak ($\le -0.30\text{ dBTP}$):** Mentre il **Sample Peak discreto a $1\times$** rispetta il ceiling di $-0.30\text{ dBFS}$ su tutte le 6 sessioni (`-0.3000 dBFS` su 5 tracce, `-2.4192 dBFS` su `track01_style`), il **guardrail indipendente True Peak ($\le -0.30\text{ dBTP}$)** continua a essere superato in **5 sessioni su 6** sia in `Control V0p` sia in `Treatment V3b-B0.5` (con valori tra $-0.0868\text{ dBTP}$ e $+0.2996\text{ dBTP}$ a causa dell'inter-sample overshoot, e con una variazione su `track01` da $+0.2647\text{ dBTP}$ in `V0p` a $+0.2996\text{ dBTP}$ in `V3b-B0.5`). Ciò conferma che `V3b` non sostituisce né garantisce di per sé la conformità True Peak.
-3. **Preservazione Spettrale (SC, LSD, ASD):** La convergenza spettrale (`SC`), la distanza spettrale logaritmica (`LSD`) e la distanza spettrale aggregata (`ASD`) rimangono pressoché identiche tra `V0p` e `V3b-B0.5`, confermando l'assenza di regressioni timbriche.
+3. **Prossimità delle Metriche Spettrali Proxy (SC, LSD, ASD):** La convergenza spettrale (`SC`), la distanza spettrale logaritmica (`LSD`) e la distanza spettrale aggregata (`ASD`) rimangono pressoché invariate tra `V0p` e `V3b-B0.5` nelle metriche oggettive calcolate offline; ogni valutazione percettiva timbrica è demandata esclusivamente al test d'ascolto cieco umano.
 
 ### 7.4 Stabilità Numerica e Parità Sperimentale Accoppiata
 1. **Zero Anomalie Numeriche:** Nessun valore `NaN` o `Inf` rilevato in alcuna delle metriche, gradienti o traiettorie di ottimizzazione.
 2. **Identità Biunivoca Parametrica:** Per tutte le sessioni e per entrambe le varianti è verificata l'uguaglianza $\max |\theta - \text{map\_z\_to\_theta}(z)| < 10^{-5}$ su tutte le 41 dimensioni dello spazio continuo DDSP.
-3. **Integrità Storica Preservata:** Tutti i file di audit storici (`V0p`, `V1`, `V1b`, `V2`, `V3a`, preflight V1, V2, V3 e Errata) restano intatti con `git diff` rigorosamente a zero.
+3. **Integrità Storica Preservata:** Tutti i 15 file di audit storici restano intatti con `git diff` rigorosamente a zero rispetto al rispettivo commit di congelamento (`6afb247f249cd03684d1f42df343911928f7e8bd..HEAD` per i 14 file preesistenti; `4fbc01db1ab2e0589323c06850192a3f308a73be..HEAD` per `SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md`; `2123842f964c2d91d9163d7067385cc126eacad4..HEAD` per `SPRINT3_V3B_V0P_ABLATION_RESULTS.json`).
 
 ### 7.5 Pacchetto di Validazione d'Ascolto Cieco (Blind Human Evaluation Package)
-Per consentire la validazione percettiva umana priva di bias cognitivi:
-- Sono stati renderizzati 12 file WAV a 24-bit PCM (48 kHz) con nomi anonimizzati (`variant_A.wav` e `variant_B.wav`);
-- La chiave di decodifica segreta è memorizzata separatamente in `docs/sprint3/SPRINT3_V3B_BLIND_MAPPING.json`;
+Per consentire la validazione percettiva umana in condizioni controllate:
+- Sono stati renderizzati 12 file WAV a 24-bit PCM (48 kHz) con nomi anonimizzati (`variant_A.wav` e `variant_B.wav`) in `docs/sprint3/blind_v3b_wavs/` (cartella esclusa da Git via `.gitignore`);
+- Il manifest tecnico di verifica dei 12 WAV (SHA-256, dimensioni, durata, Sample Peak, True Peak 4x e Integrated LUFS BS.1770, privo della chiave di decodifica) è archiviato in `docs/sprint3/SPRINT3_V3B_BLIND_AUDIO_MANIFEST.json` e `docs/sprint3/SPRINT3_V3B_BLIND_AUDIO_MANIFEST.md`;
+- Il pacchetto condivisibile privo di mapping per i revisori d'ascolto è generato in `human_validation/private/sprint3_v3b_blind_evaluator_pack.zip` (contiene esclusivamente i 12 WAV, `SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md` e `SPRINT3_V3B_BLIND_AUDIO_MANIFEST.md`);
 - Il foglio di lavoro anonimo per i revisori d'ascolto è pronto in `docs/sprint3/SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md`.
+
+> **Avvertenza di Sicurezza sul Blinding:** Il file `docs/sprint3/SPRINT3_V3B_BLIND_MAPPING.json` è tracciato nel branch Git ed è quindi visibile a chiunque abbia accesso al repository. Per garantire un reale doppio cieco, gli ascoltatori umani devono ricevere **esclusivamente** l'archivio `sprint3_v3b_blind_evaluator_pack.zip` distribuito dal coordinatore non valutatore e non devono consultare il repository né `SPRINT3_V3B_BLIND_MAPPING.json` fino al completamento del foglio di valutazione.

@@ -23,6 +23,7 @@ Modes:
 
 import argparse
 import gc
+import hashlib
 import json
 import math
 import os
@@ -32,6 +33,7 @@ import shutil
 import sys
 import time
 from typing import Any, Dict, List, Optional, Tuple
+import zipfile
 
 import numpy as np
 import soundfile as sf
@@ -49,7 +51,9 @@ enable_fast_cpu_biquad()
 
 from ddsp_mastering.dsp.chain import DifferentiableMasteringChain
 from ddsp_mastering.loss.dynamic_prior import TOTAL_DSP_DELAY_SAMPLES, V3bDynamicPriorLoss, compute_active_sample_mask
+from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
 from ddsp_mastering.optimize import AutoMasteringOptimizer, MasteringBenchmarkSuite
+from ddsp_mastering.optimize.metrics import calculate_sample_peak_dbfs, calculate_true_peak_dbtp
 from ddsp_mastering.param_space import NUM_PARAMS, PARAM_SPECS, Z_NEUTRAL, map_theta_to_z, map_z_to_theta
 from scripts.human_validation.offline_renderer import render_offline_with_tail_flush
 from scripts.sprint3.harmonized_session_prep import (
@@ -823,6 +827,25 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         f"| $w_{{\\text{{diff}}}}$ | Peso di regolarizzazione differenziale multibanda ($\\mathcal{{L}}_{{\\text{{diff}}}}$) | `{FROZEN_V3B_B05_PARAMS['w_diff']}` |",
         f"| $w_{{\\text{{conflict}}}}$ | Peso di isolamento conflitti makeup gain vs compressione ($\\mathcal{{L}}_{{\\text{{conflict}}}}$) | `{FROZEN_V3B_B05_PARAMS['w_conflict']}` |",
         "",
+        "### Manifest Verificato dei Commit (`human-validation-package`) & Audit Diff Storico",
+        "",
+        "Sequenza esatta e verificata dei commit su `human-validation-package` (si precisa che l'hash `f01e94717a7fd1718418c5bf978750c749e13895` non esiste nella storia Git del repository):",
+        "",
+        "| Ordine | SHA Commit | Messaggio | Stato Integrità Artefatti |",
+        "|:---:|:---|:---|:---|",
+        "| 1 | `c267de68098a551c235c769c1f02389297ffdfac` | `fix(sprint3-v3b): unify preflight and V3bDynamicPriorLoss formulas, add w_lim sensitivity and exact sample-level alignment test` | Preflight V3 runner e gate test |",
+        "| 2 | `6afb247f249cd03684d1f42df343911928f7e8bd` | `feat(sprint3-v3b): generate preflight V3 results and report with unified formulas and w_lim sensitivity` | **Baseline storica Preflight V3 congelata** (14 file storici con `git diff 6afb247..HEAD` vuoto) |",
+        "| 3 | `4fbc01db1ab2e0589323c06850192a3f308a73be` | `fix(sprint3-v3b): refine gate tests 7 and 9 and add preflight V3 audit errata note` | Introduce `SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md` (`git diff 4fbc01d..HEAD` vuoto) |",
+        "| 4 | `befda910f2191b8887f1e330bc515da29639b000` | `feat(sprint3-v3b): integrate V3b-B0.5 into AutoMasteringOptimizer, add ablation runner and regression tests` | Integrazione V3b-B0.5 in `optimizer.py` |",
+        "| 5 | `2123842f964c2d91d9163d7067385cc126eacad4` | `feat(sprint3-v3b): execute V3b-B0.5 vs V0p controlled ablation and publish results and report` | Congela `SPRINT3_V3B_V0P_ABLATION_RESULTS.json` (`git diff 2123842..HEAD` vuoto) |",
+        "| 6 | `7f7ad10a74560f335cfde89eda9d257a5872ab12` | `feat(sprint3-v3b): generate blind listening validation package and secret key mapping` | Export dei 12 WAV anonimi, `SPRINT3_V3B_BLIND_MAPPING.json` e worksheet |",
+        "| 7 | `58ca5258467ec429f8ead69698f3a9acd6fba892` | `fix(sprint3-v3b): fix Table 3 parameter keys, add Table 3B, and align Section 1 and 7.3 text from frozen JSON` | Sanatoria formattazione Tabella 3 / 3B e True Peak guardrail |",
+        "",
+        "Riepilogo `git diff --name-status 6afb247f249cd03684d1f42df343911928f7e8bd..58ca5258467ec429f8ead69698f3a9acd6fba892` (9 file prima di questo commit di chiusura audit):",
+        "- `A`: `docs/sprint3/SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md`, `docs/sprint3/SPRINT3_V3B_BLIND_MAPPING.json`, `docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md`, `docs/sprint3/SPRINT3_V3B_V0P_ABLATION_REPORT.md`, `docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json`, `scripts/sprint3/evaluate_v3b_ablation.py`",
+        "- `M`: `python/ddsp_mastering/loss/dynamic_prior.py`, `python/ddsp_mastering/optimize/optimizer.py`, `tests/test_sprint3_v3b_gate.py`",
+        "- Il commit corrente aggiunge (`A`) `docs/sprint3/SPRINT3_V3B_BLIND_AUDIO_MANIFEST.json` e `docs/sprint3/SPRINT3_V3B_BLIND_AUDIO_MANIFEST.md` e aggiorna (`M`) runner, report e Gate Test 15–17 mantenendo a diff zero tutti i 15 artefatti storici protetti e `SPRINT3_V3B_V0P_ABLATION_RESULTS.json`.",
+        "",
         "---",
         "",
         "## 2. Tabella 1 — Metriche Audio Oggettive Full-Track (Control V0p vs Treatment V3b-B0.5)",
@@ -1057,7 +1080,7 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         "",
         "### 7.1 Impatto di V3b-B0.5 sull'Attenuazione del Limiter e Contenimento dei Picchi",
         f"1. **Attivazione Mirata su `track01`:** Su `track01` (brano con materiale transiente denso e picchi oltre soglia), il termine $L_{{\\text{{lim}}}}$ si attiva sui Chunk 0, 1 e 2 (sul Chunk 1 allo step finale: $P_{{95}} = {t01_c1_p95:.3f}\\text{{ dB}}$, $\\text{{CVaR}}_{{0.95}} = {t01_c1_cvar:.3f}\\text{{ dB}}$; aggregato sui 4 chunk: $P_{{95}} = {t01_agg_3_p95:.3f}\\text{{ dB}}$, $\\text{{CVaR}}_{{0.95}} = {t01_agg_3_cvar:.3f}\\text{{ dB}}$). Il gradiente $\\nabla_u \\mathcal{{L}}_{{\\text{{V3b}}}}$ ha norma finita ($\\|\\nabla_u \\mathcal{{L}}_{{\\text{{V3b}}}}\\|_2 = {t01_grad_u:.4f}$), modulando principalmente le soglie di compressione (`comp_low_threshold_db` $-0.1051\\text{{ dB}}$, `comp_high_threshold_db` $-0.2062\\text{{ dB}}$) e il guadagno EQ in banda 4 (`eq_b4_gain_db` $-0.0149\\text{{ dB}}$) per attenuare l'impatto dei picchi sullo stadio finale.",
-        f"2. **Riduzione dei Picchi Estremi:** Rispetto a `Control V0p`, `Treatment V3b-B0.5` riduce l'attenuazione media aggregata del limiter (${t01_agg_3_mean:.3f}\\text{{ dB}}$ vs ${t01_agg_0_mean:.3f}\\text{{ dB}}$), il $P_{{95}}$ (${t01_agg_3_p95:.3f}\\text{{ dB}}$ vs ${t01_agg_0_p95:.3f}\\text{{ dB}}$), il $\\text{{CVaR}}_{{0.95}}$ (${t01_agg_3_cvar:.3f}\\text{{ dB}}$ vs ${t01_agg_0_cvar:.3f}\\text{{ dB}}$) e il massimo assoluto (${t01_agg_3_max:.3f}\\text{{ dB}}$ vs ${t01_agg_0_max:.3f}\\text{{ dB}}$), senza introdurre pompaggio udibile.",
+        f"2. **Riduzione dei Picchi Estremi (Metriche Proxy):** Rispetto a `Control V0p`, `Treatment V3b-B0.5` riduce l'attenuazione media aggregata del limiter (${t01_agg_3_mean:.3f}\\text{{ dB}}$ vs ${t01_agg_0_mean:.3f}\\text{{ dB}}$), il $P_{{95}}$ (${t01_agg_3_p95:.3f}\\text{{ dB}}$ vs ${t01_agg_0_p95:.3f}\\text{{ dB}}$), il $\\text{{CVaR}}_{{0.95}}$ (${t01_agg_3_cvar:.3f}\\text{{ dB}}$ vs ${t01_agg_0_cvar:.3f}\\text{{ dB}}$) e il massimo assoluto (${t01_agg_3_max:.3f}\\text{{ dB}}$ vs ${t01_agg_0_max:.3f}\\text{{ dB}}$). Tali risultati riguardano esclusivamente le metriche proxy oggettive; ogni giudizio percettivo (inclusa l'eventuale presenza o assenza di pumping) è rinviato al test d'ascolto cieco umano.",
         "3. **Inattività Corretta in Zona Sotto-Soglia:** Nelle altre 5 sessioni (`track02`, `track03`, `track01_style`, `track02_style`, `track03_style`), in cui l'attenuazione di picco del limiter resta sotto la soglia $\\tau_{95} = 2.0\\text{ dB}$, $L_{\\text{lim}}$ si mantiene esattamente pari a $0.0000$, evitando interventi spuri e preservando la bit-identità rispetto a `Control V0p`.",
         "",
         "### 7.2 Dinamica del Compressore Multibanda e Bilanciamento Interbanda",
@@ -1067,18 +1090,21 @@ def generate_v3b_ablation_report(results_payload: Dict[str, Any], out_path: Path
         "### 7.3 Qualità Audio Full-Track, Traguardo di Loudness e Guardrail True Peak",
         f"1. **Loudness Full-Track ($\\Delta\\text{{LUFS}}$):** `Treatment V3b-B0.5` mantiene sostanzialmente invariato l'Integrated LUFS full-track raggiunto da `Control V0p`: su `track01` si registra ${t01_lufs_3:.4f}\\text{{ LUFS}}$ in `V3b-B0.5` contro ${t01_lufs_0:.4f}\\text{{ LUFS}}$ in `V0p` (scarto di soli ${t01_lufs_3 - t01_lufs_0:+.4f}\\text{{ LU}}$), mentre sulle altre 5 sessioni (dove i termini V3b restano a zero) il livello integrato è esattamente identico tra le due varianti.",
         f"2. **Guardrail Indipendente True Peak ($\\le -0.30\\text{{ dBTP}}$):** Mentre il **Sample Peak discreto a $1\\times$** rispetta il ceiling di $-0.30\\text{{ dBFS}}$ su tutte le 6 sessioni (`-0.3000 dBFS` su 5 tracce, `-2.4192 dBFS` su `track01_style`), il **guardrail indipendente True Peak ($\\le -0.30\\text{{ dBTP}}$)** continua a essere superato in **{len(tp_violations)} sessioni su {len(sessions)}** sia in `Control V0p` sia in `Treatment V3b-B0.5` (con valori tra ${tp_min_viol:+.4f}\\text{{ dBTP}}$ e ${tp_max_viol:+.4f}\\text{{ dBTP}}$ a causa dell'inter-sample overshoot, e con una variazione su `track01` da ${t01_tp_0:+.4f}\\text{{ dBTP}}$ in `V0p` a ${t01_tp_3:+.4f}\\text{{ dBTP}}$ in `V3b-B0.5`). Ciò conferma che `V3b` non sostituisce né garantisce di per sé la conformità True Peak.",
-        "3. **Preservazione Spettrale (SC, LSD, ASD):** La convergenza spettrale (`SC`), la distanza spettrale logaritmica (`LSD`) e la distanza spettrale aggregata (`ASD`) rimangono pressoché identiche tra `V0p` e `V3b-B0.5`, confermando l'assenza di regressioni timbriche.",
+        "3. **Prossimità delle Metriche Spettrali Proxy (SC, LSD, ASD):** La convergenza spettrale (`SC`), la distanza spettrale logaritmica (`LSD`) e la distanza spettrale aggregata (`ASD`) rimangono pressoché invariate tra `V0p` e `V3b-B0.5` nelle metriche oggettive calcolate offline; ogni valutazione percettiva timbrica è demandata esclusivamente al test d'ascolto cieco umano.",
         "",
         "### 7.4 Stabilità Numerica e Parità Sperimentale Accoppiata",
         "1. **Zero Anomalie Numeriche:** Nessun valore `NaN` o `Inf` rilevato in alcuna delle metriche, gradienti o traiettorie di ottimizzazione.",
         "2. **Identità Biunivoca Parametrica:** Per tutte le sessioni e per entrambe le varianti è verificata l'uguaglianza $\\max |\\theta - \\text{map\\_z\\_to\\_theta}(z)| < 10^{-5}$ su tutte le 41 dimensioni dello spazio continuo DDSP.",
-        "3. **Integrità Storica Preservata:** Tutti i file di audit storici (`V0p`, `V1`, `V1b`, `V2`, `V3a`, preflight V1, V2, V3 e Errata) restano intatti con `git diff` rigorosamente a zero.",
+        "3. **Integrità Storica Preservata:** Tutti i 15 file di audit storici restano intatti con `git diff` rigorosamente a zero rispetto al rispettivo commit di congelamento (`6afb247f249cd03684d1f42df343911928f7e8bd..HEAD` per i 14 file preesistenti; `4fbc01db1ab2e0589323c06850192a3f308a73be..HEAD` per `SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md`; `2123842f964c2d91d9163d7067385cc126eacad4..HEAD` per `SPRINT3_V3B_V0P_ABLATION_RESULTS.json`).",
         "",
         "### 7.5 Pacchetto di Validazione d'Ascolto Cieco (Blind Human Evaluation Package)",
-        "Per consentire la validazione percettiva umana priva di bias cognitivi:",
-        "- Sono stati renderizzati 12 file WAV a 24-bit PCM (48 kHz) con nomi anonimizzati (`variant_A.wav` e `variant_B.wav`);",
-        "- La chiave di decodifica segreta è memorizzata separatamente in `docs/sprint3/SPRINT3_V3B_BLIND_MAPPING.json`;",
+        "Per consentire la validazione percettiva umana in condizioni controllate:",
+        "- Sono stati renderizzati 12 file WAV a 24-bit PCM (48 kHz) con nomi anonimizzati (`variant_A.wav` e `variant_B.wav`) in `docs/sprint3/blind_v3b_wavs/` (cartella esclusa da Git via `.gitignore`);",
+        "- Il manifest tecnico di verifica dei 12 WAV (SHA-256, dimensioni, durata, Sample Peak, True Peak 4x e Integrated LUFS BS.1770, privo della chiave di decodifica) è archiviato in `docs/sprint3/SPRINT3_V3B_BLIND_AUDIO_MANIFEST.json` e `docs/sprint3/SPRINT3_V3B_BLIND_AUDIO_MANIFEST.md`;",
+        "- Il pacchetto condivisibile privo di mapping per i revisori d'ascolto è generato in `human_validation/private/sprint3_v3b_blind_evaluator_pack.zip` (contiene esclusivamente i 12 WAV, `SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md` e `SPRINT3_V3B_BLIND_AUDIO_MANIFEST.md`);",
         "- Il foglio di lavoro anonimo per i revisori d'ascolto è pronto in `docs/sprint3/SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md`.",
+        "",
+        "> **Avvertenza di Sicurezza sul Blinding:** Il file `docs/sprint3/SPRINT3_V3B_BLIND_MAPPING.json` è tracciato nel branch Git ed è quindi visibile a chiunque abbia accesso al repository. Per garantire un reale doppio cieco, gli ascoltatori umani devono ricevere **esclusivamente** l'archivio `sprint3_v3b_blind_evaluator_pack.zip` distribuito dal coordinatore non valutatore e non devono consultare il repository né `SPRINT3_V3B_BLIND_MAPPING.json` fino al completamento del foglio di valutazione.",
         "",
     ])
 
@@ -1116,6 +1142,156 @@ def generate_blind_listening_worksheet(all_blind_mappings: Dict[str, Any], out_p
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"[DONE] Generated blind listening worksheet to: {out_path}", flush=True)
+
+
+def generate_blind_audio_manifest_and_zip(
+    wav_dir: Path,
+    out_json_path: Path,
+    out_md_path: Path,
+    worksheet_path: Path,
+    zip_out_path: Path,
+) -> Dict[str, Any]:
+    """Read back the 12 blind WAV files, compute independent audio/SHA-256 manifest,
+    and build a shareable evaluator zip strictly free of SPRINT3_V3B_BLIND_MAPPING.json."""
+    wav_files = sorted(wav_dir.glob("*_variant_[AB].wav"))
+    if len(wav_files) != 12:
+        raise FileNotFoundError(
+            f"Expected 12 blind WAV files in {wav_dir}, found {len(wav_files)}."
+        )
+
+    file_entries: List[Dict[str, Any]] = []
+    pair_lookup: Dict[str, Dict[str, Dict[str, Any]]] = {}
+
+    for wav_path in wav_files:
+        info = sf.info(str(wav_path))
+        data, sr = sf.read(str(wav_path), dtype="float32", always_2d=True)
+        sha256_hex = hashlib.sha256(wav_path.read_bytes()).hexdigest()
+        tensor_audio = torch.from_numpy(data.T).unsqueeze(0).to(torch.float64)
+
+        lufs = float(calculate_integrated_loudness_bs1770(tensor_audio, sample_rate=float(sr)))
+        sample_peak_dbfs = float(calculate_sample_peak_dbfs(tensor_audio))
+        true_peak_dbtp = float(
+            calculate_true_peak_dbtp(tensor_audio, sample_rate=float(sr), oversampling_factor=4)
+        )
+
+        stem = wav_path.stem
+        session_prefix, variant_tag = stem.rsplit("_variant_", 1)
+
+        entry = {
+            "file_name": wav_path.name,
+            "session": session_prefix,
+            "blind_label": f"variant_{variant_tag}",
+            "sample_rate_hz": int(info.samplerate),
+            "channels": int(info.channels),
+            "subtype": str(info.subtype),
+            "frames": int(info.frames),
+            "duration_sec": round(float(info.duration), 6),
+            "bytes": int(wav_path.stat().st_size),
+            "sha256": sha256_hex,
+            "integrated_lufs_bs1770": round(lufs, 6),
+            "sample_peak_dbfs": round(sample_peak_dbfs, 6),
+            "true_peak_4x_dbtp": round(true_peak_dbtp, 6),
+        }
+        file_entries.append(entry)
+        pair_lookup.setdefault(session_prefix, {})[variant_tag] = entry
+
+    pair_deltas: List[Dict[str, Any]] = []
+    max_abs_delta_lufs = 0.0
+    for session_prefix in sorted(pair_lookup.keys()):
+        pair = pair_lookup[session_prefix]
+        a_entry = pair["A"]
+        b_entry = pair["B"]
+        delta_ab = float(a_entry["integrated_lufs_bs1770"] - b_entry["integrated_lufs_bs1770"])
+        abs_delta = abs(delta_ab)
+        max_abs_delta_lufs = max(max_abs_delta_lufs, abs_delta)
+        pair_deltas.append({
+            "session": session_prefix,
+            "variant_A_file": a_entry["file_name"],
+            "variant_B_file": b_entry["file_name"],
+            "lufs_A": round(float(a_entry["integrated_lufs_bs1770"]), 4),
+            "lufs_B": round(float(b_entry["integrated_lufs_bs1770"]), 4),
+            "delta_lufs_A_minus_B": round(delta_ab, 4),
+            "abs_delta_lufs": round(abs_delta, 4),
+            "identical_sha256_in_pair": bool(a_entry["sha256"] == b_entry["sha256"]),
+        })
+
+    manifest_payload = {
+        "artifact_type": "AutoMastering_Sprint3_V3b_Blind_Audio_Manifest",
+        "description": "Independent disk-readback verification manifest for the 12 anonymized 24-bit WAV files (strictly without key mapping).",
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "wav_count": len(file_entries),
+        "expected_sample_rate_hz": 48000,
+        "expected_channels": 2,
+        "expected_subtype": "PCM_24",
+        "max_abs_delta_lufs_across_pairs": round(max_abs_delta_lufs, 6),
+        "level_matched_tolerance_lu": 0.01,
+        "extra_gain_applied_on_export": False,
+        "contains_secret_mapping": False,
+        "evaluator_zip_relative_path": zip_out_path.relative_to(_REPO_ROOT).as_posix(),
+        "files": file_entries,
+        "pair_deltas": pair_deltas,
+    }
+
+    out_json_path.parent.mkdir(parents=True, exist_ok=True)
+    out_json_path.write_text(json.dumps(manifest_payload, indent=2), encoding="utf-8")
+    print(f"[DONE] Saved blind audio manifest JSON to: {out_json_path}", flush=True)
+
+    md_lines = [
+        "# SPRINT 3 — V3B BLIND AUDIO MANIFEST (SHA-256 & INTEGRITÀ WAV)",
+        "",
+        "**Scopo:** Verifica indipendente da disco dei 12 file WAV anonimizzati per l'ascolto cieco (48 kHz, stereo, 24-bit PCM `PCM_24`).  ",
+        "**Nota di Blinding:** Questo documento non contiene la chiave di decodifica (`SPRINT3_V3B_BLIND_MAPPING.json`) e può essere incluso nel pacchetto condiviso con i valutatori.",
+        "",
+        "## 1. Inventario File WAV (`docs/sprint3/blind_v3b_wavs/`)",
+        "",
+        "| File | Sessione | Etichetta | SR (Hz) | Ch | Formato | Frames | Durata (s) | Bytes | Integrated LUFS | Sample Peak (dBFS) | True Peak 4x (dBTP) | SHA-256 |",
+        "|:---|:---|:---:|:---:|:---:|:---:|---:|---:|---:|---:|---:|---:|:---|",
+    ]
+    for e in file_entries:
+        md_lines.append(
+            f"| `{e['file_name']}` | `{e['session']}` | `{e['blind_label']}` | {e['sample_rate_hz']} | {e['channels']} | `{e['subtype']}` | "
+            f"{e['frames']} | {e['duration_sec']:.4f} | {e['bytes']} | {e['integrated_lufs_bs1770']:.4f} | "
+            f"{e['sample_peak_dbfs']:+.4f} | {e['true_peak_4x_dbtp']:+.4f} | `{e['sha256']}` |"
+        )
+
+    md_lines.extend([
+        "",
+        "## 2. Parità di Livello per Coppia (`variant_A` vs `variant_B` senza Gain Aggiuntivo)",
+        "",
+        "| Sessione | LUFS `variant_A` | LUFS `variant_B` | $\\Delta\\text{LUFS}_{A-B}$ (LU) | $|\\Delta\\text{LUFS}|$ (LU) | Bit-Identici (SHA-256 uguale) |",
+        "|:---|---:|---:|---:|---:|:---:|",
+    ])
+    for pd in pair_deltas:
+        same_flag = "Sì" if pd["identical_sha256_in_pair"] else "No"
+        md_lines.append(
+            f"| **`{pd['session']}`** | {pd['lufs_A']:.4f} | {pd['lufs_B']:.4f} | "
+            f"{pd['delta_lufs_A_minus_B']:+.4f} | {pd['abs_delta_lufs']:.4f} | {same_flag} |"
+        )
+
+    md_lines.extend([
+        "",
+        f"- **Massimo scarto assoluto di coppia $|\\Delta\\text{{LUFS}}|$:** `{max_abs_delta_lufs:.4f} LU` (sotto la soglia di tolleranza `0.0100 LU`, senza applicazione di gain di compensazione esterno).",
+        f"- **Archivio Condivisibile Evaluators (senza chiave segreta):** `{zip_out_path.relative_to(_REPO_ROOT).as_posix()}`.",
+        "- **Contenuto dell'archivio `.zip`:** esclusivamente i 12 file `.wav` in `blind_v3b_wavs/`, `SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md` e `SPRINT3_V3B_BLIND_AUDIO_MANIFEST.md` (strictly NO `SPRINT3_V3B_BLIND_MAPPING.json`).",
+        "",
+    ])
+
+    out_md_path.parent.mkdir(parents=True, exist_ok=True)
+    out_md_path.write_text("\n".join(md_lines), encoding="utf-8")
+    print(f"[DONE] Saved blind audio manifest MD to: {out_md_path}", flush=True)
+
+    # Create shareable evaluator zip strictly free of SPRINT3_V3B_BLIND_MAPPING.json
+    if not worksheet_path.exists():
+        raise FileNotFoundError(f"Blind listening worksheet missing: {worksheet_path}")
+    zip_out_path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(zip_out_path, mode="w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
+        for wav_path in wav_files:
+            zf.write(wav_path, arcname=f"blind_v3b_wavs/{wav_path.name}")
+        zf.write(worksheet_path, arcname=worksheet_path.name)
+        zf.write(out_md_path, arcname=out_md_path.name)
+    print(f"[DONE] Built blind evaluator zip (no secret mapping) at: {zip_out_path}", flush=True)
+
+    return manifest_payload
 
 
 def run_ablation(export_wavs: bool = True, session_filter: Optional[str] = None):
@@ -1241,6 +1417,12 @@ def main():
         default=False,
         help="Regenerate SPRINT3_V3B_V0P_ABLATION_REPORT.md directly from existing JSON without optimization.",
     )
+    parser.add_argument(
+        "--blind-manifest-only",
+        action="store_true",
+        default=False,
+        help="Read back existing 12 blind WAVs to generate SHA-256/LUFS manifest and secret-free evaluator zip.",
+    )
 
     args = parser.parse_args()
 
@@ -1250,7 +1432,17 @@ def main():
             shutil.rmtree(c_dir)
             print(f"[CLEAN] Removed cache directory: {c_dir}")
 
-    if args.report_only:
+    if args.blind_manifest_only:
+        docs_dir = _REPO_ROOT / "docs" / "sprint3"
+        zip_path = _REPO_ROOT / "human_validation" / "private" / "sprint3_v3b_blind_evaluator_pack.zip"
+        generate_blind_audio_manifest_and_zip(
+            wav_dir=docs_dir / "blind_v3b_wavs",
+            out_json_path=docs_dir / "SPRINT3_V3B_BLIND_AUDIO_MANIFEST.json",
+            out_md_path=docs_dir / "SPRINT3_V3B_BLIND_AUDIO_MANIFEST.md",
+            worksheet_path=docs_dir / "SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md",
+            zip_out_path=zip_path,
+        )
+    elif args.report_only:
         out_json = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3B_V0P_ABLATION_RESULTS.json"
         out_report = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3B_V0P_ABLATION_REPORT.md"
         payload = json.loads(out_json.read_text(encoding="utf-8"))

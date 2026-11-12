@@ -794,40 +794,57 @@ def test_14_v3b_b05_optimizer_config_and_single_chunk_evaluation():
 # ==============================================================================
 # Gate 15: Integrity and zero-diff preservation of all historical artifacts
 # ==============================================================================
+_PROTECTED_HISTORICAL_BASELINES = {
+    "docs/sprint3/SPRINT3_V3B_PREFLIGHT_RESULTS.json": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V3B_PREFLIGHT_REPORT.md": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V2_RESULTS.json": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V2_REPORT.md": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_RESULTS.json": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_REPORT.md": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md": "4fbc01db1ab2e0589323c06850192a3f308a73be",
+    "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V2_REPORT.md": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V0P_V1_ABLATION_RESULTS.json": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V0P_V1_REPORT.md": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V3A_ABLATION_REPORT.md": "6afb247f249cd03684d1f42df343911928f7e8bd",
+    "docs/sprint3/SPRINT3_V3A_PREFLIGHT_GRADIENT_DIAGNOSTICS.json": "6afb247f249cd03684d1f42df343911928f7e8bd",
+}
+
+
+def _assert_artifact_immutable(repo_root: Path, rel_path: str, baseline_sha: str) -> None:
+    """Assert file exists, is non-empty, has clean working tree status, and zero historical git diff since baseline_sha..HEAD."""
+    p = repo_root / rel_path
+    assert p.exists(), f"Protected artifact missing: {rel_path}"
+    assert p.stat().st_size > 0, f"Protected artifact is empty: {rel_path}"
+
+    status_res = subprocess.run(
+        ["git", "status", "--porcelain", "--", rel_path],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=str(repo_root),
+    )
+    assert status_res.stdout.strip() == "", f"Uncommitted modification in protected artifact {rel_path}: {status_res.stdout}"
+
+    diff_res = subprocess.run(
+        ["git", "diff", "--name-only", f"{baseline_sha}..HEAD", "--", rel_path],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=str(repo_root),
+    )
+    assert diff_res.stdout.strip() == "", (
+        f"Historical modification detected in {rel_path} between {baseline_sha}..HEAD: {diff_res.stdout}"
+    )
+
+
 def test_15_preserved_artifacts_zero_diff():
-    """Verify that all historical preflight and ablation artifacts exist, are non-empty, and unmodified in git."""
+    """Verify that all historical preflight and ablation artifacts exist, are non-empty, and unmodified in git (working tree + history)."""
     repo_root = Path(__file__).resolve().parents[1]
-    historical_files = [
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_RESULTS.json",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_REPORT.md",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V2_RESULTS.json",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V2_REPORT.md",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_RESULTS.json",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_REPORT.md",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md",
-        "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
-        "docs/sprint3/SPRINT3_V2_REPORT.md",
-        "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
-        "docs/sprint3/SPRINT3_V0P_V1_ABLATION_RESULTS.json",
-        "docs/sprint3/SPRINT3_V0P_V1_REPORT.md",
-        "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json",
-        "docs/sprint3/SPRINT3_V3A_ABLATION_REPORT.md",
-        "docs/sprint3/SPRINT3_V3A_PREFLIGHT_GRADIENT_DIAGNOSTICS.json",
-    ]
-
-    for rel_path in historical_files:
-        p = repo_root / rel_path
-        assert p.exists(), f"Historical artifact missing: {rel_path}"
-        assert p.stat().st_size > 0, f"Historical artifact is empty: {rel_path}"
-
-        res = subprocess.run(
-            ["git", "status", "--porcelain", str(p)],
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=str(repo_root),
-        )
-        assert res.stdout.strip() == "", f"Uncommitted modification in historical artifact: {rel_path}"
+    for rel_path, baseline_sha in _PROTECTED_HISTORICAL_BASELINES.items():
+        _assert_artifact_immutable(repo_root, rel_path, baseline_sha)
 
 
 # Aliases for suite runners
@@ -842,9 +859,9 @@ test_gate_15_preserved_artifacts_zero_diff = test_15_preserved_artifacts_zero_di
 def test_16_v3b_ablation_results_integrity():
     """Verify completeness of 6 sessions in SPRINT3_V3B_V0P_ABLATION_RESULTS.json, roundtrip theta, and zero diff."""
     repo_root = Path(__file__).resolve().parents[1]
-    results_path = repo_root / "docs" / "sprint3" / "SPRINT3_V3B_V0P_ABLATION_RESULTS.json"
-    assert results_path.exists(), f"Ablation results missing: {results_path}"
-    assert results_path.stat().st_size > 0, f"Ablation results file is empty: {results_path}"
+    results_rel = "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json"
+    results_path = repo_root / results_rel
+    _assert_artifact_immutable(repo_root, results_rel, "2123842f964c2d91d9163d7067385cc126eacad4")
 
     data = json.loads(results_path.read_text(encoding="utf-8"))
     sessions = data.get("sessions", [])
@@ -880,41 +897,18 @@ def test_16_v3b_ablation_results_integrity():
             diff = abs(stored_val - calc_val)
             assert diff < 1e-5, f"[{sid}] V3b theta mismatch on {p.name}: {stored_val} vs {calc_val} (diff: {diff})"
 
-    # Verify zero diff on historical/preflight artifacts
-    historical_files = [
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_RESULTS.json",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_REPORT.md",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V2_RESULTS.json",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V2_REPORT.md",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_RESULTS.json",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_REPORT.md",
-        "docs/sprint3/SPRINT3_V3B_PREFLIGHT_V3_AUDIT_ERRATA.md",
-        "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
-        "docs/sprint3/SPRINT3_V2_REPORT.md",
-        "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
-        "docs/sprint3/SPRINT3_V0P_V1_ABLATION_RESULTS.json",
-        "docs/sprint3/SPRINT3_V0P_V1_REPORT.md",
-        "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json",
-        "docs/sprint3/SPRINT3_V3A_ABLATION_REPORT.md",
-        "docs/sprint3/SPRINT3_V3A_PREFLIGHT_GRADIENT_DIAGNOSTICS.json",
-    ]
-    for rel_path in historical_files:
-        p = repo_root / rel_path
-        assert p.exists() and p.stat().st_size > 0
-        res = subprocess.run(
-            ["git", "status", "--porcelain", str(p)],
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=str(repo_root),
-        )
-        assert res.stdout.strip() == "", f"Uncommitted modification in historical artifact: {rel_path}"
+    # Verify zero diff on historical/preflight artifacts (both working tree and baseline..HEAD history)
+    for rel_path, baseline_sha in _PROTECTED_HISTORICAL_BASELINES.items():
+        _assert_artifact_immutable(repo_root, rel_path, baseline_sha)
 
-    # Verify ablation report has non-zero Table 3 variation for eq_b4_gain_db on track01
+    # Verify ablation report has non-zero Table 3 variation and no unvalidated perceptual claims
     report_path = repo_root / "docs" / "sprint3" / "SPRINT3_V3B_V0P_ABLATION_REPORT.md"
     assert report_path.exists() and report_path.stat().st_size > 0, f"Report missing: {report_path}"
     report_text = report_path.read_text(encoding="utf-8")
     assert "eq_b4_gain_db" in report_text, "Expected eq_b4_gain_db column in Tabella 3"
+    assert "senza introdurre pompaggio udibile" not in report_text
+    assert "confermando l'assenza di regressioni timbriche" not in report_text
+    assert "f01e94717a7fd1718418c5bf978750c749e13895" in report_text  # Explicit audit clarification of non-existence
     t3_start = report_text.find("## 4. Tabella 3")
     assert t3_start != -1, "Tabella 3 section missing in report"
     t3_section = report_text[t3_start : t3_start + 3000]
@@ -927,4 +921,83 @@ def test_16_v3b_ablation_results_integrity():
 
 
 test_gate_16_v3b_ablation_results_integrity = test_16_v3b_ablation_results_integrity
+
+
+# ==============================================================================
+# Gate 17: Blind Audio WAV Package, SHA-256 Manifest, and Secret-Free Evaluator Zip
+# ==============================================================================
+def test_17_blind_audio_wav_package_and_manifest_validity():
+    """Verify all 12 blind WAV files on disk match SPRINT3_V3B_BLIND_AUDIO_MANIFEST.json/md
+    (48kHz, stereo, PCM_24, SHA-256, LUFS parity < 0.01 LU) and evaluator zip excludes key mapping."""
+    import hashlib
+    import zipfile
+    import soundfile as sf
+    from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
+
+    repo_root = Path(__file__).resolve().parents[1]
+    manifest_json_path = repo_root / "docs" / "sprint3" / "SPRINT3_V3B_BLIND_AUDIO_MANIFEST.json"
+    manifest_md_path = repo_root / "docs" / "sprint3" / "SPRINT3_V3B_BLIND_AUDIO_MANIFEST.md"
+    wav_dir = repo_root / "docs" / "sprint3" / "blind_v3b_wavs"
+    zip_path = repo_root / "human_validation" / "private" / "sprint3_v3b_blind_evaluator_pack.zip"
+
+    assert manifest_json_path.exists() and manifest_json_path.stat().st_size > 0
+    assert manifest_md_path.exists() and manifest_md_path.stat().st_size > 0
+
+    manifest_raw = manifest_json_path.read_text(encoding="utf-8")
+    assert "control_v0p" not in manifest_raw and "treatment_v3b_b05" not in manifest_raw
+    manifest = json.loads(manifest_raw)
+    assert manifest.get("wav_count") == 12
+    assert manifest.get("contains_secret_mapping") is False
+    assert manifest.get("expected_sample_rate_hz") == 48000
+    assert manifest.get("expected_channels") == 2
+    assert manifest.get("expected_subtype") == "PCM_24"
+    assert float(manifest.get("max_abs_delta_lufs_across_pairs", 99.0)) < 0.01
+
+    entries = manifest.get("files", [])
+    assert len(entries) == 12
+
+    pair_lufs = {}
+    expected_names = set()
+    for entry in entries:
+        fname = entry["file_name"]
+        expected_names.add(f"blind_v3b_wavs/{fname}")
+        wav_path = wav_dir / fname
+        assert wav_path.exists(), f"Missing blind WAV file: {wav_path}"
+        assert wav_path.stat().st_size == entry["bytes"]
+
+        info = sf.info(str(wav_path))
+        assert info.samplerate == 48000
+        assert info.channels == 2
+        assert info.subtype == "PCM_24"
+        assert info.frames == entry["frames"] and info.frames > 0
+
+        sha_actual = hashlib.sha256(wav_path.read_bytes()).hexdigest()
+        assert sha_actual == entry["sha256"], f"SHA-256 mismatch for {fname}"
+
+        data, sr = sf.read(str(wav_path), dtype="float32", always_2d=True)
+        tensor_audio = torch.from_numpy(data.T).unsqueeze(0).to(torch.float64)
+        lufs_actual = float(calculate_integrated_loudness_bs1770(tensor_audio, sample_rate=float(sr)))
+        assert abs(lufs_actual - float(entry["integrated_lufs_bs1770"])) < 1e-3
+        pair_lufs.setdefault(entry["session"], {})[entry["blind_label"]] = lufs_actual
+
+    assert len(pair_lufs) == 6
+    for sid, vals in pair_lufs.items():
+        delta_lu = abs(vals["variant_A"] - vals["variant_B"])
+        assert delta_lu < 0.01, f"[{sid}] Blind pair LUFS mismatch: |A-B|={delta_lu:.4f} LU >= 0.01 LU"
+
+    assert zip_path.exists() and zip_path.stat().st_size > 0, f"Evaluator zip missing: {zip_path}"
+    with zipfile.ZipFile(zip_path, mode="r") as zf:
+        names = set(zf.namelist())
+        assert "SPRINT3_V3B_BLIND_MAPPING.json" not in names
+        assert not any("MAPPING" in n.upper() for n in names), f"Secret mapping leaked in zip: {names}"
+        expected_zip_members = expected_names | {
+            "SPRINT3_V3B_BLIND_LISTENING_WORKSHEET.md",
+            "SPRINT3_V3B_BLIND_AUDIO_MANIFEST.md",
+        }
+        assert names == expected_zip_members, f"Unexpected zip members: {names ^ expected_zip_members}"
+        for zi in zf.infolist():
+            assert zi.file_size > 0, f"Empty entry inside zip: {zi.filename}"
+
+
+test_gate_17_blind_audio_wav_package_and_manifest_validity = test_17_blind_audio_wav_package_and_manifest_validity
 
