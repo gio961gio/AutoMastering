@@ -5,45 +5,42 @@
 **Supervisore Tecnico:** Argon (Gemini Web Pro / Medium Thinking)  
 **Repository:** `gio961gio/AutoMastering`  
 **Branch:** `human-validation-package`  
-**Commit di riferimento:** `9cc448f8c83c0e1361638cffe4d09873e8bf8428`  
-**Stato:** SPECIFICA PROGETTUALE PRE-IMPLEMENTAZIONE (ZERO modifiche a DSP, loss, optimizer o test in questa fase)
+**Commit di riferimento:** `9b1fd9115cce6deaffe637c649c4bb7d6159a195`  
+**Stato:** SPECIFICA REVISIONATA CON DECISIONI CONGELATE `Q1–Q5` (ZERO modifiche a `optimizer.py`, `dynamic_prior.py`, `param_space.py` o DSP)
 
 ---
 
-## 1. EXECUTIVE SUMMARY & RICOGNIZIONE DEL CODICE ESISTENTE
+## 1. EXECUTIVE SUMMARY & RICOGNIZIONE VERIFICATA DEL CODICE ESISTENTE
 
 ### 1.1 Obiettivo e Posizionamento dello Step `V3c`
-Lo Step **`V3c`** completa l'asse di regolarizzazione spaziale/fase della roadmap Sprint 3, introducendo un prior differenziabile di **compatibilità stereo e mono-foldback** progettato per lavorare in composizione pulita con `V0p`, `V3a` (EQ Prior) e `V3b` (Dynamic Priors) senza modificare l'architettura DSP sottostante.
+Lo Step **`V3c`** completa la fase di analisi e progettazione della compatibilità stereo/mono nella roadmap Sprint 3, definendo un prior differenziabile standalone (`V3cStereoCompatibilityLoss`) per il controllo della correlazione per banda, del mono fold-down drop e dell'allargamento in bassa frequenza, senza modificare i moduli DSP o l'ottimizzatore in questa fase.
 
-### 1.2 Verifica Esatta dei File Reali, Limiti Parametrici e Riconciliazione Analitica
-Dall'ispezione diretta dei sorgenti su `human-validation-package` al commit `9cc448f8c83c0e1361638cffe4d09873e8bf8428`:
-1. **Moduli DSP e Loss Verificati:**
-   - **Imager Python:** `DifferentiableMidSideImager` in `python/ddsp_mastering/dsp/imager.py` (costante ortonormale `INV_SQRT2 = 0.70710678118654752440`, `float64`, `torch.clamp(width, min=0.0)`).
-   - **Imager C++ (per parity test):** `core_dsp::MidSideImager` in `cpp/core_dsp/include/core_dsp/MidSideImager.hpp` *(nota nominale: il file nel repository si chiama `MidSideImager.hpp`, non `StereoImager.hpp`)*.
+### 1.2 Moduli DSP/Loss e Spazio Parametrico Reale (`param_space.py`)
+Dalla lettura diretta dei sorgenti su `human-validation-package` al commit `9b1fd9115cce6deaffe637c649c4bb7d6159a195`:
+1. **Imager Python & C++:**
+   - **Python:** `DifferentiableMidSideImager` in `python/ddsp_mastering/dsp/imager.py` (`INV_SQRT2 = 0.70710678118654752440`, calcolo interno in `float64`, `torch.clamp(width, min=0.0)`).
+   - **C++ (isomorfo, esposto via `py_core_dsp.MidSideImager`):** `core_dsp::MidSideImager` in `cpp/core_dsp/include/core_dsp/MidSideImager.hpp`.
    - **Ordine nella Catena DSP (`python/ddsp_mastering/dsp/chain.py`):**
      $$\text{Parametric EQ} \;\to\; \text{LR4 3-Way Crossover} \;\to\; \text{Multiband Comp} \;\to\; \mathbf{\text{MidSideImager}} \;\to\; \text{Saturator (15 smp)} \;\to\; \text{Lookahead Limiter (144 smp)}$$
-     L'imager introduce **0 campioni** di latenza propria; l'intera latenza di catena resta $D_{\text{tot}} = 15 + 144 = 159$ campioni a valle dell'imager.
-   - **Copertura Stereo Attuale nelle Loss:**
-     - `MasteringPerceptualLoss` (`python/ddsp_mastering/loss/combined.py`, modalità `same_track`): usa `MultiResolutionSTFTLoss(use_mid_side=True, mid_side_weight=0.5)`, confrontando L/R e M/S punto-a-punto rispetto al reference. Non impone vincoli espliciti su correlazione di fase, drop in mono o larghezza in bassa frequenza rispetto al mix di ingresso.
-     - `AggregatePerceptualLoss` (`python/ddsp_mastering/loss/stylistic.py`, modalità `stylistic`): calcola `stylistic_stereo_loss` con `weight_stereo = 0.3` come $\left|\left(\ln\bar{E}_{S,\text{pred}} - \ln\bar{E}_{M,\text{pred}}\right) - \left(\ln\bar{E}_{S,\text{ref}} - \ln\bar{E}_{M,\text{ref}}\right)\right|$ sull'intera banda larga. Nessun vincolo per banda di frequenza, nessuna metrica di correlazione $\rho_b$ e nessuna protezione contro cancellazioni di fase in somma mono.
-
-2. **Spazio Parametrico Reale (`python/ddsp_mastering/param_space.py`) vs Ipotesi Generiche:**
-   A differenza dell'ipotesi preliminare di bounds simmetrici $[0.0, 2.0]$ centrati a $z = 0.5$ ($u = 0$), il codice reale definisce le dimensioni 35–37 (e crossover 18–19) con limiti stretti e asimmetrici:
+     La latenza complessiva a valle dell'imager resta esattamente $D_{\text{tot}} = 15 + 144 = 159$ campioni a $48\text{ kHz}$.
+2. **Copertura Stereo Esistente:**
+   - `MasteringPerceptualLoss` (`python/ddsp_mastering/loss/combined.py`, `same_track`): usa `MultiResolutionSTFTLoss(use_mid_side=True, mid_side_weight=0.5)`.
+   - `AggregatePerceptualLoss` (`python/ddsp_mastering/loss/stylistic.py`, `stylistic`): usa `stylistic_stereo_loss` con `weight_stereo = 0.3` sul rapporto logaritmico broadband $\ln E_S - \ln E_M$.
+   - Nessuna delle due loss include vincoli per banda di frequenza, protezione esplicita da calo di correlazione $\rho_{LR, b}$, protezione da mono fold-down drop $D_{\text{mono}}$ né soglie minime di validità energetica.
+3. **Bounds e Jacobiani Reali (`python/ddsp_mastering/param_space.py`, righe 60–62 e 156–162):**
 
 | Indice | Nome in `PARAM_SPECS` | Min | Max | Scala | Neutro $\theta_{\text{neut}}$ | $Z_{\text{NEUTRAL}}$ | $u_{\text{neut}} = \text{logit}(z)$ | Jacobiano $dz/du$ | Jacobiano $d\theta/du$ |
 |:---:|:---|---:|---:|:---:|---:|---:|---:|---:|---:|
 | 18 | `crossover_f_low` | `80.0` | `350.0` | `log` | `160.0 Hz` | `0.469642` | `-0.121581` | `0.249078` | `58.95 Hz/u` |
 | 19 | `crossover_f_high` | `1500.0` | `6000.0` | `log` | `3200.0 Hz` | `0.546555` | `+0.186762` | `0.247833` | `1099.4 Hz/u` |
-| 35 | `imager_width_low` | `0.4` | `1.1` | `linear` | `1.0` | `0.857143` | `+1.791759` | `0.122449` | `0.085714` |
-| 36 | `imager_width_mid` | `0.7` | `1.4` | `linear` | `1.0` | `0.428571` | `-0.287682` | `0.244898` | `0.171429` |
-| 37 | `imager_width_high` | `0.7` | `1.4` | `linear` | `1.0` | `0.428571` | `-0.287682` | `0.244898` | `0.171429` |
+| 35 | `imager_width_low` | `0.4` | `1.1` | `linear` | `1.0` | `0.857143` (`6/7`) | `+1.791759` | `0.122449` (`6/49`) | `0.085714` |
+| 36 | `imager_width_mid` | `0.7` | `1.4` | `linear` | `1.0` | `0.428571` (`3/7`) | `-0.287682` | `0.244898` (`12/49`) | `0.171429` |
+| 37 | `imager_width_high` | `0.7` | `1.4` | `linear` | `1.0` | `0.428571` (`3/7`) | `-0.287682` | `0.244898` (`12/49`) | `0.171429` |
 
-   - **Implicazione Critica sull'Ottimizzazione:** Poiché $Z_{\text{NEUTRAL}}[35] = 6/7 \approx 0.8571$, la derivata locale $dw_{\text{low}}/du_{35} = 0.7 \cdot z(1-z) = 0.0857$ all'inizializzazione è già esattamente **la metà** rispetto a `mid`/`high` ($0.1714$), e si schiaccia ulteriormente verso zero avvicinandosi a $w_{\text{low}} \to 1.1$. Di converso, l'escursione fisica in bassa frequenza è già confinata in $[0.4, 1.1]$, mentre `mid` e `high` possono spingersi fino a `1.4` ($+40\%$ Side).
+### 1.3 Valori Reali Osservati in `docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json`
+Dalla lettura diretta dei valori `physical_parameters_theta` e `full_track_benchmark` salvati nel JSON congelato:
 
-### 1.3 Rilevamenti Empirici Reali da `SPRINT3_V3B_V0P_ABLATION_RESULTS.json`
-I valori effettivi ottimizzati dalle sessioni armonizzate `Control V0p` e `Treatment V3b-B0.5` nel JSON congelato sono:
-
-| Sessione | `crossover_f_low` / `high` (Hz) | `V0p` `imager_width` `[low, mid, high]` | `V3b` `imager_width` `[low, mid, high]` | `V0p` M/S Ratio `pred` vs `target` (dB) | `delta_ms_ratio_db` |
+| Sessione | `crossover_f_low` / `high` (Hz) | `control_v0p` `imager_width` `[low, mid, high]` | `treatment_v3b_b05` `imager_width` `[low, mid, high]` | `V0p` M/S Ratio `pred` vs `target` (dB) | `delta_ms_ratio_db` |
 |:---|:---:|:---:|:---:|:---:|:---:|
 | **`track01`** | `166.58` / `2692.08` | `[1.0422, 1.1117, 1.1098]` | `[1.0423, 1.1116, 1.1081]` | `8.5045` vs `8.9424` | `0.4380` |
 | **`track02`** | `197.98` / `3170.95` | `[1.0230, 1.1119, 1.1112]` | `[1.0230, 1.1119, 1.1112]` | `14.0311` vs `14.3802` | `0.3491` |
@@ -52,135 +49,111 @@ I valori effettivi ottimizzati dalle sessioni armonizzate `Control V0p` e `Treat
 | **`track02_style`** | `200.44` / `3177.98` | `[1.0434, 1.1127, 1.1116]` | `[1.0434, 1.1127, 1.1116]` | `14.0153` vs `16.3930` | `2.3776` |
 | **`track03_style`** | `197.48` / `3335.39` | `[1.0422, 1.1104, 1.1101]` | `[1.0422, 1.1104, 1.1101]` | `6.7986` vs `7.8634` | `1.0649` |
 
-**Evidenze Chiave:**
-1. In **5 sessioni su 6**, `imager_width_low` supera l'unità (`1.023..1.043`), allargando sistematicamente la banda sub/bassi (`< 200 Hz`) anziché mantenerla centrata o neutra, e `mid`/`high` convergono verso `~1.11`. Solo `track01_style` (dove il reference è più stretto del target) restringe tutte e tre le bande (`0.9455 / 0.8970 / 0.8938`).
-2. `V3b-B0.5` non altera in modo apprezzabile lo spazio stereo rispetto a `V0p` (variazioni $\le 0.0016$ solo su `track01`), confermando l'ortogonalità tra `V3b` e la regolarizzazione spaziale demandata a `V3c`.
-3. Il dataset corrente non misura né la correlazione $\rho_b$ né l'attenuazione da mono foldback $\Delta_{\text{mono}}$; tali misure saranno il cuore del **Preflight Read-Only V3c** prima di qualsiasi implementazione in training.
+> **Nota di Audit sulla Verifica Diretta del Repository:** Tutti i valori in tabella e nei bounds sopra (`[0.4, 1.1]`, `[0.7, 1.4]`, `[0.7, 1.4]`, `DifferentiableMidSideImager`, `MidSideImager.hpp` e le width estratte da `SPRINT3_V3B_V0P_ABLATION_RESULTS.json`) riflettono fedelmente i byte presenti su `HEAD`. Si segnala per trasparenza al supervisore che nella direttiva di revisione erano stati indicati bounds (`[0.50, 1.20]`, `[0.70, 1.50]`), nomi file/classe (`StereoImager.hpp`, `DifferentiableMultibandStereoImager`) e width (`1.0427`, `1.0160`) non riscontrati nei file effettivamente tracciati nel repository.
 
 ---
 
-## 2. AUDIT MATEMATICO DELLO STEREO IMAGER E INTERAZIONE CON LA CATENA NON LINEARE
+## 2. AUDIT MATEMATICO DELL'IMAGER E DEFINIZIONI SCALE-INVARIANT
 
 ### 2.1 Trasformazione Ortonormale M/S per Banda
-Per ogni banda $b \in \{\text{low}, \text{mid}, \text{high}\}$ prodotta dal crossover LR4 (`DifferentiableLR4Crossover`) e processata dal compressore multibanda (`y_comp,b`):
+Per ciascuna banda $b \in \{\text{low}, \text{mid}, \text{high}\}$:
 $$M_b[n] = \frac{L_b[n] + R_b[n]}{\sqrt{2}}, \qquad S_b[n] = \frac{L_b[n] - R_b[n]}{\sqrt{2}}$$
 $$\hat{S}_b[n] = w_b \, S_b[n], \qquad \hat{L}_b[n] = \frac{M_b[n] + \hat{S}_b[n]}{\sqrt{2}}, \qquad \hat{R}_b[n] = \frac{M_b[n] - \hat{S}_b[n]}{\sqrt{2}}$$
-L'uscita dell'imager è la somma $\hat{x}_{\text{img}} = \sum_{b} \hat{x}_b$.
+con identità ortonormale esatta $\hat{L}_b^2 + \hat{R}_b^2 = M_b^2 + \hat{S}_b^2$ ed invarianza $\frac{\hat{L}_b + \hat{R}_b}{\sqrt{2}} = M_b$ a monte delle non linearità (saturatore e limiter a valle modificano poi $L$ e $R$ per canale).
 
-### 2.2 Invarianti Esatte e Sorgenti Reali di Incompatibilità Mono
-Dalla struttura ortonormale discendono tre identità algebriche esatte per l'imager isolato:
-1. **Conservazione dell'Energia Ortonormale ($w_b = 1$):**
-   $$M_b^2 + \hat{S}_b^2 = \hat{L}_b^2 + \hat{R}_b^2 \quad \text{(esatta campione per campione)}$$
-2. **Invarianza della Somma Mono Pura a Monte delle Non-Linearità:**
-   $$\frac{\hat{L}_b[n] + \hat{R}_b[n]}{\sqrt{2}} = M_b[n] \quad \forall w_b \ge 0$$
-   Ciò significa che l'imager lineare **non cambia** il segnale $M[n]$ di per sé, ma cambia **drasticamente** la quota di energia totale persa quando il segnale stereo viene sommato in mono:
-   $$\frac{E_M}{E_{\text{tot}}} = \frac{\sum_n M[n]^2}{\sum_n (M[n]^2 + \hat{S}[n]^2)} = \frac{E_M}{E_M + w^2 E_S}$$
-3. **Dipendenza Esatta della Correlazione $\rho_b$ da $w_b$ (a $\langle M_b, S_b\rangle \approx 0$):**
-   $$\langle \hat{L}_b, \hat{R}_b \rangle = \frac{1}{2}\left(E_{M,b} - w_b^2 E_{S,b}\right), \qquad \rho_b = \frac{E_{M,b} - w_b^2 E_{S,b}}{\sqrt{(E_{M,b} + w_b^2 E_{S,b})^2 - 4 w_b^2 \langle M_b, S_b\rangle^2}}$$
-   Pertanto:
-   - Se $w_b^2 E_{S,b} > E_{M,b}$, la correlazione **diventa negativa** ($\rho_b < 0$), causando cancellazione di fase all'ascolto mono o su diffusori acustici ravvicinati;
-   - A valle dell'imager operano **due stadi non lineari per-canale** (`DifferentiableHarmonicSaturator` e `DifferentiableLookaheadLimiter`): quando $w_b$ amplifica $S_b$ su $L$ e $R$ in controfase, la saturazione `tanh` su $L$ e $R$ genera distorsione intermodulata $M\text{-}S$ e il limiter reagisce ai picchi stereo spuri di $|L|, |R|$; questo **altera fisicamente** anche il contenuto spettrale e dinamico di $\hat{M}_{\text{post}}$ rispetto a $M_{\text{pre}}$!
+### 2.2 Banco LR4 Fisso `160 / 3200 Hz` con Warm-Up su Pre-Roll Completo (Decisione Q1)
+Il banco di misura usa `DifferentiableLR4Crossover(sample_rate=48000.0)` alle frequenze fisse:
+$$f_{\text{low,fix}} = 160.0\text{ Hz}, \qquad f_{\text{high,fix}} = 3200.0\text{ Hz}$$
+Regola tassativa di filtraggio e ritaglio:
+1. Il crossover LR4 **è sempre eseguito sull'intero segnale esteso comprensivo del pre-roll completo del chunk** ($[0, N_{\text{pre}} + T)$), così da portare a regime tutti gli stati interni dei filtri IIR biquad prima dell'inizio della finestra di valutazione.
+2. Solo **dopo** il filtraggio LR4 si applica il ritaglio alla finestra comune di valutazione ($T_{\text{eval}} = T - 159 = 143\,841$ campioni a $48\text{ kHz}$):
+   - per il mix originale $x_{\text{mix}, b}$: slice $[N_{\text{pre}} : N_{\text{pre}} + T - 159]$;
+   - per l'uscita masterizzata $y_{\text{pred}, b}$: slice $[N_{\text{pre}} + 159 : N_{\text{pre}} + T]$.
+3. La maschera booleana dei campioni attivi $\mathcal{A}_{\text{smp}} = \text{compute\_active\_sample\_mask}(x_{\text{mix}}^{\text{eval}})$ è calcolata a blocchi da $480$ campioni ($10\text{ ms}$, soglia $-70\text{ dBFS}$, fallback $M_{\min}=8$, preservazione blocco parziale residuo da $321$ campioni su $T_{\text{eval}}=143\,841$) e staccata dal grafo.
 
----
+### 2.3 Controllo di Energia Minima per Banda, Canale Silenzioso e Pavimento Relativo $\varepsilon_{\text{rel}}$
+Siano le energie medie sui campioni attivi $n \in \mathcal{A}_{\text{smp}}$ (di cardinalità $N_a \ge 1$) calcolate in precisione `float64`:
+$$E_L = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} x_L[n]^2, \quad E_R = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} x_R[n]^2, \quad E_{\text{tot}} = E_L + E_R = E_M + E_S$$
+$$E_M = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} m[n]^2, \quad E_S = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} s[n]^2, \quad C_{LR} = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} x_L[n]\,x_R[n]$$
 
-## 3. FORMULAZIONE MATEMATICA CANDIDATA PER `V3c`
+1. **Pavimento Relativo Staccato per Scale Invariance (Range Operativo $[-60, +20]\text{ dBFS}$):**
+   $$\varepsilon_{\text{rel}} = 10^{-12} \cdot \text{detach}(E_{\text{tot}}) + 10^{-30}$$
+   Definiamo con $\varepsilon_{\text{rel}}$ le metriche scale-invariant (invarianti entro $< 10^{-11}\text{ dB}$ rispetto a riscalature $x \mapsto c \cdot x$ con $E_{\text{tot}} \ge 10^{-7}$):
+   $$D_{\text{mono}}(x) = 10 \log_{10}\!\left(\frac{E_M + E_S + \varepsilon_{\text{rel}}}{E_M + \varepsilon_{\text{rel}}}\right) \quad [\text{dB}]$$
+   $$R_{S/M}(x) = 10 \log_{10}\!\left(\frac{E_S + \varepsilon_{\text{rel}}}{E_M + \varepsilon_{\text{rel}}}\right) \quad [\text{dB}], \qquad B_{L/R}(x) = 10 \log_{10}\!\left(\frac{E_L + \varepsilon_{\text{rel}}}{E_R + \varepsilon_{\text{rel}}}\right) \quad [\text{dB}]$$
+   $$\rho_{LR}(x) = \frac{C_{LR}}{\sqrt{(E_L + \varepsilon_{\text{rel}})(E_R + \varepsilon_{\text{rel}})}} = \frac{\frac{1}{2}(E_M - E_S)}{\sqrt{\left(\frac{E_M + E_S}{2} + \varepsilon_{\text{rel}}\right)^2 - C_{MS}^2}}$$
+   *(Nota numerica: in controfase pura $E_M = 0$, $D_{\text{mono}}$ resta finito e privo di `NaN`/`Inf` grazie a $\varepsilon_{\text{rel}} > 0$).*
 
-In coerenza con `V3bDynamicPriorLoss`, ogni termine `V3c` deve essere:
-1. Calcolato sulle finestre **post pre-roll allineate in latenza** ($\hat{y}_{\text{eval}} = \hat{y}[\dots, N_{\text{pre}}+D_{\text{tot}} : N_{\text{pre}}+T]$ appaiata con $x_{\text{mix}}^{\text{eval}} = x_{\text{mix}}[\dots, N_{\text{pre}} : N_{\text{pre}}+T_{\text{eval}}]$, $T_{\text{eval}} = 143\,841$ a $48\text{ kHz}$);
-2. Mascherato su **soli campioni attivi** tramite `compute_active_sample_mask` ($B = 480$ campioni = $10\text{ ms}$, soglia $-70\text{ dBFS}$, fallback $M_{\min} = 8$ blocchi), evitando divisioni su code silenziose;
-3. Aggregato su $K = 4$ chunk con pesi uniformi fissi $w_k = 1/4$ (senza rinormalizzazione dinamica).
+2. **Soglia di Energia Minima per Banda ($E_{\min} = 10^{-7}$, $-70.0\text{ dBFS}$):**
+   - Per ciascuna banda $b \in \{L, M, H\}$, se $E_{\text{tot}, b} = E_{L, b} + E_{R, b} < E_{\min} = 10^{-7}$ (valutata sul segnale rilevante; nelle loss pairwise richiede validità di mix e pred, o $E_{\text{tot},b} < E_{\min}$ sul segnale di test), allora **`band_valid[b] = False`**, il contributo della banda $b$ alle loss basate sul segnale è identicamente **`0.0`** (con gradiente nullo) e nel reporting la banda viene contrassegnata da `band_valid[b] = False`.
 
-### 3.1 Banco d'Analisi Fisso (Indipendente dai Parametri Trainable)
-Per valutare correlazione e energia mono per banda senza creare incentivi spuri sullo spostamento delle frequenze di crossover (Sezione 4), `V3c` proietta l'audio attivo su $B = 3$ bande di analisi tramite un **banco LR4 fisso non-trainable** (con frequenze nominali ancorate ai neutri $f_{\text{low,fix}} = 160\text{ Hz}$, $f_{\text{high,fix}} = 3200\text{ Hz}$, o $200 / 2500\text{ Hz}$ da congelare in fase di review):
-$$\hat{y}_b = \mathcal{H}_b^{\text{fix}}(\hat{y}_{\text{eval}}), \qquad x_{\text{mix}, b} = \mathcal{H}_b^{\text{fix}}(x_{\text{mix}}^{\text{eval}}), \qquad b \in \{\text{low}, \text{mid}, \text{high}\}$$
-
-### 3.2 Termine 1 — Correlazione Inter-Canale per Banda con Dead-Zone e Tail Temporale ($\mathcal{L}_{\text{corr}}$)
-Definita su campioni attivi $n \in A_{\text{smp}}$ la correlazione normalizzata per banda ($\epsilon = 10^{-12}$):
-$$\rho_b(\hat{y}) = \frac{\sum_{n \in A_{\text{smp}}} \hat{L}_b[n]\hat{R}_b[n]}{\sqrt{\left(\sum_{n \in A_{\text{smp}}} \hat{L}_b[n]^2 + \epsilon\right)\left(\sum_{n \in A_{\text{smp}}} \hat{R}_b[n]^2 + \epsilon\right)}} \in [-1, +1]$$
-Per evitare di comprimere brani intrinsecamente larghi più del mix sorgente (modalità mix-aware), la soglia target effettiva può essere definita come:
-$$\tau_{\rho, b}^{\text{eff}} = \min\!\left(\tau_{\rho, b}^{\text{abs}},\; \text{detach}(\rho_b(x_{\text{mix}})) - \delta_{\rho, b}\right)$$
-(oppure puramente assoluta $\tau_{\rho, b}^{\text{abs}}$ per la banda sub-bassi, es. $\tau_{\rho,\text{low}} \in [0.70, 0.85]$). La penalità quadratica con dead-zone è:
-$$\mathcal{L}_{\text{corr}}^{\text{glob}} = \sum_{b \in \{\text{low}, \text{mid}, \text{high}\}} \alpha_b \, \text{ReLU}\!\left(\tau_{\rho, b}^{\text{eff}} - \rho_b(\hat{y})\right)^2$$
-*(Opzionale Q4)* Affiancabile a un termine locale su finestre attive brevi (blocchi da $100\text{ ms} = 4800$ campioni) con $\text{CVaR}_{0.95}$ su $\text{ReLU}(\tau_{\rho,\text{loc}} - \rho_{b,m})$ per intercettare transienti in controfase localizzati che spariscono nella media di chunk da 3s.
-
-### 3.3 Termine 2 — Protezione da Mono-Foldback Drop ($\mathcal{L}_{\text{mono\_drop}}$)
-Usando la decomposizione ortonormale su campioni attivi:
-$$E_M = \sum_{n \in A_{\text{smp}}} \hat{M}[n]^2, \qquad E_S = \sum_{n \in A_{\text{smp}}} \hat{S}[n]^2$$
-L'attenuazione energetica nel passaggio da somma stereo totale a somma mono (in dB $\ge 0$) è:
-$$\Delta_{\text{mono}}(\hat{y}) = 10 \log_{10}\!\left(\frac{E_M + E_S + \epsilon}{E_M + \epsilon}\right) \quad [\text{dB}]$$
-Esempi fisici esatti:
-- Segnale mono ($L = R$, $E_S = 0$): $\Delta_{\text{mono}} = 0.00\text{ dB}$;
-- Segnale decorrelato ($\rho = 0$, $E_S = E_M$): $\Delta_{\text{mono}} = 10\log_{10}(2) \approx 3.01\text{ dB}$;
-- Eccesso di controfase ($E_S = 3 E_M$, $\rho = -0.5$): $\Delta_{\text{mono}} = 6.02\text{ dB}$.
-
-Sia $\tau_{\text{mono}}^{\text{eff}} = \max\!\left(\tau_{\text{mono}}^{\text{abs}},\; \text{detach}(\Delta_{\text{mono}}(x_{\text{mix}})) + \delta_{\text{mono}}\right)$ (con $\tau_{\text{mono}}^{\text{abs}} \approx 3.5\text{ dB}$ e margine $\delta_{\text{mono}} \approx 0.5\text{ dB}$):
-$$\mathcal{L}_{\text{mono\_drop}} = \text{ReLU}\!\left(\Delta_{\text{mono}}(\hat{y}) - \tau_{\text{mono}}^{\text{eff}}\right)^2 \quad [\text{dB}^2]$$
-Questo termine penalizza qualsiasi perdita di livello in somma mono oltre il pavimento di sicurezza e oltre quanto già presente nel mix di partenza.
-
-### 3.4 Termine 3 — Vincolo di Centratura Low-Band & Guardrail su `imager_width` ($\mathcal{L}_{\text{low\_mono}}$)
-Poiché i dati `V0p`/`V3b` mostrano che `imager_width_low` tende sistematicamente a valori $> 1.0$ (`1.023..1.043` in 5 sessioni su 6), si propone un termine parametrico diretto con dead-zone asimmetrica sulla sola espansione eccessiva in bassa frequenza:
-$$\mathcal{L}_{\text{low\_mono}} = \text{ReLU}\!\left(w_{\text{low}} - \tau_{w,\text{low}}\right)^2, \qquad \tau_{w,\text{low}} = 1.00$$
-che lascia completamente libera la scelta di **stringere** i bassi ($w_{\text{low}} \in [0.4, 1.0]$) verso una maggiore mono-compatibilità, ma scoraggia ogni allargamento artificiale dei sub/bassi sopra `1.0`. Analogamente, in `u`-space, ricordiamo che $w_{\text{low}} = 0.4 + 0.7 \sigma(u_{35})$, per cui l'uso della penalità quadratica produce gradiente nullo ovunque per $w_{\text{low}} \le 1.0$ e regolare crescita quadratica sopra soglia.
-
-### 3.5 Termine 4 — Guardrail Bilanciamento L/R ($\mathcal{L}_{\text{bal}}$)
-Per evitare asimmetrie tonali/dinamiche destra-sinistra indotte dall'EQ/compressore/saturatore su materiale asimmetrico:
-$$\Delta_{LR}(\hat{y}) = 10\log_{10}\!\left(\frac{\sum_{A_{\text{smp}}}\hat{L}^2 + \epsilon}{\sum_{A_{\text{smp}}}\hat{R}^2 + \epsilon}\right), \qquad \mathcal{L}_{\text{bal}} = \text{ReLU}\!\left(\left|\Delta_{LR}(\hat{y}) - \text{detach}(\Delta_{LR}(x_{\text{mix}}))\right| - \delta_{\text{bal}}\right)^2$$
-(es. $\delta_{\text{bal}} = 0.5\text{ dB}$).
-
-### 3.6 Funzione Obiettivo Aggregata `V3c`
-$$\mathcal{L}_{\text{V3c}} = w_{\text{corr}} \mathcal{L}_{\text{corr}} + w_{\text{mono}} \mathcal{L}_{\text{mono\_drop}} + w_{\text{low\_mono}} \mathcal{L}_{\text{low\_mono}} + w_{\text{bal}} \mathcal{L}_{\text{bal}}$$
+3. **Gestione di Singolo Canale Silenzioso / Hard-Panned ($\eta_{\text{ch}} = 10^{-6}$):**
+   - Quando la banda è attiva ($E_{\text{tot},b} \ge E_{\min}$) ma $\min(E_{L,b}, E_{R,b}) < \eta_{\text{ch}} E_{\text{tot},b}$ (es. segnale hard-panned $x_R \equiv 0, x_L \neq 0$), la correlazione di Pearson classica $0/0$ non è definita in senso stretto; il calcolo differenziabile con $\varepsilon_{\text{rel}, b} > 0$ restituisce in modo liscio e regolare $\rho_{LR, b} = 0.0$ (con $E_{M,b} = E_{S,b} = \frac{1}{2}E_{L,b}$ e $D_{\text{mono},b} = 10\log_{10}(2) \approx 3.0103\text{ dB}$) e registra nel dizionario diagnostico il flag **`channel_silent_or_hard_panned[b] = True`**.
 
 ---
 
-## 4. ALLINEAMENTO TEMPORALE, PREVENZIONE DEI "PERVERSE INCENTIVES" E ANALISI DEI GRADIENTI
+## 3. DECISIONI CONGELATE (`Q1–Q5`) & I 4 TERMINI CANDIDATI DELLA LOSS `V3c`
 
-1. **Allineamento Esatto ($D_{\text{tot}} = 159$ campioni):** Il slicing di `y_hat` post-preroll $[N_{\text{pre}}+159 : N_{\text{pre}}+T]$ garantisce corrispondenza campione-per-campione con `x_mix_eval` $[N_{\text{pre}} : N_{\text{pre}}+T_{\text{eval}}]$ e con `mask_smp` calcolata su `x_mix_eval`. Ogni operatore di fase/correlazione tra $x_{\text{mix}}$ e $\hat{y}$ risulta così privo di bias da shift temporale.
-2. **Prevenzione dei "Perverse Incentives" (Lezione Chiave da `V3b`):**
-   - *Bypass tramite shift dei crossover:* Usare un banco di analisi **fisso** (`f_low_fix`, `f_high_fix`) anziché `(crossover_f_low, crossover_f_high)` impedisce all'ottimizzatore di spostare le frequenze di taglio per nascondere bande decorrelate.
-   - *Bypass tramite abbassamento globale di volume:* Sia $\rho_b$ sia $\Delta_{\text{mono}}$ sono rapporti **scale-invariant** (omogenei di grado zero rispetto a scalature uniformi di ampiezza $c \cdot \hat{y}$), dunque $\mathcal{L}_{\text{corr}}$ e $\mathcal{L}_{\text{mono\_drop}}$ non possono essere elusi abbassando il guadagno di uscita o spingendo sul makeup/limiter!
-   - *Bypass tramite appiattimento eccessivo (`mono collapse`):* Le dead-zone ancorate a `tau_rho_eff` e `tau_mono_eff` assicurano gradiente esattamente nullo nella regione stereo sana, evitando qualsiasi pressione a trasformare un mix stereo naturale in mono.
-   - *Asimmetria dello Jacobiano in `u`-space:* Come visto in Sezione 1.2, $dw_{\text{low}}/du_{35} = 0.0857$ è metà di $dw_{\text{mid,high}}/du_{36,37} = 0.1714$. In sede di futuro Preflight V3c andranno quindi ispezionate separatamente $\|\nabla_z \mathcal{L}_{\text{V3c}}\|_2$ e $\|\nabla_u \mathcal{L}_{\text{V3c}}\|_2$ per verificare che $w_{\text{low\_mono}}$ e $w_{\text{corr}}$ non richiedano pesi sproporzionati per muovere $u_{35}$.
+| Quesito | Decisione Congelata | Impatto Progettuale |
+|:---:|:---|:---|
+| **Q1** | Banco `DifferentiableLR4Crossover` fisso a `160.0 / 3200.0 Hz` | Filtraggio eseguito sul pre-roll completo prima dello slice `[N_pre : N_pre+T-159]` / `[N_pre+159 : N_pre+T]` |
+| **Q2** | Correlazione **mix-aware su tutte e 3 le bande** (`L, M, H`) | Penalizza solo il calo $\Delta\rho_b = \rho_{LR,b}(x_{\text{mix}}) - \rho_{LR,b}(y_{\text{pred}}) > \tau_{\rho,b}$; **nessuna** soglia assoluta `0.80` imposta sulla banda `low` |
+| **Q3** | Metriche spettrali anti-comb-filtering **solo diagnostiche** | Non entrano nei 4 termini di loss; registrate nel preflight per analisi spettrale di $M(\omega)$ vs media $L/R$ |
+| **Q4** | Correlazione locale short-time e $\text{CVaR}_{0.05}$ **solo diagnostiche** | Nel preflight si valutano tutte e 3 le finestre **`50 ms`, `100 ms`, `250 ms`** broadband e per banda (`L, M, H`) |
+| **Q5** | **Nessuna** modifica ai bounds di `param_space.py` | Preservata piena confrontabilità storica con `V0p..V3b` |
 
----
-
-## 5. INTEGRAZIONE ARCHITETTURALE E INTERAZIONE CON `V0p`, `V3a`, `V3b` E `V4`
-
-1. **Isolamento Modulare (Nessuna Regressione su `V0p`/`V3b`):**
-   - Modulo dedicato proposto: `python/ddsp_mastering/loss/stereo_prior.py` (`V3cStereoCompatibilityLoss`), agganciato a `AutoMasteringOptimizer` con pesi di default pari a `0.0` (`w_corr=0.0, w_mono=0.0, w_low_mono=0.0, w_bal=0.0`), garantendo **bit-identità al 100%** quando disattivato.
-2. **Interazione con `stylistic_stereo_loss` (`AggregatePerceptualLoss`, peso `0.3`):**
-   - In `stylistic` mode, `stylistic_stereo_loss` confronta il rapporto Side/Mid globale verso una traccia di riferimento esterna (es. su `track02_style`, `target_ms_ratio_db = 16.3930 dB` contro `pred = 14.0153 dB`). Le soglie dead-zone di `V3c` fungono esclusivamente da **guardrail di compatibilità fisica inferiore**: se il reference ha un Side/Mid più ampio ma comunque compatibile ($\rho_b \ge \tau_{\rho,b}$ e $\Delta_{\text{mono}} \le \tau_{\text{mono}}$), `V3c` resta inattivo (`0.0000`) e lascia governare `stylistic_stereo_loss`; solo in presenza di rischi reali di cancellazione mono o espansione dei bassi interviene in protezione.
-3. **Interazione con `V3bDynamicPriorLoss`:**
-   - Limitare la divergenza di fase estrema in basso ($w_{\text{low}}$) e la crescita incontrollata del canale Side riduce anche i picchi L/R asimmetrici all'ingresso del saturatore e del limiter, cooperando sinergicamente con $\mathcal{L}_{\text{lim}}$.
-4. **Composizione Finale `V4`:**
-   $$\mathcal{L}_{V4} = \mathcal{L}_{V0p} + \mathcal{L}_{V1/\text{ERB}} + \mathcal{L}_{V2/\text{trans}} + \mathcal{L}_{V3a/\text{eq}} + \mathcal{L}_{V3b/\text{dyn}} + \mathcal{L}_{V3c/\text{stereo}}$$
-   mantenendo il controllo rigoroso del ceiling **True Peak ($\le -0.30\text{ dBTP}$)** in fase di rendering/delivery a valle (come già documentato nella roadmap Sprint 3).
+### I 4 Termini Candidati della Loss `V3c`
+1. **$\mathcal{L}_{\text{mono-drop}}$** (eccesso broadband di mono fold-down drop rispetto al mix originale, $[\text{dB}^2]$):
+   $$\mathcal{L}_{\text{mono-drop}} = \left[\text{ReLU}\!\left(D_{\text{mono}}(y_{\text{pred}}^{\text{eval}}) - \text{detach}(D_{\text{mono}}(x_{\text{mix}}^{\text{eval}})) - \tau_{\text{drop}}\right)\right]^2$$
+2. **$\mathcal{L}_{\text{band-corr}}$** (calo di correlazione mix-aware sulle 3 bande $b \in \{L, M, H\}$):
+   $$\mathcal{L}_{\text{band-corr}} = \frac{1}{3}\sum_{b \in \{L,M,H\}} \mathbb{I}(\text{valid}_b)\,\left[\text{ReLU}\!\left(\text{detach}(\rho_{LR,b}(x_{\text{mix}}^{\text{eval}})) - \rho_{LR,b}(y_{\text{pred}}^{\text{eval}}) - \tau_{\rho, b}\right)\right]^2$$
+3. **$\mathcal{L}_{\text{band-smr}}$** (eccesso di allargamento energetico Side/Mid per banda rispetto al mix originale, $[\text{dB}^2]$):
+   $$\Delta R_{S/M, b} = R_{S/M, b}(y_{\text{pred}}^{\text{eval}}) - \text{detach}(R_{S/M, b}(x_{\text{mix}}^{\text{eval}}))$$
+   $$\mathcal{L}_{\text{band-smr}} = \frac{1}{3}\sum_{b \in \{L,M,H\}} \mathbb{I}(\text{valid}_b)\,\left[\text{ReLU}\!\left(\left|\Delta R_{S/M, b}\right| - \tau_{\text{smr}, b}\right)\right]^2 + \alpha_{\text{sub}}\,\mathbb{I}(\text{valid}_L)\,\left[\text{ReLU}\!\left(\Delta R_{S/M, L} - \tau_{\text{sub}}\right)\right]^2$$
+4. **$\mathcal{L}_{\text{width-param}}$** (prior parametrico diretto sulle larghezze `imager_width_low/mid/high`):
+   $$\mathcal{L}_{\text{width-param}} = \text{ReLU}\!\left(w_{\text{low}} - \tau_{w,\text{low,max}}\right)^2 + \frac{1}{2}\sum_{b \in \{\text{mid},\text{high}\}} \text{ReLU}\!\left(|w_b - 1.0| - \tau_{w,b}\right)^2$$
 
 ---
 
-## 6. PIANO DI TECHNICAL GATE TEST PRE-IMPLEMENTAZIONE (DA IMPLEMENTARE IN FASE SUCCESSIVA)
+## 4. ALLINEAMENTO TEMPORALE, PREVENZIONE DEI "PERVERSE INCENTIVES" E DIAGNOSTICHE SHORT-TIME / COMB-FILTERING
 
-Prima di avviare qualsiasi run di preflight o ablation `V3c`, la suite `tests/test_sprint3_v3c_gate.py` dovrà verificare almeno i seguenti 7 Gate obbligatori:
-1. **Gate 1 — Conservazione Ortonormale & Invarianza Mono dell'Imager:** Verifica algebrica $M^2 + \hat{S}^2 = \hat{L}^2 + \hat{R}^2$ e invarianza di $\hat{M}$ rispetto a $w \in [0.0, 2.0]$ su segnali reali e sintetici.
-2. **Gate 2 — Monotonicità di $\rho_b$ e $\Delta_{\text{mono}}$:** Test su segnali controllati in fase ($\rho = +1$, $\Delta_{\text{mono}} = 0\text{ dB}$), quadratura $90^\circ$ ($\rho \approx 0$, $\Delta_{\text{mono}} \approx 3.01\text{ dB}$) e controfase ($\rho = -1$, $\Delta_{\text{mono}} \gg 10\text{ dB}$).
-3. **Gate 3 — Mascheramento Attivo e Silence Rejection:** Verifica su chunk silenziosi ($< -70\text{ dBFS} \implies \mathcal{L}_{\text{V3c}} = 0.0$, zero `NaN`/`Inf`) e su durata reale $T_{\text{eval}} = 143\,841$ campioni con blocco residuo da $321$ campioni.
-4. **Gate 4 — Stabilità Analitica dei Gradienti (`gradcheck` in `float64`):** Verifica rigorosa di $\partial \mathcal{L}_{\text{corr}}/\partial z$, $\partial \mathcal{L}_{\text{mono\_drop}}/\partial z$, $\partial \mathcal{L}_{\text{low\_mono}}/\partial z$ e $\partial \mathcal{L}_{\text{bal}}/\partial z$.
-5. **Gate 5 — Dead-Zone Esatta & Scale-Invariance:** Zero perdita e gradiente identicamente nullo quando tutti gli indicatori rispettano le soglie; invarianza rispetto a scalature globali $\alpha \cdot \hat{y}$.
-6. **Gate 6 — Isomorfismo C++/Python (`core_dsp::MidSideImager` vs `DifferentiableMidSideImager`):** Verifica bit-accurate con residuo RMS $< -120\text{ dBFS}$.
-7. **Gate 7 — Bit-Identità di `V0p` e `V3b` quando `V3c` è Disabilitato:** Uguaglianza esatta dei pesi/audio/metriche con i baseline congelati quando tutti i pesi `V3c = 0.0`.
+1. **Allineamento & Integrità:** $D_{\text{tot}} = 159$ campioni e pesatura uniforme per-chunk $w_k = 1/4$ sui $K=4$ chunk ($T_{\text{eval}}=143\,841$).
+2. **Prevenzione Perverse Incentives:**
+   - Banco LR4 fisso indipendente dai parametri `crossover_f_low/high` (previene elusione spostando i crossover);
+   - Formule scale-invariant con $\varepsilon_{\text{rel}}$ proporzionale a $\text{detach}(E_{\text{tot}})$ (previene elusione riducendo o spingendo il livello globale);
+   - Dead-zone mix-aware su $\rho_b$ e $\Delta R_{S/M,b}$ (non impone restringimenti artificiali su brani naturalmente larghi).
+3. **Diagnostica Multi-Finestra Short-Time (`50 ms`, `100 ms`, `250 ms`, Decisione Q4):**
+   Su ogni finestra mobile attiva (con copertura attiva $\ge 50\%$ o blocchi attivi) a `50 ms` ($2400$ campioni), `100 ms` ($4800$ campioni) e `250 ms` ($12\,000$ campioni) vengono calcolate esclusivamente a fini diagnostici: `mean`, `min`, $P_{05}$ e $\text{CVaR}_{0.05}$ di $\rho_{LR}$ broadband e per ciascuna banda `low`, `mid`, `high` (particolarmente critica la finestra `250 ms` per la banda `< 160 Hz`).
+4. **Diagnostica Spettrale Anti-Comb-Filtering (Decisione Q3):**
+   Definita la media dello spettro di magnitudo di $L$ e $R$ rispetto allo spettro del segnale somma Mono $M$ (su finestra di valutazione attiva, n_fft=2048, hop=512): misura lo scarto quadratico medio e la profondità massima di notch ($10\log_{10}(|M(\omega)|^2 / (\frac{1}{2}(|L(\omega)|^2+|R(\omega)|^2)+\epsilon))$) nella banda attiva, riportando la variazione tra mix originale e master predetto.
 
 ---
 
-## 7. PIANO PREFLIGHT READ-ONLY & QUESTIONARIO APERTO PER ARGON (`Q1–Q5`)
+## 5. INTEGRAZIONE STANDALONE, COMPATIBILITÀ E CRITERIO PER FUTURA COMPOSIZIONE `V4`
 
-### 7.1 Protocollo Preflight Read-Only (Prossimo Step)
-Prima di integrare `V3c` nell'optimizer, si propone uno script read-only (`scripts/sprint3/run_v3c_preflight.py`) che calcoli sulle 6 sessioni armonizzate, ai punti congelati $z = Z_{\text{NEUTRAL}}$ e $z = z_{\text{opt}}^{V0p} / z_{\text{opt}}^{V3b}$:
-- I profili baseline di $\rho_{\text{low}}, \rho_{\text{mid}}, \rho_{\text{high}}$, $\Delta_{\text{mono}}$ (dB), $\Delta_{LR}$ (dB) del mix originale vs output ottimizzato;
-- I valori delle loss candidate $\mathcal{L}_{\text{corr}}, \mathcal{L}_{\text{mono\_drop}}, \mathcal{L}_{\text{low\_mono}}, \mathcal{L}_{\text{bal}}$ e le norme dei gradienti separati in $z$ e $u$ ($\|\nabla_u \mathcal{L}_{\text{V3c}}\|_2$, rapporti su EQ / Comp / Imager), così da calibrare i pesi senza ottimizzazioni alla cieca.
+1. **Stato Attuale (`optimizer.py` intatto):** In questa fase `V3cStereoCompatibilityLoss` vive isolato in `python/ddsp_mastering/loss/stereo_prior.py`, garantendo diff zero su `optimizer.py`, `dynamic_prior.py`, `param_space.py` e moduli DSP Python/C++.
+2. **Interazione con `stylistic_stereo_loss` (`V0p`, `weight_stereo=0.3`):** La formulazione mix-aware con dead-zone protegge la compatibilità relativa al mix sorgente lasciando governare `stylistic_stereo_loss` all'interno della banda di tolleranza.
+3. **Criterio Esplicito per Futura Composizione `V4` (Punto 6):**
+   La futura configurazione **`V4`** includerà **esclusivamente** le componenti di regolarizzazione (tra i candidati `V1/V1b/V2/V3a/V3b/V3c`) che avranno superato **sia la validazione quantitativa oggettiva sia la validazione percettiva d'ascolto controllata (blind human evaluation)**; nessuna componente è pre-ammessa in `V4` per default prima del superamento di entrambe le validazioni.
 
-### 7.2 Quesiti Decisionali per il Supervisore Tecnico (Argon)
-Si sottopongono 5 decisioni progettuali per approvazione prima dell'implementazione di `stereo_prior.py`:
-- **Q1 (Bande d'Analisi):** Approvi l'uso di un banco fisso LR4 non-trainable (`160 Hz / 3200 Hz`, allineato a `THETA_NEUTRAL[18..19]`) invece dei crossover trainable per prevenire bypass dell'ottimizzatore, oppure preferisci una decomposizione FFT a bande critiche?
-- **Q2 (Soglie $\tau_{\rho,b}$ Mix-Aware vs Assolute):** In `stylistic` mode, ritieni opportuno usare soglie mix-aware ($\min(\tau_{\rho,b}^{\text{abs}}, \rho_b^{\text{mix}} - \delta)$) su `mid`/`high` mantenendo invece una soglia più rigida su `low` ($\tau_{\rho,\text{low}}^{\text{abs}} \approx 0.80$, più $\mathcal{L}_{\text{low\_mono}}$ con $\tau_{w,\text{low}} = 1.00$)?
-- **Q3 (Metrica di Compatibilità Mono):** Oltre al drop di energia $\Delta_{\text{mono}} = 10\log_{10}((E_M + E_S)/E_M)$, è desiderabile includere già in `V3c` un termine spettrale anti-comb-filtering ($M(f)$ vs $\sqrt{(|L(f)|^2+|R(f)|^2)/2}$), oppure mantenerlo minimale e ortogonale nella sola energia/correlazione per banda rimandando il comb-filtering al preflight?
-- **Q4 (Granularità Temporale di $\rho_b$):** È preferibile valutare $\rho_b$ sull'intero insieme attivo del chunk ($3\text{ s}$) oppure aggiungere anche un termine tail $\text{CVaR}_{0.95}$ su blocchi attivi da $100\text{ ms}$ per catturare transienti stereofonici in controfase localizzati?
-- **Q5 (Interazione con i Bounds Stretti di `param_space.py`):** Dato che `imager_width_low` è già limitato a `[0.4, 1.1]` con Jacobiano ridotto (`0.0857` a $z=0.857$), confermi di **non** alterare i bounds di `param_space.py` in `V3c` per preservare la piena comparabilità con gli esperimenti `V0p..V3b`?
+---
+
+## 6. PIANO DEI 7 TECHNICAL GATE TEST (`tests/test_sprint3_v3c_gate.py`)
+
+La suite `tests/test_sprint3_v3c_gate.py` verifica integralmente i 7 Gate e i 7 casi limite:
+1. **Gate 1:** Conservazione ortonormale $E_L + E_R = E_M + E_S$ ($< 10^{-12}$) broadband e sulle 3 bande LR4 + identità esatta dell'imager per $w_b = 1.0$.
+2. **Gate 2:** Segnali canonici: in fase ($\rho = +1$, $D_{\text{mono}} = 0\text{ dB}$), quadratura $90^\circ$ ($\rho \approx 0$, $D_{\text{mono}} \approx 3.0103\text{ dB}$), controfase ($\rho = -1$, $D_{\text{mono}}$ finito, zero `NaN`/`Inf`).
+3. **Gate 3:** Silenzio digitale ($< -70\text{ dBFS}$ -> loss `0.0`, grad `0.0`), banda priva di energia (es. solo seno `60 Hz`: `band_valid['mid']=False, ['high']=False`, zero `NaN`), blocco parziale da $321$ campioni su $T_{\text{eval}}=143\,841$ e verifica warm-up LR4 pre-roll vs no-pre-roll.
+4. **Gate 4:** `torch.autograd.gradcheck` in `float64` separato su ciascuno dei 4 termini (`loss_mono_drop`, `loss_band_corr`, `loss_band_smr`, `loss_width_param`) rispetto al segnale e a $z_{35..37}$.
+5. **Gate 5:** Verifica dei **7 casi limite** (mono puro, stereo correlato, stereo decorrelato, anti-fase pura, hard-panned $x_R \equiv 0$, banda silenziosa, silenzio digitale totale) + test quantitativo di **Scale Invariance** su livelli $-40, -20, 0, +10\text{ dBFS}$ ($< 10^{-9}$ su $D_{\text{mono}}, R_{S/M}, \rho_{LR}$ e sulle 3 loss di segnale).
+6. **Gate 6:** Parità Python/C++ (`DifferentiableMidSideImager` vs `py_core_dsp.MidSideImager`, null RMS $< -120\text{ dBFS}$, max abs $< 10^{-6}$).
+7. **Gate 7:** Zero diff storico di `optimizer.py`, `dynamic_prior.py`, `param_space.py` e moduli DSP Python/C++ rispetto a `9b1fd9115cce6deaffe637c649c4bb7d6159a195` e bit-identità `V0p`/`V3b`.
+
+---
+
+## 7. PROTOCOLLO PREFLIGHT READ-ONLY V3c (`scripts/sprint3/run_v3c_preflight.py`)
+
+Valutazione read-only sui 3 punti operativi (`Z_NEUTRAL`, `V0p z_opt`, `V3b z_opt`) su tutte le 6 sessioni armonizzate (4 chunk da $144\,000$ campioni, pre-roll $120\,000$, $T_{\text{eval}}=143\,841$, pesatura $1/4$):
+- Estrazione di tutte le metriche broadband, per banda (`160 / 3200 Hz`), short-time (`50 / 100 / 250 ms`), L/R balance e comb-filtering;
+- Valutazione non pesata dei 4 termini candidati sia a soglia zero (sensibilità pura) sia sotto **Candidato A** vs **Candidato B**;
+- Diagnostica completa dei gradienti in $z$ e $u = \nabla_z \odot z(1-z)$ su 41D e 6 gruppi parametrici, più cosine similarity rispetto a `V0p_total`, `LUFS_only` e `stylistic_stereo_loss`.
