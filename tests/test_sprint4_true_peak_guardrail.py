@@ -41,6 +41,23 @@ from scripts.human_validation.offline_renderer import (
 )
 
 
+def _internal_detector_4x_peak_db(audio_2xT: np.ndarray) -> float:
+    """Measure peak using the project's internal 4x polyphase FIR + aligned 1x detector.
+
+    Note: This custom Type-II WLS polyphase FIR is an internal DSP detector topology and is
+    explicitly distinct from the external normative Kaiser sinc metric (`calculate_true_peak_dbtp`).
+    """
+    import torch.nn.functional as F
+
+    coeffs = torch.tensor(get_tp_fir_prototype_coeffs(), dtype=torch.float64)
+    kernels = torch.stack([coeffs[0::4], coeffs[1::4], coeffs[2::4], coeffs[3::4]], dim=0).unsqueeze(1)
+    x = torch.from_numpy(np.ascontiguousarray(audio_2xT, dtype=np.float64))
+    y_poly = F.conv1d(F.pad(x.unsqueeze(1), (11, 0)), kernels)  # [2, 4, T]
+    x_1x = F.pad(x, (6, 0))[:, : x.shape[-1]].unsqueeze(1)  # [2, 1, T]
+    peak_lin = float(torch.cat([y_poly, x_1x], dim=1).abs().max().item())
+    return 20.0 * math.log10(max(peak_lin, 1e-12))
+
+
 def _measure_pcm24_roundtrip(audio_2xT: np.ndarray, sr: int = 48000):
     buf = io.BytesIO()
     sf.write(buf, np.ascontiguousarray(audio_2xT.T, dtype=np.float32), sr, format="WAV", subtype="PCM_24")
@@ -123,6 +140,119 @@ def test_t1_high_frequency_isp_tones_cpp_and_python(freq_hz: float):
                 tp_py, sp_py, _ = _measure_pcm24_roundtrip(y_py, sr=sr)
                 assert tp_py <= -0.30
                 assert sp_py <= -0.30
+
+
+@pytest.mark.parametrize(
+    ("sr", "freqs_hz"),
+    [
+        (44100, (21100.0, 21500.0, 21900.0, 22000.0)),
+        (48000, (23000.0, 23500.0, 23900.0, 23990.0)),
+        (96000, (46000.0, 47000.0, 47800.0, 47980.0)),
+    ],
+)
+def test_t1b_near_nyquist_dense_phases_and_detector_vs_external_pcm24(sr: int, freqs_hz: tuple):
+    """FASE B: Verify near-Nyquist tones with dense phase grid & multiple amplitudes across 44.1/48/96 kHz.
+
+    Compares the custom WLS 4x internal detector peak against external PCM_24 `calculate_true_peak_dbtp`
+    (kept explicitly distinct from the custom WLS FIR specification) to prove zero dangerous ISP underestimation.
+    """
+    # 0.25 s covers multiple Nyquist-beating cycles (e.g., 2.5 beats at 23.99 kHz / 48 kHz)
+    N = int(round(0.25 * sr))
+    n = np.arange(N, dtype=np.float64)
+    ramp = 0.5 * (1.0 - np.cos(np.pi * np.arange(256) / 256.0))
+    win = np.ones(N, dtype=np.float64)
+    win[:256] = ramp
+    win[-256:] = ramp[::-1]
+
+    phases = np.linspace(0.0, np.pi, 12, endpoint=False)
+    cpp_lim = py_core_dsp.LookaheadLimiter(float(sr), "true_peak_4x")
+    py_lim = DifferentiableLookaheadLimiter(sample_rate=float(sr), detector_mode="true_peak_4x")
+
+    for freq_hz in freqs_hz:
+        assert freq_hz < 0.5 * sr
+        for amp in (1.0, 1.5, 3.0):
+            # Test dense phases on C++, and subset of worst-case + orthogonal phases on Python for runtime parity
+            for p_idx, phi0 in enumerate(phases):
+                s = amp * np.sin(2.0 * np.pi * freq_hz * n / float(sr) + phi0) * win
+                u_np = np.pad(np.stack([s, 0.90 * s], axis=0), ((0, 0), (0, 256)))
+
+                cpp_lim.reset()
+                y_cpp = cpp_lim.process(u_np.astype(np.float32)).astype(np.float64)
+                det_cpp = _internal_detector_4x_peak_db(y_cpp)
+                ext_cpp, sp_cpp, _ = _measure_pcm24_roundtrip(y_cpp, sr=sr)
+
+                assert det_cpp <= INTERNAL_CEILING_DBTP + 0.015, (
+                    f"Near-Nyquist internal detector breach at sr={sr}, f={freq_hz}, amp={amp}, phi={phi0:.3f}: {det_cpp:.4f}"
+                )
+                assert ext_cpp <= DELIVERY_CEILING_DBTP, (
+                    f"Near-Nyquist PCM_24 external TP breach at sr={sr}, f={freq_hz}, amp={amp}, phi={phi0:.3f}: {ext_cpp:.4f}"
+                )
+                assert ext_cpp <= det_cpp + 0.06, (
+                    f"Dangerous detector underestimation at sr={sr}, f={freq_hz}: det={det_cpp:.4f}, ext={ext_cpp:.4f}"
+                )
+                assert sp_cpp <= DELIVERY_CEILING_DBTP
+
+                if p_idx % 4 == 0:
+                    with torch.no_grad():
+                        y_py = py_lim(torch.from_numpy(u_np).unsqueeze(0)).squeeze(0).numpy()
+                    ext_py, sp_py, _ = _measure_pcm24_roundtrip(y_py, sr=sr)
+                    det_py = _internal_detector_4x_peak_db(y_py)
+                    assert det_py <= INTERNAL_CEILING_DBTP + 0.015
+                    assert ext_py <= DELIVERY_CEILING_DBTP
+                    assert sp_py <= DELIVERY_CEILING_DBTP
+
+
+def test_t2b_hf_multitone_multiple_phases_across_sample_rates():
+    """FASE B: High-frequency multitone test with varying phase constellations across 44.1 / 48 / 96 kHz."""
+    phase_sets = (
+        (0.0, 0.0, 0.0, 0.0),
+        (0.15, 0.85, 1.70, 2.45),
+        (0.5 * np.pi, 0.25 * np.pi, 1.1 * np.pi, 1.6 * np.pi),
+        (1.2, 2.7, 0.4, 3.0),
+    )
+    sr_configs = (
+        (44100, (16200.0, 18400.0, 20300.0, 21500.0)),
+        (48000, (18000.0, 20000.0, 22000.0, 23500.0)),
+        (96000, (36000.0, 40000.0, 44000.0, 47000.0)),
+    )
+
+    for sr, (f1, f2, f3, f4) in sr_configs:
+        N = int(round(0.25 * sr))
+        n = np.arange(N, dtype=np.float64)
+        ramp = 0.5 * (1.0 - np.cos(np.pi * np.arange(256) / 256.0))
+        win = np.ones(N, dtype=np.float64)
+        win[:256] = ramp
+        win[-256:] = ramp[::-1]
+
+        cpp_lim = py_core_dsp.LookaheadLimiter(float(sr), "true_peak_4x")
+        py_lim = DifferentiableLookaheadLimiter(sample_rate=float(sr), detector_mode="true_peak_4x")
+
+        for amp in (0.6, 1.2):
+            for p1, p2, p3, p4 in phase_sets:
+                s = amp * (
+                    np.sin(2.0 * np.pi * f1 * n / float(sr) + p1)
+                    + np.sin(2.0 * np.pi * f2 * n / float(sr) + p2)
+                    + np.sin(2.0 * np.pi * f3 * n / float(sr) + p3)
+                    + np.sin(2.0 * np.pi * f4 * n / float(sr) + p4)
+                ) * win
+                u_np = np.pad(np.stack([s, -0.88 * s], axis=0), ((0, 0), (0, 256)))
+
+                cpp_lim.reset()
+                y_cpp = cpp_lim.process(u_np.astype(np.float32)).astype(np.float64)
+                det_cpp = _internal_detector_4x_peak_db(y_cpp)
+                ext_cpp, sp_cpp, _ = _measure_pcm24_roundtrip(y_cpp, sr=sr)
+
+                assert det_cpp <= INTERNAL_CEILING_DBTP + 0.015
+                assert ext_cpp <= DELIVERY_CEILING_DBTP
+                assert ext_cpp <= det_cpp + 0.06
+                assert sp_cpp <= DELIVERY_CEILING_DBTP
+
+                if abs(amp - 1.2) < 1e-9 and p1 == 0.0:
+                    with torch.no_grad():
+                        y_py = py_lim(torch.from_numpy(u_np).unsqueeze(0)).squeeze(0).numpy()
+                    ext_py, sp_py, _ = _measure_pcm24_roundtrip(y_py, sr=sr)
+                    assert ext_py <= DELIVERY_CEILING_DBTP
+                    assert sp_py <= DELIVERY_CEILING_DBTP
 
 
 # ---------------------------------------------------------------------------
