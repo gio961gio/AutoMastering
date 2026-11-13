@@ -7,16 +7,17 @@ Standalone module implementing the frozen pre-implementation design (Q1-Q5):
    - pred_eval slice: [n_pre + delay : n_pre + T]
 2. Active sample mask A_smp(x_mix^eval) with 480-sample blocks (10 ms at 48 kHz),
    -70.0 dBFS silence threshold, M_min=8 fallback, and partial remainder block handling.
-3. Minimum per-band energy validation E_min = 1e-7 (-70.0 dBFS): bands below threshold get
-   band_valid[b] = False with identically 0.0 loss and 0.0 gradient.
+3. Minimum per-band energy validation E_min = 1e-7 (-70.0 dBFS): evaluation validity is
+   determined EXCLUSIVELY by the original mix energy (E_tot_mix >= E_min). When mix is active,
+   a silent or sub-threshold prediction stays valid, with pred's eps_rel anchored to
+   detach(max(E_tot_mix, E_tot_pred)) * 1e-12 + 1e-30 for finiteness, continuity, and scale invariance.
 4. Explicit handling of single-channel silent / hard-panned bands (min(E_L, E_R) < 1e-6 * E_tot).
-5. Relative detached epsilon floor eps_rel = 1e-12 * detach(E_tot) + 1e-30 for quantitative
+5. Relative detached epsilon floor eps_rel = 1e-12 * detach(E_anchor) + 1e-30 for quantitative
    scale invariance across [-60 dBFS, +20 dBFS].
-6. Four candidate loss terms:
-   - loss_mono_drop
-   - loss_band_corr (mix-aware on all 3 bands)
-   - loss_band_smr
-   - loss_width_param
+6. Frozen Candidate A thresholds & same_track pilot weights:
+   - Candidate A: tau_drop_db=0.50, tau_corr=(0.03, 0.05, 0.08), tau_smr_db=(2.0, 2.0, 2.0),
+     tau_sub_db=0.50, alpha_sub=1.0, tau_w_low_max=1.00, tau_w_mid=0.15, tau_w_high=0.15
+   - Pilot same_track weights: w_mono_drop=1.00, w_band_corr=10.00, w_band_smr=0.05, w_width_param=0.25
 7. Diagnostic-only metrics (never entering the loss):
    - L/R balance (dB)
    - Multi-window short-time local correlation (50 ms, 100 ms, 250 ms) with mean, min, P05, CVaR05
@@ -43,6 +44,24 @@ ABS_EPS_FLOOR = 1e-30
 SHORT_TIME_WINDOWS_MS: Tuple[int, ...] = (50, 100, 250)
 BAND_NAMES: Tuple[str, ...] = ("low", "mid", "high")
 
+# Frozen Candidate A thresholds & pilot same_track weights (Step V3c Hardening)
+CANDIDATE_A_THRESHOLDS: Dict[str, Any] = {
+    "tau_drop_db": 0.50,
+    "tau_corr": (0.03, 0.05, 0.08),
+    "tau_smr_db": (2.0, 2.0, 2.0),
+    "tau_sub_db": 0.50,
+    "alpha_sub": 1.0,
+    "tau_w_low_max": 1.00,
+    "tau_w_mid": 0.15,
+    "tau_w_high": 0.15,
+}
+PILOT_SAME_TRACK_WEIGHTS: Dict[str, float] = {
+    "w_mono_drop": 1.00,
+    "w_band_corr": 10.00,
+    "w_band_smr": 0.05,
+    "w_width_param": 0.25,
+}
+
 
 def _ensure_batch_stereo(x: torch.Tensor) -> torch.Tensor:
     """Ensure shape [B, 2, N] in float64."""
@@ -62,6 +81,8 @@ def compute_masked_stereo_stats(
     mask_smp: torch.Tensor,
     min_energy: float = MIN_ACTIVE_BAND_ENERGY,
     eta_ch: float = SINGLE_CHANNEL_ENERGY_RATIO,
+    ref_energy_anchor: Optional[torch.Tensor] = None,
+    eps_rel_factor: float = REL_EPS_SCALE,
 ) -> Dict[str, Any]:
     """Compute exact float64 stereo correlation, mono drop, SMR, and L/R balance on active samples.
 
@@ -70,6 +91,9 @@ def compute_masked_stereo_stats(
         mask_smp: Boolean tensor of shape (B, T_eval).
         min_energy: Minimum active E_tot = E_L + E_R for band/broadband validity.
         eta_ch: Threshold on min(E_L, E_R) / E_tot for hard-panned / silent single channel flag.
+        ref_energy_anchor: Optional reference mix e_tot tensor [B] used when computing
+            predicted signal stats so eps_rel stays anchored to mix energy even if pred -> 0.
+        eps_rel_factor: Relative floor multiplier (default 1e-12).
 
     Returns:
         Dictionary containing differentiable scalar/batch tensors and boolean validity metadata.
@@ -89,7 +113,11 @@ def compute_masked_stereo_stats(
     e_tot = e_l + e_r
     c_lr = torch.sum(l_sig * r_sig, dim=-1) / n_act
 
-    eps_rel = REL_EPS_SCALE * e_tot.detach() + ABS_EPS_FLOOR
+    if ref_energy_anchor is not None:
+        e_anchor = torch.maximum(e_tot.detach(), ref_energy_anchor.detach()).clamp(min=ABS_EPS_FLOOR)
+    else:
+        e_anchor = torch.clamp(e_tot.detach(), min=ABS_EPS_FLOOR)
+    eps_rel = float(eps_rel_factor) * e_anchor + ABS_EPS_FLOOR
 
     mono_drop_db = 10.0 * torch.log10((e_m + e_s + eps_rel) / (e_m + eps_rel))
     smr_db = 10.0 * torch.log10((e_s + eps_rel) / (e_m + eps_rel))
@@ -108,6 +136,7 @@ def compute_masked_stereo_stats(
         "e_m": e_m,
         "e_s": e_s,
         "e_tot": e_tot,
+        "e_tot_tensor": e_tot,
         "c_lr": c_lr,
         "eps_rel": eps_rel,
         "mono_drop_db": mono_drop_db,
@@ -115,6 +144,7 @@ def compute_masked_stereo_stats(
         "lr_balance_db": lr_balance_db,
         "corr_lr": corr_lr,
         "valid": bool(valid),
+        "energy_valid": bool(valid),
         "channel_silent_or_hard_panned": bool(hard_panned),
     }
 
@@ -266,20 +296,21 @@ class V3cStereoCompatibilityLoss(nn.Module):
         min_active_blocks: int = 8,
         min_band_energy: float = MIN_ACTIVE_BAND_ENERGY,
         eta_ch: float = SINGLE_CHANNEL_ENERGY_RATIO,
-        # Candidate thresholds
-        tau_drop_db: float = 0.25,
-        tau_corr: Tuple[float, float, float] = (0.02, 0.03, 0.05),
-        tau_smr_db: Tuple[float, float, float] = (1.5, 1.5, 1.5),
-        tau_sub_db: float = 0.0,
+        eps_rel_factor: float = REL_EPS_SCALE,
+        # Frozen Candidate A thresholds
+        tau_drop_db: float = 0.50,
+        tau_corr: Tuple[float, float, float] = (0.03, 0.05, 0.08),
+        tau_smr_db: Tuple[float, float, float] = (2.0, 2.0, 2.0),
+        tau_sub_db: float = 0.50,
         alpha_sub: float = 1.0,
-        tau_w_low_max: float = 1.0,
+        tau_w_low_max: float = 1.00,
         tau_w_mid: float = 0.15,
         tau_w_high: float = 0.15,
-        # Weights (disabled/0.0 by default until validated)
-        w_mono_drop: float = 1.0,
-        w_band_corr: float = 1.0,
-        w_band_smr: float = 1.0,
-        w_width_param: float = 1.0,
+        # Frozen pilot same_track weights
+        w_mono_drop: float = 1.00,
+        w_band_corr: float = 10.00,
+        w_band_smr: float = 0.05,
+        w_width_param: float = 0.25,
         window_durations_ms: Tuple[int, ...] = SHORT_TIME_WINDOWS_MS,
     ):
         super().__init__()
@@ -292,6 +323,7 @@ class V3cStereoCompatibilityLoss(nn.Module):
         self.min_active_blocks = int(min_active_blocks)
         self.min_band_energy = float(min_band_energy)
         self.eta_ch = float(eta_ch)
+        self.eps_rel_factor = float(eps_rel_factor)
 
         self.tau_drop_db = float(tau_drop_db)
         self.tau_corr = tuple(float(v) for v in tau_corr)
@@ -311,6 +343,21 @@ class V3cStereoCompatibilityLoss(nn.Module):
         self.crossover = DifferentiableLR4Crossover(sample_rate=self.sample_rate)
         self.register_buffer("fixed_f_low", torch.tensor(self.f_low_hz, dtype=torch.float64))
         self.register_buffer("fixed_f_high", torch.tensor(self.f_high_hz, dtype=torch.float64))
+
+    def _compute_signal_stereo_stats(
+        self,
+        x_stereo: torch.Tensor,
+        active_mask: torch.Tensor,
+        ref_energy_anchor: Optional[torch.Tensor] = None,
+    ) -> Dict[str, Any]:
+        return compute_masked_stereo_stats(
+            audio_eval_f64=x_stereo,
+            mask_smp=active_mask,
+            min_energy=self.min_band_energy,
+            eta_ch=self.eta_ch,
+            ref_energy_anchor=ref_energy_anchor,
+            eps_rel_factor=self.eps_rel_factor,
+        )
 
     def _filter_and_slice_pair(
         self,
@@ -446,7 +493,9 @@ class V3cStereoCompatibilityLoss(nn.Module):
                 "is_silent": True,
                 "mask_meta": mask_meta,
                 "broadband_valid": False,
+                "pred_energy_below_emin_broadband": True,
                 "band_valid": band_valid_map,
+                "pred_energy_below_emin": {b: True for b in BAND_NAMES},
                 "channel_silent_or_hard_panned": {b: False for b in BAND_NAMES},
                 "loss_mono_drop": 0.0,
                 "loss_band_corr": 0.0,
@@ -457,16 +506,15 @@ class V3cStereoCompatibilityLoss(nn.Module):
             }
             return total_loss, diagnostics
 
-        # Broadband stats (mix & pred)
+        # Broadband stats (mix & pred; validity determined strictly by mix energy, eps_rel anchored to mix)
         with torch.no_grad():
-            bb_mix = compute_masked_stereo_stats(
-                mix_eval, mask_smp, min_energy=self.min_band_energy, eta_ch=self.eta_ch
-            )
-        bb_pred = compute_masked_stereo_stats(
-            pred_eval, mask_smp, min_energy=self.min_band_energy, eta_ch=self.eta_ch
+            bb_mix = self._compute_signal_stereo_stats(mix_eval, mask_smp, ref_energy_anchor=None)
+        bb_pred = self._compute_signal_stereo_stats(
+            pred_eval, mask_smp, ref_energy_anchor=bb_mix["e_tot_tensor"]
         )
 
-        broadband_valid = bool(bb_mix["valid"] and bb_pred["valid"])
+        broadband_valid = (not is_silent) and bool(bb_mix["energy_valid"])
+        pred_bb_below_emin = bool(float(bb_pred["e_tot"].min().item()) < self.min_band_energy)
         if broadband_valid:
             mono_excess = bb_pred["mono_drop_db"] - bb_mix["mono_drop_db"].detach() - self.tau_drop_db
             loss_mono_drop = (F.relu(mono_excess) ** 2).mean()
@@ -477,20 +525,24 @@ class V3cStereoCompatibilityLoss(nn.Module):
         corr_terms: List[torch.Tensor] = []
         smr_terms: List[torch.Tensor] = []
         band_valid: Dict[str, bool] = {}
+        pred_below_emin_map: Dict[str, bool] = {}
         hard_panned_flags: Dict[str, bool] = {}
         band_metrics: Dict[str, Any] = {}
 
         for idx, b in enumerate(BAND_NAMES):
             with torch.no_grad():
-                st_mix = compute_masked_stereo_stats(
-                    mix_bands[b], mask_smp, min_energy=self.min_band_energy, eta_ch=self.eta_ch
+                st_mix = self._compute_signal_stereo_stats(
+                    mix_bands[b], mask_smp, ref_energy_anchor=None
                 )
-            st_pred = compute_masked_stereo_stats(
-                pred_bands[b], mask_smp, min_energy=self.min_band_energy, eta_ch=self.eta_ch
+            st_pred = self._compute_signal_stereo_stats(
+                pred_bands[b], mask_smp, ref_energy_anchor=st_mix["e_tot_tensor"]
             )
 
-            is_valid_b = bool(st_mix["valid"] and st_pred["valid"])
+            # Validity depends EXCLUSIVELY on original mix energy validity (never pred energy!)
+            is_valid_b = (not is_silent) and bool(st_mix["energy_valid"])
+            pred_below_emin_b = bool(float(st_pred["e_tot"].min().item()) < self.min_band_energy)
             band_valid[b] = is_valid_b
+            pred_below_emin_map[b] = pred_below_emin_b
             hard_panned_flags[b] = bool(
                 st_mix["channel_silent_or_hard_panned"] or st_pred["channel_silent_or_hard_panned"]
             )
@@ -519,22 +571,23 @@ class V3cStereoCompatibilityLoss(nn.Module):
                 d_mono = float((st_pred["mono_drop_db"] - st_mix["mono_drop_db"]).mean().item()) if is_valid_b else 0.0
                 band_metrics[b] = {
                     "band_valid": is_valid_b,
-                    "band_valid_mix": bool(st_mix["valid"]),
-                    "band_valid_pred": bool(st_pred["valid"]),
+                    "band_valid_mix": bool(st_mix["energy_valid"]),
+                    "band_valid_pred": bool(st_pred["energy_valid"]),
+                    "pred_energy_below_emin": pred_below_emin_b,
                     "channel_silent_or_hard_panned": hard_panned_flags[b],
                     "e_tot_mix": float(st_mix["e_tot"].mean().item()),
                     "e_tot_pred": float(st_pred["e_tot"].mean().item()),
-                    "smr_db_mix": float(st_mix["smr_db"].mean().item()) if st_mix["valid"] else None,
-                    "smr_db_pred": float(st_pred["smr_db"].mean().item()) if st_pred["valid"] else None,
+                    "smr_db_mix": float(st_mix["smr_db"].mean().item()) if st_mix["energy_valid"] else None,
+                    "smr_db_pred": float(st_pred["smr_db"].mean().item()) if (is_valid_b or st_pred["energy_valid"]) else None,
                     "delta_smr_db": d_smr if is_valid_b else None,
-                    "corr_lr_mix": float(st_mix["corr_lr"].mean().item()) if st_mix["valid"] else None,
-                    "corr_lr_pred": float(st_pred["corr_lr"].mean().item()) if st_pred["valid"] else None,
+                    "corr_lr_mix": float(st_mix["corr_lr"].mean().item()) if st_mix["energy_valid"] else None,
+                    "corr_lr_pred": float(st_pred["corr_lr"].mean().item()) if (is_valid_b or st_pred["energy_valid"]) else None,
                     "delta_corr_lr": d_corr if is_valid_b else None,
-                    "mono_drop_db_mix": float(st_mix["mono_drop_db"].mean().item()) if st_mix["valid"] else None,
-                    "mono_drop_db_pred": float(st_pred["mono_drop_db"].mean().item()) if st_pred["valid"] else None,
+                    "mono_drop_db_mix": float(st_mix["mono_drop_db"].mean().item()) if st_mix["energy_valid"] else None,
+                    "mono_drop_db_pred": float(st_pred["mono_drop_db"].mean().item()) if (is_valid_b or st_pred["energy_valid"]) else None,
                     "delta_mono_drop_db": d_mono if is_valid_b else None,
-                    "lr_balance_db_mix": float(st_mix["lr_balance_db"].mean().item()) if st_mix["valid"] else None,
-                    "lr_balance_db_pred": float(st_pred["lr_balance_db"].mean().item()) if st_pred["valid"] else None,
+                    "lr_balance_db_mix": float(st_mix["lr_balance_db"].mean().item()) if st_mix["energy_valid"] else None,
+                    "lr_balance_db_pred": float(st_pred["lr_balance_db"].mean().item()) if (is_valid_b or st_pred["energy_valid"]) else None,
                 }
 
         loss_band_corr = (corr_terms[0] + corr_terms[1] + corr_terms[2]) / 3.0
@@ -551,10 +604,12 @@ class V3cStereoCompatibilityLoss(nn.Module):
             "is_silent": False,
             "mask_meta": mask_meta,
             "broadband_valid": broadband_valid,
+            "pred_energy_below_emin_broadband": pred_bb_below_emin,
             "channel_silent_or_hard_panned_broadband": bool(
                 bb_mix["channel_silent_or_hard_panned"] or bb_pred["channel_silent_or_hard_panned"]
             ),
             "band_valid": band_valid,
+            "pred_energy_below_emin": pred_below_emin_map,
             "channel_silent_or_hard_panned": hard_panned_flags,
             "loss_mono_drop": float(loss_mono_drop.item()),
             "loss_band_corr": float(loss_band_corr.item()),
@@ -568,6 +623,7 @@ class V3cStereoCompatibilityLoss(nn.Module):
             with torch.no_grad():
                 diagnostics["broadband"] = {
                     "valid": broadband_valid,
+                    "pred_energy_below_emin": pred_bb_below_emin,
                     "e_tot_mix": float(bb_mix["e_tot"].mean().item()),
                     "e_tot_pred": float(bb_pred["e_tot"].mean().item()),
                     "smr_db_mix": float(bb_mix["smr_db"].mean().item()),

@@ -1,15 +1,18 @@
 """Sprint 3 V3c Stereo & Mono Compatibility Technical Gate Test Suite.
 
-Verifies all 7 required Technical Gates + 7 corner cases + Scale Invariance:
+Verifies all 8 required Technical Gates + 7 corner cases + Scale Invariance:
 1. Orthonormal energy conservation (E_L + E_R == E_M + E_S) broadband and LR4-banded + w=1 identity.
 2. Canonical correlation and mono fold-down drop (in-phase, quadrature 90 deg, anti-phase).
-3. Active sample mask, digital silence rejection, inactive band gating (E_min=1e-7),
+3. Active sample mask, digital silence rejection, inactive mix band gating (E_min=1e-7),
    321-sample partial block on T_eval=143,841, and LR4 pre-roll warm-up effect.
 4. Float64 torch.autograd.gradcheck across all 4 candidate terms (signal + z[35:38]).
 5. All 7 corner cases (mono, correlated stereo, decorrelated stereo, anti-phase, hard-panned,
-   silent band, total silence) + quantitative scale invariance over [-40, +10] dBFS (< 1e-9).
+   silent band, total silence) + quantitative scale invariance over [-60, +20] dBFS (< 1e-8).
 6. Python/C++ parity for DifferentiableMidSideImager vs py_core_dsp.MidSideImager (< -120 dBFS RMS null).
-7. Zero diff preservation of frozen optimizer/prior/param_space/DSP modules vs 9b1fd9115cce6deaffe637c649c4bb7d6159a195.
+7. Zero diff preservation of frozen optimizer/prior/param_space/DSP modules vs 9b1fd9115cce6deaffe637c649c4bb7d6159a195
+   AND deterministic bit-identity verification (max_diff == 0.0) of V0p & V3b forward/backward paths.
+8. Active mix with sub-threshold / completely silent prediction (< E_min=1e-7): mix-only validity,
+   non-zero penalties, finite continuous gradients wrt pred & z[35:38], and continuity across E_min.
 """
 
 import math
@@ -25,10 +28,12 @@ from ddsp_mastering.dsp.crossover import DifferentiableLR4Crossover
 from ddsp_mastering.dsp.imager import DifferentiableMidSideImager
 from ddsp_mastering.loss.dynamic_prior import TOTAL_DSP_DELAY_SAMPLES, compute_active_sample_mask
 from ddsp_mastering.loss.stereo_prior import (
+    CANDIDATE_A_THRESHOLDS,
     FIXED_CROSSOVER_HIGH_HZ,
     FIXED_CROSSOVER_LOW_HZ,
     INV_SQRT2,
     MIN_ACTIVE_BAND_ENERGY,
+    PILOT_SAME_TRACK_WEIGHTS,
     V3cStereoCompatibilityLoss,
     compute_masked_stereo_stats,
 )
@@ -288,7 +293,7 @@ def test_gate_5_seven_corner_cases_dead_zone_and_scale_invariance():
     assert abs(d_hp["broadband"]["corr_lr_mix"]) < 1e-12
     assert abs(d_hp["broadband"]["mono_drop_db_mix"] - 10.0 * math.log10(2.0)) < 1e-6
 
-    # Quantitative Scale Invariance over [-40, -20, 0, +10] dBFS relative to -10 dBFS reference
+    # Quantitative Scale Invariance over [-60, -40, -20, 0, +10, +20] dBFS relative to baseline
     mix_base = cases["2_correlated_stereo"]
     pred_base = cases["3_decorrelated_stereo"]
     ref_loss, ref_diag = criterion(mix_base, pred_base, compute_diagnostics=True)
@@ -296,19 +301,19 @@ def test_gate_5_seven_corner_cases_dead_zone_and_scale_invariance():
     ref_smr = ref_diag["broadband"]["smr_db_pred"]
     ref_corr = ref_diag["broadband"]["corr_lr_pred"]
 
-    # RMS level of mix_base; scale to exact target dBFS levels
+    # RMS level of mix_base; scale jointly across [-60 dBFS .. +20 dBFS]
     rms_curr = float(torch.sqrt(0.5 * torch.mean(mix_base ** 2)).item())
-    for target_db in (-40.0, -20.0, 0.0, 10.0):
+    for target_db in (-60.0, -40.0, -20.0, 0.0, 10.0, 20.0):
         target_rms = 10.0 ** (target_db / 20.0)
         scale = target_rms / rms_curr
         l_sc, d_sc = criterion(mix_base * scale, pred_base * scale, compute_diagnostics=True)
-        assert abs(d_sc["broadband"]["mono_drop_db_pred"] - ref_drop) < 1e-9
-        assert abs(d_sc["broadband"]["smr_db_pred"] - ref_smr) < 1e-9
-        assert abs(d_sc["broadband"]["corr_lr_pred"] - ref_corr) < 1e-9
-        assert abs(l_sc.item() - ref_loss.item()) < 1e-9
-        assert abs(d_sc["loss_mono_drop"] - ref_diag["loss_mono_drop"]) < 1e-9
-        assert abs(d_sc["loss_band_corr"] - ref_diag["loss_band_corr"]) < 1e-9
-        assert abs(d_sc["loss_band_smr"] - ref_diag["loss_band_smr"]) < 1e-9
+        assert abs(d_sc["broadband"]["mono_drop_db_pred"] - ref_drop) < 1e-8
+        assert abs(d_sc["broadband"]["smr_db_pred"] - ref_smr) < 1e-8
+        assert abs(d_sc["broadband"]["corr_lr_pred"] - ref_corr) < 1e-8
+        assert abs(l_sc.item() - ref_loss.item()) < 1e-8
+        assert abs(d_sc["loss_mono_drop"] - ref_diag["loss_mono_drop"]) < 1e-8
+        assert abs(d_sc["loss_band_corr"] - ref_diag["loss_band_corr"]) < 1e-8
+        assert abs(d_sc["loss_band_smr"] - ref_diag["loss_band_smr"]) < 1e-8
 
 
 # ==============================================================================
@@ -351,7 +356,7 @@ def test_gate_6_cpp_python_mid_side_imager_parity():
 
 
 # ==============================================================================
-# Gate 7: Zero-Diff Preservation of Frozen Core Modules vs Pre-V3c Baseline
+# Gate 7: Zero-Diff Preservation + Deterministic Bit-Identity of V0p & V3b Paths
 # ==============================================================================
 def test_gate_7_frozen_modules_zero_diff_and_v0p_v3b_isolation():
     repo_root = Path(__file__).resolve().parents[1]
@@ -375,8 +380,200 @@ def test_gate_7_frozen_modules_zero_diff_and_v0p_v3b_isolation():
         )
         assert df_res.stdout.strip() == "", f"Historical diff in protected path {rel}: {df_res.stdout}"
 
-    # Verify V0p/V3b path bit-identity (AutoMasteringOptimizer has no V3c coupling)
+    # Verify AutoMasteringOptimizer has zero V3c coupling
+    from ddsp_mastering.dsp.chain import DifferentiableMasteringChain
+    from ddsp_mastering.loss.combined import MasteringPerceptualLoss
+    from ddsp_mastering.loss.dynamic_prior import V3bDynamicPriorLoss
     from ddsp_mastering.optimize import AutoMasteringOptimizer
+
     opt = AutoMasteringOptimizer(v3b_w_lim=0.50, v3b_w_diff=0.02, v3b_w_conflict=0.02)
     assert hasattr(opt, "v3b_prior_loss")
     assert not hasattr(opt, "v3c_prior_loss")
+
+    # Deterministic bit-identity check before & after invoking V3cStereoCompatibilityLoss
+    n_pre = 4800
+    t_eval = 14400
+    torch.manual_seed(98765)
+    mix_ext = torch.randn(1, 2, n_pre + t_eval + TOTAL_DSP_DELAY_SAMPLES, dtype=torch.float32) * 0.2
+    ref_chunk = mix_ext[..., n_pre:].clone()
+
+    def _run_v0p_v3b_snapshot():
+        chain = DifferentiableMasteringChain(sample_rate=48000.0)
+        loss_v0p = MasteringPerceptualLoss(sample_rate=48000.0, target_lufs=-14.0)
+        loss_v3b = V3bDynamicPriorLoss(sample_rate=48000.0, w_lim=0.50, w_diff=0.02, w_conflict=0.02)
+
+        z_a = (Z_NEUTRAL.clone() + 0.03).clamp(0.05, 0.95).to(torch.float32).requires_grad_(True)
+        y_ext, diag_k = chain(mix_ext, z=z_a, eq_mode="iir", return_diagnostics=True)
+        y_post = y_ext[..., n_pre:]
+        l_v0p, _ = loss_v0p(y_post, ref_chunk, z=z_a, align_latency=True)
+        _, _, _, l_v3b, _ = loss_v3b.compute_chunk_terms(
+            mix_audio=mix_ext, diagnostics=diag_k, z=z_a, preroll_samples=n_pre
+        )
+        l_comb = l_v0p + l_v3b.to(l_v0p.dtype)
+        l_comb.backward()
+        return (
+            y_ext.detach().clone(),
+            float(l_v0p.item()),
+            float(l_v3b.item()),
+            z_a.grad.detach().clone(),
+        )
+
+    y0, v0p_0, v3b_0, grad_0 = _run_v0p_v3b_snapshot()
+
+    # Execute V3c standalone forward + backward between snapshots
+    v3c = V3cStereoCompatibilityLoss(delay_dsp_samples=TOTAL_DSP_DELAY_SAMPLES)
+    z_v3c = (Z_NEUTRAL.clone() + 0.03).clamp(0.05, 0.95).to(torch.float32).requires_grad_(True)
+    y_ext_v3c = DifferentiableMasteringChain(sample_rate=48000.0)(mix_ext, z=z_v3c, eq_mode="iir")
+    l_v3c, _ = v3c(mix_ext, y_ext_v3c, z=z_v3c, n_pre=n_pre, compute_diagnostics=True)
+    l_v3c.backward()
+
+    y1, v0p_1, v3b_1, grad_1 = _run_v0p_v3b_snapshot()
+
+    assert torch.max(torch.abs(y0 - y1)).item() == 0.0
+    assert abs(v0p_0 - v0p_1) == 0.0
+    assert abs(v3b_0 - v3b_1) == 0.0
+    assert torch.max(torch.abs(grad_0 - grad_1)).item() == 0.0
+
+
+# ==============================================================================
+# Gate 8: Frozen Candidate A / Pilot Weights + Sub-Threshold & Silent Prediction
+# ==============================================================================
+def test_gate_8_predicted_subthreshold_and_silent_when_mix_active():
+    # 8.0 Verify frozen Candidate A defaults and pilot same_track weights
+    criterion = V3cStereoCompatibilityLoss(delay_dsp_samples=0)
+    assert criterion.tau_drop_db == CANDIDATE_A_THRESHOLDS["tau_drop_db"] == 0.50
+    assert criterion.tau_corr == CANDIDATE_A_THRESHOLDS["tau_corr"] == (0.03, 0.05, 0.08)
+    assert criterion.tau_smr_db == CANDIDATE_A_THRESHOLDS["tau_smr_db"] == (2.0, 2.0, 2.0)
+    assert criterion.tau_sub_db == CANDIDATE_A_THRESHOLDS["tau_sub_db"] == 0.50
+    assert criterion.alpha_sub == CANDIDATE_A_THRESHOLDS["alpha_sub"] == 1.0
+    assert criterion.tau_w_low_max == CANDIDATE_A_THRESHOLDS["tau_w_low_max"] == 1.00
+    assert criterion.tau_w_mid == CANDIDATE_A_THRESHOLDS["tau_w_mid"] == 0.15
+    assert criterion.tau_w_high == CANDIDATE_A_THRESHOLDS["tau_w_high"] == 0.15
+    assert criterion.w_mono_drop == PILOT_SAME_TRACK_WEIGHTS["w_mono_drop"] == 1.00
+    assert criterion.w_band_corr == PILOT_SAME_TRACK_WEIGHTS["w_band_corr"] == 10.00
+    assert criterion.w_band_smr == PILOT_SAME_TRACK_WEIGHTS["w_band_smr"] == 0.05
+    assert criterion.w_width_param == PILOT_SAME_TRACK_WEIGHTS["w_width_param"] == 0.25
+
+    sr = 48000.0
+    N = 24000
+    t = torch.arange(N, dtype=torch.float64) / sr
+    # Correlated multi-band active mix: low (15 Hz), mid (800 Hz), high (18000 Hz)
+    # Minimal crossover skirt leakage between bands so low+high alone leaves mid < 1e-10
+    tone_l = 0.05 * (torch.sin(2 * math.pi * 15 * t) + torch.sin(2 * math.pi * 800 * t) + torch.sin(2 * math.pi * 18000 * t))
+    tone_q = 0.05 * (torch.cos(2 * math.pi * 15 * t) + torch.cos(2 * math.pi * 800 * t) + torch.cos(2 * math.pi * 18000 * t))
+    mix_active = torch.stack([tone_l, 0.90 * tone_l + 0.10 * tone_q], dim=0).unsqueeze(0)
+
+    # ------------------------------------------------------------------
+    # Case 8.1: Mix active in mid band, pred quasi-silent in mid band (E_tot_mid^pred ~ 1e-10 < E_min)
+    # ------------------------------------------------------------------
+    pred_low_high = 0.05 * (
+        torch.stack([
+            torch.sin(2 * math.pi * 15 * t) + torch.sin(2 * math.pi * 18000 * t),
+            0.9 * (torch.sin(2 * math.pi * 15 * t) + torch.sin(2 * math.pi * 18000 * t))
+            + 0.1 * (torch.cos(2 * math.pi * 15 * t) + torch.cos(2 * math.pi * 18000 * t)),
+        ], dim=0).unsqueeze(0)
+    )
+    # Decorrelated mid component scaled so E_tot_mid^pred ~ 1e-10
+    mid_unit = torch.stack([
+        torch.sin(2 * math.pi * 800 * t),
+        torch.cos(2 * math.pi * 800 * t),
+    ], dim=0).unsqueeze(0)
+    pred_quasi_mid = (pred_low_high + 1.0e-5 * mid_unit).detach().clone().requires_grad_(True)
+
+    l_81, d_81 = criterion(mix_active, pred_quasi_mid, compute_diagnostics=True)
+    assert d_81["band_valid"]["mid"] is True
+    assert d_81["bands"]["mid"]["pred_energy_below_emin"] is True
+    assert 1e-12 < d_81["bands"]["mid"]["e_tot_pred"] < MIN_ACTIVE_BAND_ENERGY
+    assert d_81["loss_band_corr"] > 0.0
+    assert d_81["loss_band_smr"] > 0.0
+    assert math.isfinite(l_81.item())
+    l_81.backward()
+    assert pred_quasi_mid.grad is not None
+    assert torch.isfinite(pred_quasi_mid.grad).all()
+    assert torch.norm(pred_quasi_mid.grad).item() > 0.0
+
+    # Also verify finite non-zero gradients wrt z[35:38] when mid band into imager yields E_tot_mid ~ 1e-10
+    tone_lh_l = 0.05 * (torch.sin(2 * math.pi * 15 * t) + torch.sin(2 * math.pi * 18000 * t))
+    tone_lh_q = 0.05 * (torch.cos(2 * math.pi * 15 * t) + torch.cos(2 * math.pi * 18000 * t))
+    tone_full_l = tone_lh_l + 0.05 * torch.sin(2 * math.pi * 800 * t)
+    tone_full_q = tone_lh_q + 0.05 * torch.cos(2 * math.pi * 800 * t)
+    mix_corr_mod = torch.stack([tone_full_l, 0.65 * tone_full_l + 0.76 * tone_full_q], dim=0).unsqueeze(0)
+    mix_lh_only = torch.stack([tone_lh_l, 0.65 * tone_lh_l + 0.76 * tone_lh_q], dim=0).unsqueeze(0)
+    xover = DifferentiableLR4Crossover(sample_rate=sr)
+    imager = DifferentiableMidSideImager()
+    f_l = torch.tensor(FIXED_CROSSOVER_LOW_HZ, dtype=torch.float64)
+    f_h = torch.tensor(FIXED_CROSSOVER_HIGH_HZ, dtype=torch.float64)
+    mb_l, _, mb_h = xover(mix_lh_only, f_l, f_h)
+    _, mb_m, _ = xover(mix_corr_mod, f_l, f_h)
+    mb_m_tiny = mb_m * 2.0e-4  # E_tot_mid drops by 4e-8 => ~ 1e-10
+    z_sub = Z_NEUTRAL.to(torch.float64).clone()
+    z_sub[35] = 0.95  # w_low > 1.0
+    z_sub[36] = 0.98  # w_mid ~ 1.386
+    z_sub[37] = 0.98  # w_high ~ 1.386
+    z_sub.requires_grad_(True)
+    th_sub = map_z_to_theta(z_sub)
+    pred_im = imager(mb_l, mb_m_tiny, mb_h, th_sub[35:36], th_sub[36:37], th_sub[37:38])
+    l_sub_z, d_sub_z = criterion(mix_corr_mod, pred_im, z=z_sub, compute_diagnostics=True)
+    assert d_sub_z["band_valid"]["mid"] is True
+    assert d_sub_z["bands"]["mid"]["pred_energy_below_emin"] is True
+    assert 1e-12 < d_sub_z["bands"]["mid"]["e_tot_pred"] < MIN_ACTIVE_BAND_ENERGY
+    assert d_sub_z["loss_band_corr"] > 0.0
+    assert d_sub_z["loss_band_smr"] > 0.0
+    l_sub_z.backward()
+    assert z_sub.grad is not None
+    assert torch.isfinite(z_sub.grad).all()
+    assert torch.all(torch.abs(z_sub.grad[35:38]) > 0.0)
+
+    # ------------------------------------------------------------------
+    # Case 8.2: Mix active across all 3 bands, pred completely silent (0.0) OR quasi-silent on both L/R
+    # ------------------------------------------------------------------
+    pred_zero = torch.zeros_like(mix_active).requires_grad_(True)
+    l_zero, d_zero = criterion(mix_active, pred_zero, compute_diagnostics=True)
+    assert d_zero["broadband_valid"] is True
+    assert all(d_zero["band_valid"].values())
+    assert d_zero["pred_energy_below_emin_broadband"] is True
+    assert all(d_zero["pred_energy_below_emin"].values())
+    assert d_zero["loss_band_corr"] > 0.0
+    assert d_zero["loss_band_smr"] > 0.0
+    assert math.isfinite(l_zero.item())
+    l_zero.backward()
+    assert torch.isfinite(pred_zero.grad).all()
+
+    pred_tiny_all = (1e-6 * torch.stack([tone_l, tone_q], dim=0).unsqueeze(0)).requires_grad_(True)
+    l_tiny, d_tiny = criterion(mix_active, pred_tiny_all, compute_diagnostics=True)
+    assert d_tiny["broadband_valid"] is True
+    assert all(d_tiny["band_valid"].values())
+    assert d_tiny["pred_energy_below_emin_broadband"] is True
+    assert all(d_tiny["pred_energy_below_emin"].values())
+    assert d_tiny["loss_band_corr"] > 0.0
+    assert d_tiny["loss_band_smr"] > 0.0
+    assert math.isfinite(l_tiny.item())
+    l_tiny.backward()
+    assert torch.isfinite(pred_tiny_all.grad).all()
+    assert torch.norm(pred_tiny_all.grad).item() > 0.0
+
+    # ------------------------------------------------------------------
+    # Case 8.3: Numerical continuity across E_min = 1e-7 threshold (zero step jump)
+    # ------------------------------------------------------------------
+    # Uniformly scale a 3-band decorrelated prediction so its mid-band energy crosses
+    # [2.0 * E_min, 1.0 * E_min, 0.5 * E_min] with zero step discontinuity at E_min.
+    pred_3band_unit = torch.stack([tone_full_l, tone_full_q], dim=0).unsqueeze(0)
+    with torch.no_grad():
+        _, _, _, unit_b_all = criterion._filter_and_slice_pair(mix_active, pred_3band_unit, n_pre=0, delay_samples=0)
+        mask_m, _, _ = compute_active_sample_mask(mix_active)
+        st_unit = compute_masked_stereo_stats(unit_b_all["mid"], mask_m)
+        scale_unit = 1.0 / math.sqrt(float(st_unit["e_tot"].item()))
+
+    losses_across = []
+    for factor_emin in (2.0, 1.0, 0.5):
+        target_e = factor_emin * MIN_ACTIVE_BAND_ENERGY
+        amp = math.sqrt(target_e) * scale_unit
+        pred_cross = amp * pred_3band_unit
+        _, d_cross = criterion(mix_active, pred_cross, compute_diagnostics=True)
+        assert d_cross["band_valid"]["mid"] is True
+        assert abs(d_cross["bands"]["mid"]["e_tot_pred"] - target_e) / target_e < 1e-9
+        losses_across.append((d_cross["loss_band_corr"], d_cross["loss_band_smr"]))
+
+    for i in range(len(losses_across) - 1):
+        assert abs(losses_across[i][0] - losses_across[i + 1][0]) < 1e-6
+        assert abs(losses_across[i][1] - losses_across[i + 1][1]) < 1e-6

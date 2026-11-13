@@ -6,7 +6,7 @@
 **Repository:** `gio961gio/AutoMastering`  
 **Branch:** `human-validation-package`  
 **Commit di riferimento:** `9b1fd9115cce6deaffe637c649c4bb7d6159a195`  
-**Stato:** SPECIFICA REVISIONATA CON DECISIONI CONGELATE `Q1–Q5` (ZERO modifiche a `optimizer.py`, `dynamic_prior.py`, `param_space.py` o DSP)
+**Stato:** SPECIFICA CONGELATA & HARDENED (Candidate A + Pesi Pilota `same_track`, Validità Mix-Only & Ancoraggio $\varepsilon_{\text{rel}}$, Esclusione `stylistic` dal Trattamento Pilota; ZERO modifiche a `optimizer.py`, `dynamic_prior.py`, `param_space.py` o DSP)
 
 ---
 
@@ -76,16 +76,22 @@ Siano le energie medie sui campioni attivi $n \in \mathcal{A}_{\text{smp}}$ (di 
 $$E_L = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} x_L[n]^2, \quad E_R = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} x_R[n]^2, \quad E_{\text{tot}} = E_L + E_R = E_M + E_S$$
 $$E_M = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} m[n]^2, \quad E_S = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} s[n]^2, \quad C_{LR} = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} x_L[n]\,x_R[n]$$
 
-1. **Pavimento Relativo Staccato per Scale Invariance (Range Operativo $[-60, +20]\text{ dBFS}$):**
-   $$\varepsilon_{\text{rel}} = 10^{-12} \cdot \text{detach}(E_{\text{tot}}) + 10^{-30}$$
-   Definiamo con $\varepsilon_{\text{rel}}$ le metriche scale-invariant (invarianti entro $< 10^{-11}\text{ dB}$ rispetto a riscalature $x \mapsto c \cdot x$ con $E_{\text{tot}} \ge 10^{-7}$):
+1. **Pavimento Relativo Staccato & Ancorato per Scale Invariance (Range Operativo $[-60, +20]\text{ dBFS}$):**
+   - Per il segnale mix originale (`ref_energy_anchor = None`):
+     $$\varepsilon_{\text{rel}}^{\text{mix}} = 10^{-12} \cdot \text{detach}(\max(E_{\text{tot}}^{\text{mix}}, 10^{-30})) + 10^{-30}$$
+   - Per il segnale predetto (`ref_energy_anchor = detach(E_tot_mix)`), con ancoraggio esplicito all'energia del mix originale:
+     $$\varepsilon_{\text{rel}, b}^{\text{pred}} = 10^{-12}\cdot\text{detach}\!\left(\max\!\left(E_{\text{tot}, b}^{\text{mix}},\, E_{\text{tot}, b}^{\text{pred}}\right)\right) + 10^{-30}$$
+   Definiamo con $\varepsilon_{\text{rel}}$ le metriche scale-invariant (invarianti entro $< 10^{-8}$ su tutto l'intervallo $[-60, +20]\text{ dBFS}$ rispetto a riscalature congiunte $(x_{\text{mix}}, y_{\text{pred}}) \mapsto c \cdot (x_{\text{mix}}, y_{\text{pred}})$):
    $$D_{\text{mono}}(x) = 10 \log_{10}\!\left(\frac{E_M + E_S + \varepsilon_{\text{rel}}}{E_M + \varepsilon_{\text{rel}}}\right) \quad [\text{dB}]$$
    $$R_{S/M}(x) = 10 \log_{10}\!\left(\frac{E_S + \varepsilon_{\text{rel}}}{E_M + \varepsilon_{\text{rel}}}\right) \quad [\text{dB}], \qquad B_{L/R}(x) = 10 \log_{10}\!\left(\frac{E_L + \varepsilon_{\text{rel}}}{E_R + \varepsilon_{\text{rel}}}\right) \quad [\text{dB}]$$
    $$\rho_{LR}(x) = \frac{C_{LR}}{\sqrt{(E_L + \varepsilon_{\text{rel}})(E_R + \varepsilon_{\text{rel}})}} = \frac{\frac{1}{2}(E_M - E_S)}{\sqrt{\left(\frac{E_M + E_S}{2} + \varepsilon_{\text{rel}}\right)^2 - C_{MS}^2}}$$
-   *(Nota numerica: in controfase pura $E_M = 0$, $D_{\text{mono}}$ resta finito e privo di `NaN`/`Inf` grazie a $\varepsilon_{\text{rel}} > 0$).*
+   *(Proprietà su predizioni silenziose o quasi silenziose: con mix valido $E_{\text{tot}, b}^{\text{mix}} \ge 10^{-7}$, $\varepsilon_{\text{rel}, b}^{\text{pred}} \ge 10^{-19}$ garantisce denominatori strettamente positivi e ben condizionati anche quando $y_{\text{pred}, b} \equiv 0$, evitando qualsiasi `NaN`/`Inf` o collasso della scala dei gradienti.)*
 
-2. **Soglia di Energia Minima per Banda ($E_{\min} = 10^{-7}$, $-70.0\text{ dBFS}$):**
-   - Per ciascuna banda $b \in \{L, M, H\}$, se $E_{\text{tot}, b} = E_{L, b} + E_{R, b} < E_{\min} = 10^{-7}$ (valutata sul segnale rilevante; nelle loss pairwise richiede validità di mix e pred, o $E_{\text{tot},b} < E_{\min}$ sul segnale di test), allora **`band_valid[b] = False`**, il contributo della banda $b$ alle loss basate sul segnale è identicamente **`0.0`** (con gradiente nullo) e nel reporting la banda viene contrassegnata da `band_valid[b] = False`.
+2. **Regola di Validità Basata Esclusivamente sul Mix Originale ($E_{\min} = 10^{-7}$, $-70.0\text{ dBFS}$):**
+   - La validità di valutazione sia broadband sia per ciascuna banda $b \in \{L, M, H\}$ dipende **esclusivamente** dalla validità energetica del mix originale:
+     $$\text{valid}_b = \mathbb{I}(\neg\,\text{is\_silent}) \cdot \mathbb{I}\!\left(E_{\text{tot}, b}^{\text{mix}} \ge E_{\min}\right), \qquad \text{valid}_{\text{bb}} = \mathbb{I}(\neg\,\text{is\_silent}) \cdot \mathbb{I}\!\left(E_{\text{tot}, \text{bb}}^{\text{mix}} \ge E_{\min}\right)$$
+   - La validità **non** dipende mai da $E_{\text{tot}, b}^{\text{pred}}$: se una banda del mix originale è attiva ($\ge E_{\min}$), una predizione sotto soglia o silenziosa ($E_{\text{tot}, b}^{\text{pred}} < E_{\min}$) **non** disattiva `loss_mono_drop`, `loss_band_corr` o `loss_band_smr`, mantenendo continuità numerica perfetta attraverso $E_{\min}$ e penalità strettamente positive ($y_{\text{pred}, b} \equiv 0 \implies \rho_{LR, b}^{\text{pred}} = 0,\, R_{S/M, b}^{\text{pred}} = 0\text{ dB}$).
+   - Se invece il **mix originale** ha $E_{\text{tot}, b}^{\text{mix}} < E_{\min}$, allora `band_valid[b] = False` e il contributo della banda $b$ è identicamente `0.0` (gradiente nullo). Il dizionario diagnostico registra comunque il flag booleano `pred_energy_below_emin` ($E_{\text{tot}, b}^{\text{pred}} < E_{\min}$).
 
 3. **Gestione di Singolo Canale Silenzioso / Hard-Panned ($\eta_{\text{ch}} = 10^{-6}$):**
    - Quando la banda è attiva ($E_{\text{tot},b} \ge E_{\min}$) ma $\min(E_{L,b}, E_{R,b}) < \eta_{\text{ch}} E_{\text{tot},b}$ (es. segnale hard-panned $x_R \equiv 0, x_L \neq 0$), la correlazione di Pearson classica $0/0$ non è definita in senso stretto; il calcolo differenziabile con $\varepsilon_{\text{rel}, b} > 0$ restituisce in modo liscio e regolare $\rho_{LR, b} = 0.0$ (con $E_{M,b} = E_{S,b} = \frac{1}{2}E_{L,b}$ e $D_{\text{mono},b} = 10\log_{10}(2) \approx 3.0103\text{ dB}$) e registra nel dizionario diagnostico il flag **`channel_silent_or_hard_panned[b] = True`**.
@@ -113,6 +119,22 @@ $$E_M = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} m[n]^2, \quad E_S = \
 4. **$\mathcal{L}_{\text{width-param}}$** (prior parametrico diretto sulle larghezze `imager_width_low/mid/high`):
    $$\mathcal{L}_{\text{width-param}} = \text{ReLU}\!\left(w_{\text{low}} - \tau_{w,\text{low,max}}\right)^2 + \frac{1}{2}\sum_{b \in \{\text{mid},\text{high}\}} \text{ReLU}\!\left(|w_b - 1.0| - \tau_{w,b}\right)^2$$
 
+### 3.1 Parametri Congelati **Candidate A** e Pesi Pilota (`same_track`)
+A valle del primo Preflight Read-Only `V3c`, vengono congelati in `V3cStereoCompatibilityLoss` **esclusivamente** le soglie di **Candidate A** e i seguenti pesi pilota per la futura prima ablation `same_track` (nessuna scansione di pesi o soglie aggiuntiva):
+
+| Gruppo | Parametro | Valore Congelato |
+|:---|:---|---:|
+| **Soglie Candidate A** | `tau_drop_db` | `0.50` dB |
+| **Soglie Candidate A** | `tau_corr` `(low, mid, high)` | `(0.03, 0.05, 0.08)` |
+| **Soglie Candidate A** | `tau_smr_db` `(low, mid, high)` | `(2.0, 2.0, 2.0)` dB |
+| **Soglie Candidate A** | `tau_sub_db` / `alpha_sub` | `0.50` dB / `1.0` |
+| **Soglie Candidate A** | `tau_w_low_max` | `1.00` |
+| **Soglie Candidate A** | `tau_w_mid` / `tau_w_high` | `0.15` / `0.15` |
+| **Pesi Pilota `same_track`** | `w_mono_drop` | **`1.00`** |
+| **Pesi Pilota `same_track`** | `w_band_corr` | **`10.00`** |
+| **Pesi Pilota `same_track`** | `w_band_smr` | **`0.05`** |
+| **Pesi Pilota `same_track`** | `w_width_param` | **`0.25`** |
+
 ---
 
 ## 4. ALLINEAMENTO TEMPORALE, PREVENZIONE DEI "PERVERSE INCENTIVES" E DIAGNOSTICHE SHORT-TIME / COMB-FILTERING
@@ -129,31 +151,37 @@ $$E_M = \frac{1}{N_a}\sum_{n \in \mathcal{A}_{\text{smp}}} m[n]^2, \quad E_S = \
 
 ---
 
-## 5. INTEGRAZIONE STANDALONE, COMPATIBILITÀ E CRITERIO PER FUTURA COMPOSIZIONE `V4`
+## 5. INTEGRAZIONE STANDALONE, ESCLUSIONE `stylistic` DAL PILOTA & CRITERIO `V4`
 
 1. **Stato Attuale (`optimizer.py` intatto):** In questa fase `V3cStereoCompatibilityLoss` vive isolato in `python/ddsp_mastering/loss/stereo_prior.py`, garantendo diff zero su `optimizer.py`, `dynamic_prior.py`, `param_space.py` e moduli DSP Python/C++.
-2. **Interazione con `stylistic_stereo_loss` (`V0p`, `weight_stereo=0.3`):** La formulazione mix-aware con dead-zone protegge la compatibilità relativa al mix sorgente lasciando governare `stylistic_stereo_loss` all'interno della banda di tolleranza.
+2. **Gestione della Modalità `stylistic` & Ambito Esclusivo dell'Ablation Pilota:**
+   - Nel primo Preflight Read-Only `V3c`, le sessioni `stylistic` hanno evidenziato un **conflitto strutturale di direzione del gradiente** fra i termini `V3c` (che ancorano l'escursione M/S $R_{S/M}$ ed il drop di correlazione al **mix originale** del brano) e `stylistic_stereo_loss` di `V0p` (che spinge il rapporto M/S verso il **brano reference esterno**), con cosine negative rilevanti fra `V3c` e `V0p_total` sul gruppo `Imager` e conflitto con il target stilistico quando il reference richiede una maggiore apertura stereo.
+   - Pertanto, i termini `V3c` nella formulazione attuale **non sono dichiarati adatti alla modalità `stylistic`**: per la prima ablation `V3c` autorizzata verranno utilizzate **esclusivamente le 3 sessioni `same_track` (`track01`, `track02`, `track03`)**, mentre le 3 sessioni `stylistic` (`track01_style`, `track02_style`, `track03_style`) restano **esclusivamente diagnostiche** e **non verranno attivate nell'optimizer**.
+   - Un'eventuale futura formulazione `V3c` per la modalità `stylistic` dovrà preservare la libertà di apertura stereo richiesta dal brano reference esterno, limitandosi a guardrail di sicurezza su mono/fase (es. collasso mono estremo, anti-fase locale o eccessi sub-bass in somma mono).
 3. **Criterio Esplicito per Futura Composizione `V4` (Punto 6):**
    La futura configurazione **`V4`** includerà **esclusivamente** le componenti di regolarizzazione (tra i candidati `V1/V1b/V2/V3a/V3b/V3c`) che avranno superato **sia la validazione quantitativa oggettiva sia la validazione percettiva d'ascolto controllata (blind human evaluation)**; nessuna componente è pre-ammessa in `V4` per default prima del superamento di entrambe le validazioni.
 
 ---
 
-## 6. PIANO DEI 7 TECHNICAL GATE TEST (`tests/test_sprint3_v3c_gate.py`)
+## 6. PIANO DEI GATE TEST TECNICI (`1–8` in `tests/test_sprint3_v3c_gate.py`)
 
-La suite `tests/test_sprint3_v3c_gate.py` verifica integralmente i 7 Gate e i 7 casi limite:
+La suite `tests/test_sprint3_v3c_gate.py` verifica integralmente i Gate 1–8 e i 7 casi limite:
 1. **Gate 1:** Conservazione ortonormale $E_L + E_R = E_M + E_S$ ($< 10^{-12}$) broadband e sulle 3 bande LR4 + identità esatta dell'imager per $w_b = 1.0$.
 2. **Gate 2:** Segnali canonici: in fase ($\rho = +1$, $D_{\text{mono}} = 0\text{ dB}$), quadratura $90^\circ$ ($\rho \approx 0$, $D_{\text{mono}} \approx 3.0103\text{ dB}$), controfase ($\rho = -1$, $D_{\text{mono}}$ finito, zero `NaN`/`Inf`).
-3. **Gate 3:** Silenzio digitale ($< -70\text{ dBFS}$ -> loss `0.0`, grad `0.0`), banda priva di energia (es. solo seno `60 Hz`: `band_valid['mid']=False, ['high']=False`, zero `NaN`), blocco parziale da $321$ campioni su $T_{\text{eval}}=143\,841$ e verifica warm-up LR4 pre-roll vs no-pre-roll.
+3. **Gate 3:** Silenzio digitale ($< -70\text{ dBFS}$ -> loss `0.0`, grad `0.0`), banda priva di energia nel mix (es. solo seno `20 Hz`: `band_valid['mid']=False, ['high']=False`, zero `NaN`), blocco parziale da $321$ campioni su $T_{\text{eval}}=143\,841$ e verifica warm-up LR4 pre-roll vs no-pre-roll.
 4. **Gate 4:** `torch.autograd.gradcheck` in `float64` separato su ciascuno dei 4 termini (`loss_mono_drop`, `loss_band_corr`, `loss_band_smr`, `loss_width_param`) rispetto al segnale e a $z_{35..37}$.
-5. **Gate 5:** Verifica dei **7 casi limite** (mono puro, stereo correlato, stereo decorrelato, anti-fase pura, hard-panned $x_R \equiv 0$, banda silenziosa, silenzio digitale totale) + test quantitativo di **Scale Invariance** su livelli $-40, -20, 0, +10\text{ dBFS}$ ($< 10^{-9}$ su $D_{\text{mono}}, R_{S/M}, \rho_{LR}$ e sulle 3 loss di segnale).
+5. **Gate 5:** Verifica dei **7 casi limite** (mono puro, stereo correlato, stereo decorrelato, anti-fase pura, hard-panned $x_R \equiv 0$, banda silenziosa, silenzio digitale totale) + test quantitativo di **Scale Invariance** su tutto l'intervallo dichiarato **`[-60.0, -40.0, -20.0, 0.0, +10.0, +20.0] dBFS`** ($< 10^{-8}$ su $D_{\text{mono}}, R_{S/M}, \rho_{LR}$ e sulle 3 loss di segnale).
 6. **Gate 6:** Parità Python/C++ (`DifferentiableMidSideImager` vs `py_core_dsp.MidSideImager`, null RMS $< -120\text{ dBFS}$, max abs $< 10^{-6}$).
-7. **Gate 7:** Zero diff storico di `optimizer.py`, `dynamic_prior.py`, `param_space.py` e moduli DSP Python/C++ rispetto a `9b1fd9115cce6deaffe637c649c4bb7d6159a195` e bit-identità `V0p`/`V3b`.
+7. **Gate 7:** Zero diff storico di `optimizer.py`, `dynamic_prior.py`, `param_space.py` e moduli DSP Python/C++ rispetto a `9b1fd9115cce6deaffe637c649c4bb7d6159a195` **e** verifica deterministica effettiva di bit-identity (`max_diff == 0.0` su audio, loss e gradienti di `DifferentiableMasteringChain`, `MasteringPerceptualLoss` `V0p` e `V3bDynamicPriorLoss` `V3b` prima e dopo l'esecuzione di `V3cStereoCompatibilityLoss`).
+8. **Gate 8 (Predizione Sotto Soglia / Silenziosa con Mix Attivo):** Verifica obbligatoria dei 3 regimi critici quando $E_{\text{tot}, b}^{\text{mix}} \ge E_{\min}$:
+   - Banda `mid` del mix attiva e predizione quasi silenziosa in `mid` ($E_{\text{tot}, \text{mid}}^{\text{pred}} \approx 10^{-10} < E_{\min}$): `band_valid['mid'] == True`, `loss_band_corr > 0`, `loss_band_smr > 0`, gradienti su `pred` e $z_{35..37}$ finiti, non nulli e privi di `NaN`/`Inf`.
+   - Mix attivo su tutte le bande e predizione completamente silenziosa (`0.0`) o quasi silenziosa su L/R: `loss_band_corr > 0` e `loss_band_smr > 0` quando applicabile, zero `NaN`/`Inf` in metriche e gradienti.
+   - Continuità numerica attraverso la soglia $E_{\min} = 10^{-7}$ ($2\times 10^{-7} \to 1\times 10^{-7} \to 0.5\times 10^{-7}$): nessuna discontinuità a gradino ($\Delta < 10^{-6}$).
 
 ---
 
-## 7. PROTOCOLLO PREFLIGHT READ-ONLY V3c (`scripts/sprint3/run_v3c_preflight.py`)
+## 7. PROTOCOLLO PREFLIGHT READ-ONLY V3c & V2 (`scripts/sprint3/run_v3c_preflight.py`)
 
 Valutazione read-only sui 3 punti operativi (`Z_NEUTRAL`, `V0p z_opt`, `V3b z_opt`) su tutte le 6 sessioni armonizzate (4 chunk da $144\,000$ campioni, pre-roll $120\,000$, $T_{\text{eval}}=143\,841$, pesatura $1/4$):
-- Estrazione di tutte le metriche broadband, per banda (`160 / 3200 Hz`), short-time (`50 / 100 / 250 ms`), L/R balance e comb-filtering;
-- Valutazione non pesata dei 4 termini candidati sia a soglia zero (sensibilità pura) sia sotto **Candidato A** vs **Candidato B**;
-- Diagnostica completa dei gradienti in $z$ e $u = \nabla_z \odot z(1-z)$ su 41D e 6 gruppi parametrici, più cosine similarity rispetto a `V0p_total`, `LUFS_only` e `stylistic_stereo_loss`.
+- **Preflight V1 (`SPRINT3_V3C_PREFLIGHT_RESULTS.json`, `SPRINT3_V3C_PREFLIGHT_REPORT.md` — congelato):** confronto non pesato `Zero_Threshold`, `Candidate_A`, `Candidate_B`.
+- **Preflight V2 (`SPRINT3_V3C_PREFLIGHT_V2_RESULTS.json`, `SPRINT3_V3C_PREFLIGHT_V2_REPORT.md`):** valutazione con **Candidate A** e **pesi pilota congelati** $(1.00, 10.00, 0.05, 0.25)$ su termini unweighted/weighted, somma combinata `loss_v3c_total_weighted`, norme dei gradienti in `z` e `u` (41D, `Imager [35:38]` e altri 5 gruppi), rapporti rispetto a `V0p_total` e cosine similarities verso `V0p_total`, `LUFS_only` e `stylistic_stereo` (con `track01..03` operative per l'ablation pilota `same_track` e `track01_style..03_style` solo diagnostiche).
