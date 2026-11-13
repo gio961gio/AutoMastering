@@ -15,6 +15,10 @@
 | `track02_style` | `stylistic` | `0.00091` | `0.00178` | `-0.001` | `-0.005` | `eq_b2_f0` (-0.0009), `eq_b5_gain_db` (-0.0008) |
 | `track03_style` | `stylistic` | `0.00468` | `0.00541` | `-0.001` | `-0.018` | `eq_b3_f0` (-0.0047), `eq_b5_gain_db` (-0.0026) |
 
+> **Nota interpretativa FASE D (`V1b` su `track01_style` e pacchetto composito `V2`):**
+> - Su `track01_style`, **`V1b - V1 = +0.964 LU`** (`-17.83 -> -16.86 LUFS`, `+1.123 LU` più forte del target `-17.99 LUFS`): la riduzione della presenza `2.5–6 kHz` (`-2.645 dB` ERB surplus) induce Adam ad alzare l'`eq_mean_gain_db` (`-1.915 -> -1.263 dB`), aumentando la loudness integrata e abbassando il PLR (`15.37 -> 14.53 dB`). Il static loudness match (`<= 0.01 LU`) nel protocollo è quindi essenziale per evitare un bias verso `V1b` più forte.
+> - Il contrasto `H03` (`V0p` vs `V2`) valuta congiuntamente il **pacchetto composito V2** (`TransientEnvelopeLoss` + `ReferenceAwarePLRLoss`).
+
 ## 2. Tabella Comparativa Full-Track Congelata (`V0p` $\to$ `V3c`) per Tutte le 6 Sessioni
 
 | Sessione | Var. | `||dz vs V0p||_2` | `max|dz|` | LUFS | PLR (dB) | TP `1x` (dBTP) | SP `1x` (dBFS) | SC (`same`) / ASD (`style`) | ERB Surp. (dB) | $\Delta$M/S (dB) |

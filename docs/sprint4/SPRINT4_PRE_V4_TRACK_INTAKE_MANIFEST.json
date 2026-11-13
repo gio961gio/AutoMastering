@@ -1,0 +1,435 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "sprint4_pre_v4_track_intake_manifest",
+  "repository": "gio961gio/AutoMastering",
+  "branch": "human-validation-package",
+  "status": "EMPTY_TEMPLATE_PENDING_AUTHORIZED_LOCAL_AUDIO",
+  "policy": {
+    "private_audio_root": "human_validation/private/input/",
+    "git_tracking_forbidden_for_audio": true,
+    "required_sample_rate_hz": 48000,
+    "required_channels": 2,
+    "allowed_subtypes": [
+      "PCM_24",
+      "FLOAT",
+      "DOUBLE"
+    ],
+    "commercial_stream_rips_forbidden": true,
+    "provenance_and_license_required": true,
+    "dsp_optimization_executed": false,
+    "blind_pack_generated": false
+  },
+  "existing_inventory_reference": [
+    {
+      "track_id": "track01",
+      "modes": [
+        "same_track",
+        "stylistic"
+      ],
+      "status": "PRESENT_IN_PRIVATE_INPUT",
+      "duration_sec": 63.9,
+      "mix_integrated_lufs": -14.22,
+      "mix_plr_db": 18.12,
+      "mix_stereo_correlation": 0.795
+    },
+    {
+      "track_id": "track02",
+      "modes": [
+        "same_track",
+        "stylistic"
+      ],
+      "status": "PRESENT_IN_PRIVATE_INPUT",
+      "duration_sec": 71.47,
+      "mix_integrated_lufs": -22.03,
+      "mix_plr_db": 18.01,
+      "mix_stereo_correlation": 0.948
+    },
+    {
+      "track_id": "track03",
+      "modes": [
+        "same_track",
+        "stylistic"
+      ],
+      "status": "PRESENT_IN_PRIVATE_INPUT",
+      "duration_sec": 71.78,
+      "mix_integrated_lufs": -17.86,
+      "mix_plr_db": 14.45,
+      "mix_stereo_correlation": 0.715
+    }
+  ],
+  "intake_slots": [
+    {
+      "track_id": "track04",
+      "status": "MISSING_AWAITING_USER_SOURCE",
+      "acoustic_profile": "Acustico / Dinamico (voce, chitarra acustica, pianoforte)",
+      "target_hypotheses": [
+        "H01",
+        "H03",
+        "H04"
+      ],
+      "intended_regimes": [
+        "same_track",
+        "stylistic"
+      ],
+      "expected_acoustic_targets": {
+        "plr_min_db": 11.0,
+        "recommended_duration_sec": [
+          35.0,
+          90.0
+        ]
+      },
+      "source_mix": {
+        "local_relative_path": "human_validation/private/input/track04_mix.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "same_track_reference": {
+        "required": true,
+        "local_relative_path": "human_validation/private/input/track04_ref.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "stylistic_external_reference": {
+        "required": false,
+        "local_relative_path": "human_validation/private/input/track04_ref_altro_brano.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "candidate_listening_section": {
+        "label": null,
+        "start_sec": null,
+        "end_sec": null,
+        "duration_sec": null,
+        "notes": "Selezionare passaggio vocale/acustico naturale >= 20s"
+      },
+      "provenance_and_licensing": {
+        "source_type": null,
+        "license": null,
+        "usage_authorization_confirmed": false,
+        "authorized_by": null,
+        "notes": null
+      }
+    },
+    {
+      "track_id": "track05",
+      "status": "MISSING_AWAITING_USER_SOURCE",
+      "acoustic_profile": "Transienti rapidi (batteria acustica/elettronica, percussioni secche)",
+      "target_hypotheses": [
+        "H03",
+        "H05"
+      ],
+      "intended_regimes": [
+        "same_track",
+        "stylistic"
+      ],
+      "expected_acoustic_targets": {
+        "transient_rich_kick_snare": true,
+        "recommended_duration_sec": [
+          35.0,
+          90.0
+        ]
+      },
+      "source_mix": {
+        "local_relative_path": "human_validation/private/input/track05_mix.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "same_track_reference": {
+        "required": true,
+        "local_relative_path": "human_validation/private/input/track05_ref.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "stylistic_external_reference": {
+        "required": true,
+        "local_relative_path": "human_validation/private/input/track05_ref_altro_brano.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "candidate_listening_section": {
+        "label": null,
+        "start_sec": null,
+        "end_sec": null,
+        "duration_sec": null,
+        "notes": "Selezionare groove/break con attacchi cassa-rullante scoperti >= 20s"
+      },
+      "provenance_and_licensing": {
+        "source_type": null,
+        "license": null,
+        "usage_authorization_confirmed": false,
+        "authorized_by": null,
+        "notes": null
+      }
+    },
+    {
+      "track_id": "track06",
+      "status": "MISSING_AWAITING_USER_SOURCE",
+      "acoustic_profile": "Bright / Harshness & Sibilanza (eccesso energetico 3-7 kHz)",
+      "target_hypotheses": [
+        "H02",
+        "H04"
+      ],
+      "intended_regimes": [
+        "stylistic"
+      ],
+      "expected_acoustic_targets": {
+        "positive_erb_presence_surplus_expected": true,
+        "recommended_duration_sec": [
+          35.0,
+          90.0
+        ]
+      },
+      "source_mix": {
+        "local_relative_path": "human_validation/private/input/track06_mix.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "same_track_reference": {
+        "required": false,
+        "local_relative_path": null,
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "stylistic_external_reference": {
+        "required": true,
+        "local_relative_path": "human_validation/private/input/track06_ref_altro_brano.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "candidate_listening_section": {
+        "label": null,
+        "start_sec": null,
+        "end_sec": null,
+        "duration_sec": null,
+        "notes": "Selezionare ritornello vocale/hi-hat denso in zona 3-7 kHz >= 20s"
+      },
+      "provenance_and_licensing": {
+        "source_type": null,
+        "license": null,
+        "usage_authorization_confirmed": false,
+        "authorized_by": null,
+        "notes": null
+      }
+    },
+    {
+      "track_id": "track07",
+      "status": "MISSING_AWAITING_USER_SOURCE",
+      "acoustic_profile": "Sub-bass denso & Limiter Stress (target competitivo <= -8.5 LUFS)",
+      "target_hypotheses": [
+        "H05",
+        "H03"
+      ],
+      "intended_regimes": [
+        "same_track",
+        "stylistic"
+      ],
+      "expected_acoustic_targets": {
+        "expected_limiter_gr_mean_gt_db": 0.5,
+        "recommended_duration_sec": [
+          35.0,
+          90.0
+        ]
+      },
+      "source_mix": {
+        "local_relative_path": "human_validation/private/input/track07_mix.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "same_track_reference": {
+        "required": true,
+        "local_relative_path": "human_validation/private/input/track07_ref.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "stylistic_external_reference": {
+        "required": true,
+        "local_relative_path": "human_validation/private/input/track07_ref_altro_brano.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "candidate_listening_section": {
+        "label": null,
+        "start_sec": null,
+        "end_sec": null,
+        "duration_sec": null,
+        "notes": "Selezionare drop con 808/sub sostenuto e picchi alti per stimolare V3b >= 20s"
+      },
+      "provenance_and_licensing": {
+        "source_type": null,
+        "license": null,
+        "usage_authorization_confirmed": false,
+        "authorized_by": null,
+        "notes": null
+      }
+    },
+    {
+      "track_id": "track08",
+      "status": "MISSING_AWAITING_USER_SOURCE",
+      "acoustic_profile": "Wide Stereo & Rischio Cancellazione Mono (synth/pad/cori larghi, bassa correlazione)",
+      "target_hypotheses": [
+        "H06"
+      ],
+      "intended_regimes": [
+        "same_track"
+      ],
+      "expected_acoustic_targets": {
+        "stereo_correlation_max": 0.65,
+        "recommended_duration_sec": [
+          35.0,
+          90.0
+        ]
+      },
+      "source_mix": {
+        "local_relative_path": "human_validation/private/input/track08_mix.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "same_track_reference": {
+        "required": true,
+        "local_relative_path": "human_validation/private/input/track08_ref.wav",
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "stylistic_external_reference": {
+        "required": false,
+        "local_relative_path": null,
+        "sha256": null,
+        "sample_rate_hz": null,
+        "channels": null,
+        "duration_sec": null,
+        "bit_depth_or_subtype": null,
+        "integrated_lufs_bs1770": null,
+        "sample_peak_dbfs": null,
+        "true_peak_4x_dbtp": null,
+        "plr_db": null,
+        "stereo_correlation": null
+      },
+      "candidate_listening_section": {
+        "label": null,
+        "start_sec": null,
+        "end_sec": null,
+        "duration_sec": null,
+        "notes": "Selezionare sezione con side/riverbero molto ampio o chitarre raddoppiate >= 20s"
+      },
+      "provenance_and_licensing": {
+        "source_type": null,
+        "license": null,
+        "usage_authorization_confirmed": false,
+        "authorized_by": null,
+        "notes": null
+      }
+    }
+  ]
+}

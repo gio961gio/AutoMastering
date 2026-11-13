@@ -3,6 +3,11 @@
   "repository": "gio961gio/AutoMastering",
   "branch": "human-validation-package",
   "code_baseline_commit": "db4a7bf (Sprint 4 TP Hardening on top of 3fdeb68)",
+  "protocol_alignment_notes": {
+    "H03_scope": "Tests composite V2 package (TransientEnvelopeLoss + ReferenceAwarePLRLoss jointly), not an isolated single-term ablation.",
+    "V1b_track01_style_loudness_overshoot": "V1b reaches -16.8650 LUFS vs V1 -17.8289 LUFS (+0.9639 LU louder than V1, +1.1226 LU louder than target -17.9876 LUFS), driven by eq_mean_gain_db rising from -1.915 dB to -1.2625 dB while attenuating ERB presence surplus (-2.645 dB).",
+    "promotion_minimum_tracks": ">= 2 independent track_ids required for Phase 1 promotion; H06 (V3c) remains strictly exploratory while covering < 2 wide-stereo tracks."
+  },
   "strict_constraints_preserved": {
     "no_new_optimizations_run": true,
     "enable_v3c_default": false,
