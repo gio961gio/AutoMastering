@@ -1,0 +1,2605 @@
+{
+  "artifact_type": "sprint4_v0p_v3c_comparative_matrix",
+  "repository": "gio961gio/AutoMastering",
+  "branch": "human-validation-package",
+  "code_baseline_commit": "db4a7bf (Sprint 4 TP Hardening on top of 3fdeb68)",
+  "strict_constraints_preserved": {
+    "no_new_optimizations_run": true,
+    "enable_v3c_default": false,
+    "v3c_pilot_3_of_3_ties_preserved_historical": true,
+    "param_specs_41_unchanged": true,
+    "v0p_v3c_loss_weights_unchanged": true
+  },
+  "variant_registry": {
+    "V0": {
+      "status": "HISTORICAL_PRE_HARMONIZATION",
+      "lr": 0.04,
+      "num_steps": 30,
+      "preroll_sec": 0.0,
+      "sessions_count": 6,
+      "frozen_checkpoints": true,
+      "human_listening_executed": true
+    },
+    "V0p": {
+      "status": "CONTROL_BASELINE_HARMONIZED",
+      "lr": 0.04,
+      "num_steps": 30,
+      "preroll_sec": 2.5,
+      "sessions_count": 6,
+      "frozen_checkpoints": true,
+      "human_listening_executed": "paired control in V3c same_track pilot (3/3 Ties)"
+    },
+    "V1": {
+      "status": "CANDIDATE_SPECTRAL_ERB48",
+      "lr": 0.04,
+      "num_steps": 30,
+      "preroll_sec": 2.5,
+      "sessions_count": 6,
+      "frozen_checkpoints": true,
+      "human_listening_executed": false
+    },
+    "V1b": {
+      "status": "CANDIDATE_SPECTRAL_DEHARSH",
+      "lr": 0.04,
+      "num_steps": 30,
+      "preroll_sec": 2.5,
+      "sessions_count": 6,
+      "frozen_checkpoints": true,
+      "human_listening_executed": false
+    },
+    "V2": {
+      "status": "CANDIDATE_TRANSIENT_PLR",
+      "lr": 0.04,
+      "num_steps": 30,
+      "preroll_sec": 2.5,
+      "sessions_count": 6,
+      "frozen_checkpoints": true,
+      "human_listening_executed": false
+    },
+    "V3a": {
+      "status": "CANDIDATE_EQ_PRIOR",
+      "lr": 0.04,
+      "num_steps": 30,
+      "preroll_sec": 2.5,
+      "sessions_count": 6,
+      "frozen_checkpoints": true,
+      "human_listening_executed": false
+    },
+    "V3b_B05": {
+      "status": "CANDIDATE_DYNAMICS_PRIOR",
+      "lr": 0.04,
+      "num_steps": 30,
+      "preroll_sec": 2.5,
+      "sessions_count": 6,
+      "frozen_checkpoints": true,
+      "human_listening_executed": "blind pack generated in Sprint 3, human test not logged"
+    },
+    "V3c": {
+      "status": "CANDIDATE_STEREO_COMPAT_PILOT_ONLY",
+      "lr": 0.04,
+      "num_steps": 30,
+      "preroll_sec": 2.5,
+      "sessions_count": 3,
+      "frozen_checkpoints": true,
+      "human_listening_executed": "same_track pilot complete (3/3 Ties on 3 pairs, max null diff -27.9 dBFS)"
+    }
+  },
+  "v1b_vs_v1_separability": {
+    "track01": {
+      "mode": "same_track",
+      "max_abs_dz_V1b_vs_V1": 0.04340896010398865,
+      "l2_dz_V1b_vs_V1": 0.053158409654111644,
+      "delta_lufs_V1b_minus_V1": -0.03951602466969106,
+      "delta_erb_surplus_db_V1b_minus_V1": -0.22313690185546875,
+      "delta_tp_db_V1b_minus_V1": 0.030810873686726026,
+      "top3_changed_params": [
+        {
+          "param": "eq_b4_f0",
+          "dz": 0.04340896010398865
+        },
+        {
+          "param": "eq_b2_f0",
+          "dz": -0.02432483434677124
+        },
+        {
+          "param": "imager_width_high",
+          "dz": -0.00921785831451416
+        }
+      ]
+    },
+    "track02": {
+      "mode": "same_track",
+      "max_abs_dz_V1b_vs_V1": 0.024763375520706177,
+      "l2_dz_V1b_vs_V1": 0.029449137714247935,
+      "delta_lufs_V1b_minus_V1": 0.00707891034945618,
+      "delta_erb_surplus_db_V1b_minus_V1": -0.021474838256835938,
+      "delta_tp_db_V1b_minus_V1": -0.003168522721361214,
+      "top3_changed_params": [
+        {
+          "param": "eq_b2_f0",
+          "dz": -0.024763375520706177
+        },
+        {
+          "param": "eq_b4_f0",
+          "dz": 0.015637725591659546
+        },
+        {
+          "param": "eq_b3_gain_db",
+          "dz": 0.002467036247253418
+        }
+      ]
+    },
+    "track03": {
+      "mode": "same_track",
+      "max_abs_dz_V1b_vs_V1": 0.0007812380790710449,
+      "l2_dz_V1b_vs_V1": 0.0007855969502315712,
+      "delta_lufs_V1b_minus_V1": 2.910005006029337e-05,
+      "delta_erb_surplus_db_V1b_minus_V1": -0.0027341842651367188,
+      "delta_tp_db_V1b_minus_V1": -0.00013677778378469452,
+      "top3_changed_params": [
+        {
+          "param": "eq_b3_f0",
+          "dz": -0.0007812380790710449
+        },
+        {
+          "param": "crossover_f_high",
+          "dz": 4.5180320739746094e-05
+        },
+        {
+          "param": "crossover_f_low",
+          "dz": -3.3974647521972656e-05
+        }
+      ]
+    },
+    "track01_style": {
+      "mode": "stylistic",
+      "max_abs_dz_V1b_vs_V1": 0.3187794089317322,
+      "l2_dz_V1b_vs_V1": 0.6130520392742543,
+      "delta_lufs_V1b_minus_V1": 0.9639473182819636,
+      "delta_erb_surplus_db_V1b_minus_V1": -2.6450071334838867,
+      "delta_tp_db_V1b_minus_V1": 0.3584689000447061,
+      "top3_changed_params": [
+        {
+          "param": "eq_b2_gain_db",
+          "dz": 0.3187794089317322
+        },
+        {
+          "param": "eq_b2_f0",
+          "dz": -0.2787267565727234
+        },
+        {
+          "param": "eq_b3_f0",
+          "dz": 0.2664877772331238
+        }
+      ]
+    },
+    "track02_style": {
+      "mode": "stylistic",
+      "max_abs_dz_V1b_vs_V1": 0.0009119808673858643,
+      "l2_dz_V1b_vs_V1": 0.001782073383741581,
+      "delta_lufs_V1b_minus_V1": -0.0006142172987750882,
+      "delta_erb_surplus_db_V1b_minus_V1": -0.0049762725830078125,
+      "delta_tp_db_V1b_minus_V1": -0.003946365194706952,
+      "top3_changed_params": [
+        {
+          "param": "eq_b2_f0",
+          "dz": -0.0009119808673858643
+        },
+        {
+          "param": "eq_b5_gain_db",
+          "dz": -0.0007800459861755371
+        },
+        {
+          "param": "crossover_f_high",
+          "dz": -0.0006826519966125488
+        }
+      ]
+    },
+    "track03_style": {
+      "mode": "stylistic",
+      "max_abs_dz_V1b_vs_V1": 0.004678636789321899,
+      "l2_dz_V1b_vs_V1": 0.00541250474144201,
+      "delta_lufs_V1b_minus_V1": -0.001028329492237745,
+      "delta_erb_surplus_db_V1b_minus_V1": -0.017511367797851562,
+      "delta_tp_db_V1b_minus_V1": 0.001461209171033831,
+      "top3_changed_params": [
+        {
+          "param": "eq_b3_f0",
+          "dz": -0.004678636789321899
+        },
+        {
+          "param": "eq_b5_gain_db",
+          "dz": -0.002616703510284424
+        },
+        {
+          "param": "comp_mid_threshold_db",
+          "dz": 0.00037658214569091797
+        }
+      ]
+    }
+  },
+  "historical_v3c_pilot_summary": {
+    "total_pairs": 3,
+    "treatment_v3c_preferred": 0,
+    "control_v0p_preferred": 0,
+    "ties_pari": 3,
+    "perceptual_regressions_observed": 0
+  },
+  "sprint4_6_renders_tp_hardening": [
+    {
+      "track": "track01",
+      "mode": "same_track",
+      "arm": "V0p",
+      "hist_json_tp_dbtp": 0.264709523123472,
+      "hist_json_sp_dbfs": -0.29999478224503906,
+      "hist_json_lufs": -10.512072943713815,
+      "hist_json_plr_db": 10.212078161468776,
+      "hist_json_ms_ratio_db": 8.504470438164708,
+      "legacy1x_repro_tp_dbtp": 0.2647096280972771,
+      "legacy1x_repro_sp_dbfs": -0.29999478224503906,
+      "legacy1x_repro_lufs": -10.512074048924925,
+      "legacy1x_repro_plr_db": 10.212079266679886,
+      "legacy1x_repro_corr": 0.7540115447280257,
+      "legacy1x_repro_mono_drop_db": 0.5732687247681091,
+      "sprint4_mem_tp_dbtp": -0.45785197241798825,
+      "sprint4_pcm24_tp_dbtp": -0.4578525488087088,
+      "sprint4_pcm24_sp_dbfs": -0.49999958245018883,
+      "sprint4_pcm24_lufs": -10.557827890844113,
+      "sprint4_pcm24_plr_db": 10.057828308393924,
+      "sprint4_pcm24_tp_plr_db": 10.099975342035403,
+      "sprint4_pcm24_ms_ratio_db": 8.498554453018357,
+      "sprint4_pcm24_corr": 0.7537346051337694,
+      "sprint4_pcm24_mono_drop_db": 0.5740007249412207,
+      "delta_tp_db": -0.7225621769059859,
+      "delta_lufs": -0.045753841919188076,
+      "delta_plr_db": -0.15425095828596191,
+      "delta_ms_ratio_db": -0.005915923000536338,
+      "delta_corr": -0.0002769395942562314,
+      "delta_mono_drop_db": 0.000732000173111591,
+      "export_status": "pass",
+      "export_trim_applied_db": 0.0
+    },
+    {
+      "track": "track01",
+      "mode": "same_track",
+      "arm": "V3c",
+      "hist_json_tp_dbtp": 0.3074299733111626,
+      "hist_json_sp_dbfs": -0.2999942463322308,
+      "hist_json_lufs": -10.510334335667268,
+      "hist_json_plr_db": 10.210340089335038,
+      "hist_json_ms_ratio_db": 8.51060706383684,
+      "legacy1x_repro_tp_dbtp": 0.30742976664288635,
+      "legacy1x_repro_sp_dbfs": -0.2999942463322308,
+      "legacy1x_repro_lufs": -10.51033519605407,
+      "legacy1x_repro_plr_db": 10.21034094972184,
+      "legacy1x_repro_corr": 0.7543155519313015,
+      "legacy1x_repro_mono_drop_db": 0.5725103936674472,
+      "sprint4_mem_tp_dbtp": -0.45669870829435305,
+      "sprint4_pcm24_tp_dbtp": -0.45669915616367196,
+      "sprint4_pcm24_sp_dbfs": -0.49999958245018883,
+      "sprint4_pcm24_lufs": -10.556240890099044,
+      "sprint4_pcm24_plr_db": 10.056241307648856,
+      "sprint4_pcm24_tp_plr_db": 10.099541733935371,
+      "sprint4_pcm24_ms_ratio_db": 8.504630526518842,
+      "sprint4_pcm24_corr": 0.7540354382482425,
+      "sprint4_pcm24_mono_drop_db": 0.5732489703532005,
+      "delta_tp_db": -0.7641289228065583,
+      "delta_lufs": -0.0459056940449738,
+      "delta_plr_db": -0.15409964207298366,
+      "delta_ms_ratio_db": -0.005976312208270329,
+      "delta_corr": -0.0002801136830590245,
+      "delta_mono_drop_db": 0.0007385766857533893,
+      "export_status": "pass",
+      "export_trim_applied_db": 0.0
+    },
+    {
+      "track": "track02",
+      "mode": "same_track",
+      "arm": "V0p",
+      "hist_json_tp_dbtp": -0.07133491917078721,
+      "hist_json_sp_dbfs": -0.29999960546180116,
+      "hist_json_lufs": -18.039911885713035,
+      "hist_json_plr_db": 17.739912280251236,
+      "hist_json_ms_ratio_db": 14.031078509933483,
+      "legacy1x_repro_tp_dbtp": -0.0713346930562073,
+      "legacy1x_repro_sp_dbfs": -0.29999960546180116,
+      "legacy1x_repro_lufs": -18.039916316239673,
+      "legacy1x_repro_plr_db": 17.739916710777873,
+      "legacy1x_repro_corr": 0.9239663674259969,
+      "legacy1x_repro_mono_drop_db": 0.16835457804479106,
+      "sprint4_mem_tp_dbtp": -0.5278003057117182,
+      "sprint4_pcm24_tp_dbtp": -0.5278000663112656,
+      "sprint4_pcm24_sp_dbfs": -0.6991572246724536,
+      "sprint4_pcm24_lufs": -18.042750942575164,
+      "sprint4_pcm24_plr_db": 17.34359371790271,
+      "sprint4_pcm24_tp_plr_db": 17.5149508762639,
+      "sprint4_pcm24_ms_ratio_db": 14.032199769456852,
+      "sprint4_pcm24_corr": 0.9239852543386207,
+      "sprint4_pcm24_mono_drop_db": 0.16831191795242167,
+      "delta_tp_db": -0.4564653732550583,
+      "delta_lufs": -0.0028346263354919188,
+      "delta_plr_db": -0.39632299287516304,
+      "delta_ms_ratio_db": 0.0011213048983709228,
+      "delta_corr": 1.8886912623750085e-05,
+      "delta_mono_drop_db": -4.2660092369389835e-05,
+      "export_status": "pass",
+      "export_trim_applied_db": 0.0
+    },
+    {
+      "track": "track02",
+      "mode": "same_track",
+      "arm": "V3c",
+      "hist_json_tp_dbtp": -0.07132011908380755,
+      "hist_json_sp_dbfs": -0.29999960546180116,
+      "hist_json_lufs": -18.03994973980732,
+      "hist_json_plr_db": 17.73995013434552,
+      "hist_json_ms_ratio_db": 14.033382640384978,
+      "legacy1x_repro_tp_dbtp": -0.0713201623912288,
+      "legacy1x_repro_sp_dbfs": -0.29999960546180116,
+      "legacy1x_repro_lufs": -18.03995435575605,
+      "legacy1x_repro_plr_db": 17.73995475029425,
+      "legacy1x_repro_corr": 0.9240052405224809,
+      "legacy1x_repro_mono_drop_db": 0.1682669626785996,
+      "sprint4_mem_tp_dbtp": -0.5278008518461972,
+      "sprint4_pcm24_tp_dbtp": -0.5278003391859908,
+      "sprint4_pcm24_sp_dbfs": -0.6991639580611664,
+      "sprint4_pcm24_lufs": -18.042788938671315,
+      "sprint4_pcm24_plr_db": 17.343624980610148,
+      "sprint4_pcm24_tp_plr_db": 17.514988599485324,
+      "sprint4_pcm24_ms_ratio_db": 14.034505613665972,
+      "sprint4_pcm24_corr": 0.9240241274395083,
+      "sprint4_pcm24_mono_drop_db": 0.1682243034521826,
+      "delta_tp_db": -0.456480176794762,
+      "delta_lufs": -0.0028345829152662816,
+      "delta_plr_db": -0.39632976968410105,
+      "delta_ms_ratio_db": 0.001122572439866687,
+      "delta_corr": 1.8886917027449712e-05,
+      "delta_mono_drop_db": -4.2659226417024465e-05,
+      "export_status": "pass",
+      "export_trim_applied_db": 0.0
+    },
+    {
+      "track": "track03",
+      "mode": "same_track",
+      "arm": "V0p",
+      "hist_json_tp_dbtp": -0.08680964419618657,
+      "hist_json_sp_dbfs": -0.29999692589660265,
+      "hist_json_lufs": -13.501711930690604,
+      "hist_json_plr_db": 13.201715004794002,
+      "hist_json_ms_ratio_db": 6.796530450440899,
+      "legacy1x_repro_tp_dbtp": -0.08680874543232132,
+      "legacy1x_repro_sp_dbfs": -0.29999692589660265,
+      "legacy1x_repro_lufs": -13.501712241542275,
+      "legacy1x_repro_plr_db": 13.201715315645673,
+      "legacy1x_repro_corr": 0.6541576860972013,
+      "legacy1x_repro_mono_drop_db": 0.8246092677654505,
+      "sprint4_mem_tp_dbtp": -0.48909729584228023,
+      "sprint4_pcm24_tp_dbtp": -0.4890976847356997,
+      "sprint4_pcm24_sp_dbfs": -0.51132366380117,
+      "sprint4_pcm24_lufs": -13.505669307242199,
+      "sprint4_pcm24_plr_db": 12.99434564344103,
+      "sprint4_pcm24_tp_plr_db": 13.016571622506499,
+      "sprint4_pcm24_ms_ratio_db": 6.795109158409016,
+      "sprint4_pcm24_corr": 0.6540641355882686,
+      "sprint4_pcm24_mono_drop_db": 0.8248549348979128,
+      "delta_tp_db": -0.4022889393033784,
+      "delta_lufs": -0.00395706569992349,
+      "delta_plr_db": -0.20736967220464386,
+      "delta_ms_ratio_db": -0.0014203281549276525,
+      "delta_corr": -9.355050893267158e-05,
+      "delta_mono_drop_db": 0.00024566713246232386,
+      "export_status": "pass",
+      "export_trim_applied_db": 0.0
+    },
+    {
+      "track": "track03",
+      "mode": "same_track",
+      "arm": "V3c",
+      "hist_json_tp_dbtp": -0.08379203396612307,
+      "hist_json_sp_dbfs": -0.29999692589660265,
+      "hist_json_lufs": -13.501788681384848,
+      "hist_json_plr_db": 13.201791755488246,
+      "hist_json_ms_ratio_db": 6.797740886056501,
+      "legacy1x_repro_tp_dbtp": -0.08379274280237366,
+      "legacy1x_repro_sp_dbfs": -0.29999692589660265,
+      "legacy1x_repro_lufs": -13.501788886796465,
+      "legacy1x_repro_plr_db": 13.201791960899863,
+      "legacy1x_repro_corr": 0.6542374291916042,
+      "legacy1x_repro_mono_drop_db": 0.8243999004757402,
+      "sprint4_mem_tp_dbtp": -0.48973508523028264,
+      "sprint4_pcm24_tp_dbtp": -0.4897356143599514,
+      "sprint4_pcm24_sp_dbfs": -0.5107174657824847,
+      "sprint4_pcm24_lufs": -13.505720820006859,
+      "sprint4_pcm24_plr_db": 12.995003354224375,
+      "sprint4_pcm24_tp_plr_db": 13.015985205646908,
+      "sprint4_pcm24_ms_ratio_db": 6.796325094103723,
+      "sprint4_pcm24_corr": 0.6541441875088325,
+      "sprint4_pcm24_mono_drop_db": 0.8246447436469186,
+      "delta_tp_db": -0.40594287155757774,
+      "delta_lufs": -0.003931933210393979,
+      "delta_plr_db": -0.20678860667548804,
+      "delta_ms_ratio_db": -0.001415042760157803,
+      "delta_corr": -9.32416827716942e-05,
+      "delta_mono_drop_db": 0.0002448431711784549,
+      "export_status": "pass",
+      "export_trim_applied_db": 0.0
+    }
+  ],
+  "sessions": {
+    "track01": {
+      "track_prefix": "track01",
+      "mode": "same_track",
+      "seed": "5405783196615117109",
+      "target_lufs_bs1770": -7.28948637213072,
+      "duration_sec": 63.895520833333336,
+      "mix_sha256": "56c57e4fe5cb799e6364056e7fa5cf795e28db7794196804bcd58ada3086203d",
+      "ref_sha256": "6a80234664e2694188f07f33416d8537e4edfc3cc4f75cddfbe5f5eb3d6db1f5",
+      "variants": {
+        "V0": {
+          "source_artifact": "docs/human_validation/SPRINT2_V0_REPRODUCIBILITY_MANIFEST.json",
+          "git_commit": "ffafb9848bea375195973795df83af6fe0970e86",
+          "metrics": {
+            "pred_lufs": -10.505210560512166,
+            "pred_sample_peak_dbfs": -0.2999942463322308,
+            "pred_true_peak_dbtp": 0.2799839462942049,
+            "pred_plr_db": 10.205216314179935,
+            "pred_ms_ratio_db": 8.518529289915884,
+            "stereo_correlation": 0.7547098322401529
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.03216737508773804,
+            "l2_dz": 0.03694909258244423,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_low",
+                "dz": 0.03216737508773804
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": -0.017593473196029663
+              },
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": -0.0033548474311828613
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8972,
+            "crossover_f_low_hz": 174.68,
+            "crossover_f_high_hz": 2627.21,
+            "imager_width_low": 1.0424,
+            "imager_width_mid": 1.1114,
+            "imager_width_high": 1.1102,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V0p": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -10.512072943713815,
+            "target_lufs": -7.28948637213072,
+            "delta_lufs_abs": 3.2225865715830944,
+            "pred_sample_peak_dbfs": -0.29999478224503906,
+            "pred_true_peak_dbtp": 0.264709523123472,
+            "tp_violation_db_vs_neg030": 0.564709523123472,
+            "pred_plr_db": 10.212078161468776,
+            "pred_ms_ratio_db": 8.504470438164708,
+            "delta_ms_ratio_db": 0.437953366334904,
+            "spectral_convergence": 0.4056556522846222,
+            "log_spectral_distance_db": 6.788379192352295,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.6707897186279297,
+            "erb_de_harsh_loss": 0.8478537201881409
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": []
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.897,
+            "crossover_f_low_hz": 166.58,
+            "crossover_f_high_hz": 2692.08,
+            "imager_width_low": 1.0422,
+            "imager_width_mid": 1.1117,
+            "imager_width_high": 1.1098,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V1": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -10.514310065209033,
+            "target_lufs": -7.28948637213072,
+            "delta_lufs_abs": 3.2248236930783127,
+            "pred_sample_peak_dbfs": -0.29999478224503906,
+            "pred_true_peak_dbtp": 0.29257266893559586,
+            "tp_violation_db_vs_neg030": 0.5925726689355959,
+            "pred_plr_db": 10.214315282963994,
+            "pred_ms_ratio_db": 8.506118177815473,
+            "delta_ms_ratio_db": 0.4363056266841383,
+            "spectral_convergence": 0.4059476852416992,
+            "log_spectral_distance_db": 6.788287162780762,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.6726837158203125,
+            "erb_de_harsh_loss": 0.8513452410697937
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.007700145244598389,
+            "l2_dz": 0.012516196232318203,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_low",
+                "dz": 0.007700145244598389
+              },
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": 0.007477164268493652
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": -0.005347400903701782
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8953,
+            "crossover_f_low_hz": 168.49,
+            "crossover_f_high_hz": 2672.19,
+            "imager_width_low": 1.0423,
+            "imager_width_mid": 1.1117,
+            "imager_width_high": 1.1114,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V1b": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -10.553826089878724,
+            "target_lufs": -7.28948637213072,
+            "delta_lufs_abs": 3.264339717748004,
+            "pred_sample_peak_dbfs": -0.2999953181578804,
+            "pred_true_peak_dbtp": 0.3233835426223219,
+            "tp_violation_db_vs_neg030": 0.6233835426223219,
+            "pred_plr_db": 10.253830771720844,
+            "pred_ms_ratio_db": 8.497525531991986,
+            "delta_ms_ratio_db": 0.4448982725076256,
+            "spectral_convergence": 0.40560078620910645,
+            "log_spectral_distance_db": 6.810487270355225,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.4495468139648438,
+            "erb_de_harsh_loss": 0.48936575651168823
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.04316583275794983,
+            "l2_dz": 0.05552320073325181,
+            "top3_changed_params": [
+              {
+                "param": "eq_b4_f0",
+                "dz": 0.04316583275794983
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": -0.02421015501022339
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": -0.013521909713745117
+              }
+            ]
+          },
+          "diff_vs_V1_z": {
+            "max_abs_dz": 0.04340896010398865,
+            "l2_dz": 0.053158409654111644,
+            "top3_changed_params": [
+              {
+                "param": "eq_b4_f0",
+                "dz": 0.04340896010398865
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": -0.02432483434677124
+              },
+              {
+                "param": "imager_width_high",
+                "dz": -0.00921785831451416
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8797,
+            "crossover_f_low_hz": 168.49,
+            "crossover_f_high_hz": 2642.08,
+            "imager_width_low": 1.0422,
+            "imager_width_mid": 1.1131,
+            "imager_width_high": 1.1049,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V2": {
+          "source_artifact": "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
+          "git_commit": "427be98 / ea3f4ea",
+          "metrics": {
+            "pred_lufs": -10.506466493212033,
+            "target_lufs": -7.28948637213072,
+            "delta_lufs_abs": 3.2169801210813125,
+            "pred_sample_peak_dbfs": -0.29999478224503906,
+            "pred_true_peak_dbtp": 0.15224126196600044,
+            "tp_violation_db_vs_neg030": 0.45224126196600045,
+            "pred_plr_db": 10.206471710966994,
+            "pred_ms_ratio_db": 8.537952211254787,
+            "delta_ms_ratio_db": 0.40447159324482485,
+            "spectral_convergence": 0.40549758076667786,
+            "log_spectral_distance_db": 6.800564765930176,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.6515464782714844,
+            "erb_de_harsh_loss": 0.8127860426902771
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.12482225894927979,
+            "l2_dz": 0.1404259255972956,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_high",
+                "dz": 0.12482225894927979
+              },
+              {
+                "param": "crossover_f_low",
+                "dz": 0.06254321336746216
+              },
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": 0.011371135711669922
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.892,
+            "crossover_f_low_hz": 182.69,
+            "crossover_f_high_hz": 3200.65,
+            "imager_width_low": 1.0426,
+            "imager_width_mid": 1.1111,
+            "imager_width_high": 1.1075,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V3a": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json",
+          "git_commit": "533549c",
+          "metrics": {
+            "pred_lufs": -10.512324943845636,
+            "target_lufs": -7.28948637213072,
+            "delta_lufs_abs": 3.2228385717149157,
+            "pred_sample_peak_dbfs": -0.29999478223604814,
+            "pred_true_peak_dbtp": 0.27527066071825324,
+            "tp_violation_db_vs_neg030": 0.5752706607182532,
+            "pred_plr_db": 10.212330161600597,
+            "pred_ms_ratio_db": 8.503670788231187,
+            "delta_ms_ratio_db": 0.438753016268425,
+            "spectral_convergence": 0.40564557909965515,
+            "log_spectral_distance_db": 6.790928363800049,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.6684951782226562,
+            "erb_de_harsh_loss": 0.8436334133148193
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0015345215797424316,
+            "l2_dz": 0.0023962438891750315,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_high",
+                "dz": -0.0015345215797424316
+              },
+              {
+                "param": "crossover_f_low",
+                "dz": 0.0010347366333007812
+              },
+              {
+                "param": "eq_b5_gain_db",
+                "dz": -0.0008562207221984863
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8928,
+            "crossover_f_low_hz": 166.84,
+            "crossover_f_high_hz": 2686.36,
+            "imager_width_low": 1.0423,
+            "imager_width_mid": 1.1118,
+            "imager_width_high": 1.11,
+            "limiter_push_gain_db": 8.63
+          }
+        },
+        "V3b_B05": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json",
+          "git_commit": "2123842 / 9cc448f",
+          "metrics": {
+            "pred_lufs": -10.511930058638926,
+            "target_lufs": -7.28948637213072,
+            "delta_lufs_abs": 3.222443686508206,
+            "pred_sample_peak_dbfs": -0.29999478224503906,
+            "pred_true_peak_dbtp": 0.2996461245938148,
+            "tp_violation_db_vs_neg030": 0.5996461245938147,
+            "pred_plr_db": 10.211935276393888,
+            "pred_ms_ratio_db": 8.50929717696134,
+            "delta_ms_ratio_db": 0.4331266275382717,
+            "spectral_convergence": 0.4057143032550812,
+            "log_spectral_distance_db": 6.792938709259033,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.6482648849487305,
+            "erb_de_harsh_loss": 0.8068798184394836
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.011019349098205566,
+            "l2_dz": 0.016723709907880746,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_low",
+                "dz": 0.011019349098205566
+              },
+              {
+                "param": "comp_high_threshold_db",
+                "dz": -0.006871938705444336
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": -0.006501346826553345
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8944,
+            "crossover_f_low_hz": 169.32,
+            "crossover_f_high_hz": 2667.92,
+            "imager_width_low": 1.0423,
+            "imager_width_mid": 1.1116,
+            "imager_width_high": 1.1081,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V3c": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3C_ABLATION_PILOT_RESULTS.json",
+          "git_commit": "5709c3f",
+          "metrics": {
+            "pred_lufs": -10.510334335667268,
+            "target_lufs": -7.28948637213072,
+            "delta_lufs_abs": 3.2208479635365483,
+            "pred_sample_peak_dbfs": -0.2999942463322308,
+            "pred_true_peak_dbtp": 0.3074299733111626,
+            "tp_violation_db_vs_neg030": 0.6074299733111626,
+            "pred_plr_db": 10.210340089335038,
+            "pred_ms_ratio_db": 8.51060706383684,
+            "delta_ms_ratio_db": 0.43181674066277154,
+            "spectral_convergence": 0.40567925572395325,
+            "log_spectral_distance_db": 6.787280082702637,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.6730175018310547,
+            "erb_de_harsh_loss": 0.8519613146781921
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.01351630687713623,
+            "l2_dz": 0.014583790867320116,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_high",
+                "dz": -0.01351630687713623
+              },
+              {
+                "param": "crossover_f_low",
+                "dz": 0.00495833158493042
+              },
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": -0.0017815232276916504
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8971,
+            "crossover_f_low_hz": 167.81,
+            "crossover_f_high_hz": 2642.1,
+            "imager_width_low": 1.0415,
+            "imager_width_mid": 1.1114,
+            "imager_width_high": 1.1098,
+            "limiter_push_gain_db": 0.0016
+          }
+        }
+      }
+    },
+    "track02": {
+      "track_prefix": "track02",
+      "mode": "same_track",
+      "seed": "3048363069421082382",
+      "target_lufs_bs1770": -7.22295729859563,
+      "duration_sec": 71.47102083333333,
+      "mix_sha256": "e0994c556d819522de2be33ff8004a21aabe70f9af596d7ae4eaaf9db505ab3c",
+      "ref_sha256": "160ad0ed13c4e724b3847fc1a4f805eb0a896e798381e86407ec1720770a5f30",
+      "variants": {
+        "V0": {
+          "source_artifact": "docs/human_validation/SPRINT2_V0_REPRODUCIBILITY_MANIFEST.json",
+          "git_commit": "ffafb9848bea375195973795df83af6fe0970e86",
+          "metrics": {
+            "pred_lufs": -18.040022414848416,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.07311510290909978,
+            "pred_plr_db": 17.740022809386616,
+            "pred_ms_ratio_db": 14.03122629286186,
+            "stereo_correlation": 0.9239688842716977
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0015884041786193848,
+            "l2_dz": 0.0026559150778608905,
+            "top3_changed_params": [
+              {
+                "param": "comp_low_threshold_db",
+                "dz": -0.0015884041786193848
+              },
+              {
+                "param": "imager_width_low",
+                "dz": -0.0015733838081359863
+              },
+              {
+                "param": "comp_low_release_ms",
+                "dz": 0.0012592673301696777
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8879,
+            "crossover_f_low_hz": 197.95,
+            "crossover_f_high_hz": 3169.43,
+            "imager_width_low": 1.0219,
+            "imager_width_mid": 1.1119,
+            "imager_width_high": 1.1112,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V0p": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -18.039911885713035,
+            "target_lufs": -7.22295729859563,
+            "delta_lufs_abs": 10.816954587117404,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.07133491917078721,
+            "tp_violation_db_vs_neg030": 0.22866508082921277,
+            "pred_plr_db": 17.739912280251236,
+            "pred_ms_ratio_db": 14.031078509933483,
+            "delta_ms_ratio_db": 0.34909227928602604,
+            "spectral_convergence": 0.7931849360466003,
+            "log_spectral_distance_db": 11.212743759155273,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.0478324890136719,
+            "erb_de_harsh_loss": 0.0887041911482811
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": []
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8882,
+            "crossover_f_low_hz": 197.98,
+            "crossover_f_high_hz": 3170.95,
+            "imager_width_low": 1.023,
+            "imager_width_mid": 1.1119,
+            "imager_width_high": 1.1112,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V1": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -18.044182208195735,
+            "target_lufs": -7.22295729859563,
+            "delta_lufs_abs": 10.821224909600105,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.07108229429921831,
+            "tp_violation_db_vs_neg030": 0.22891770570078168,
+            "pred_plr_db": 17.744182602733936,
+            "pred_ms_ratio_db": 14.026541625302844,
+            "delta_ms_ratio_db": 0.3536291639166649,
+            "spectral_convergence": 0.7933422923088074,
+            "log_spectral_distance_db": 11.204094886779785,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.054555892944336,
+            "erb_de_harsh_loss": 0.0927542895078659
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.031309664249420166,
+            "l2_dz": 0.038551816552438854,
+            "top3_changed_params": [
+              {
+                "param": "imager_width_low",
+                "dz": 0.031309664249420166
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": 0.022196084260940552
+              },
+              {
+                "param": "eq_b5_gain_db",
+                "dz": 0.0027036070823669434
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8915,
+            "crossover_f_low_hz": 197.91,
+            "crossover_f_high_hz": 3169.46,
+            "imager_width_low": 1.0449,
+            "imager_width_mid": 1.1119,
+            "imager_width_high": 1.1115,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V1b": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -18.03710329784628,
+            "target_lufs": -7.22295729859563,
+            "delta_lufs_abs": 10.814145999250648,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.07425081702057952,
+            "tp_violation_db_vs_neg030": 0.22574918297942048,
+            "pred_plr_db": 17.73710369238448,
+            "pred_ms_ratio_db": 14.027332602999909,
+            "delta_ms_ratio_db": 0.35283818621959995,
+            "spectral_convergence": 0.7930908799171448,
+            "log_spectral_distance_db": 11.198619842529297,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.0330810546875,
+            "erb_de_harsh_loss": 0.08013488352298737
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.031402647495269775,
+            "l2_dz": 0.03531339763718987,
+            "top3_changed_params": [
+              {
+                "param": "imager_width_low",
+                "dz": 0.031402647495269775
+              },
+              {
+                "param": "eq_b4_f0",
+                "dz": 0.015305191278457642
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": -0.002567291259765625
+              }
+            ]
+          },
+          "diff_vs_V1_z": {
+            "max_abs_dz": 0.024763375520706177,
+            "l2_dz": 0.029449137714247935,
+            "top3_changed_params": [
+              {
+                "param": "eq_b2_f0",
+                "dz": -0.024763375520706177
+              },
+              {
+                "param": "eq_b4_f0",
+                "dz": 0.015637725591659546
+              },
+              {
+                "param": "eq_b3_gain_db",
+                "dz": 0.002467036247253418
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8957,
+            "crossover_f_low_hz": 197.89,
+            "crossover_f_high_hz": 3164.89,
+            "imager_width_low": 1.045,
+            "imager_width_mid": 1.1118,
+            "imager_width_high": 1.1116,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V2": {
+          "source_artifact": "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
+          "git_commit": "427be98 / ea3f4ea",
+          "metrics": {
+            "pred_lufs": -18.052104045192426,
+            "target_lufs": -7.22295729859563,
+            "delta_lufs_abs": 10.829146746596795,
+            "pred_sample_peak_dbfs": -0.30000014137494,
+            "pred_true_peak_dbtp": 0.04464334641749963,
+            "tp_violation_db_vs_neg030": 0.3446433464174996,
+            "pred_plr_db": 17.752103903817485,
+            "pred_ms_ratio_db": 14.010185370534131,
+            "delta_ms_ratio_db": 0.3699854186853777,
+            "spectral_convergence": 0.7935008406639099,
+            "log_spectral_distance_db": 11.212173461914062,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.0335264205932617,
+            "erb_de_harsh_loss": 0.08038723468780518
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.03204226493835449,
+            "l2_dz": 0.046087408869693154,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_high",
+                "dz": 0.03204226493835449
+              },
+              {
+                "param": "imager_width_low",
+                "dz": 0.029311299324035645
+              },
+              {
+                "param": "crossover_f_low",
+                "dz": 0.012456715106964111
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8897,
+            "crossover_f_low_hz": 201.65,
+            "crossover_f_high_hz": 3314.97,
+            "imager_width_low": 1.0435,
+            "imager_width_mid": 1.1123,
+            "imager_width_high": 1.1114,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V3a": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json",
+          "git_commit": "533549c",
+          "metrics": {
+            "pred_lufs": -18.04094371552833,
+            "target_lufs": -7.22295729859563,
+            "delta_lufs_abs": 10.817986416932698,
+            "pred_sample_peak_dbfs": -0.29999960545281024,
+            "pred_true_peak_dbtp": -0.07086331634740121,
+            "tp_violation_db_vs_neg030": 0.22913668365259876,
+            "pred_plr_db": 17.74094411006653,
+            "pred_ms_ratio_db": 14.029599574574593,
+            "delta_ms_ratio_db": 0.3505712146449156,
+            "spectral_convergence": 0.7932038307189941,
+            "log_spectral_distance_db": 11.214622497558594,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.0463752746582031,
+            "erb_de_harsh_loss": 0.0878383070230484
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0005447268486022949,
+            "l2_dz": 0.0010054536523234183,
+            "top3_changed_params": [
+              {
+                "param": "eq_b5_gain_db",
+                "dz": -0.0005447268486022949
+              },
+              {
+                "param": "eq_b0_gain_db",
+                "dz": -0.00031119585037231445
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": 0.00028195977210998535
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8851,
+            "crossover_f_low_hz": 198.02,
+            "crossover_f_high_hz": 3171.76,
+            "imager_width_low": 1.023,
+            "imager_width_mid": 1.112,
+            "imager_width_high": 1.1114,
+            "limiter_push_gain_db": 8.63
+          }
+        },
+        "V3b_B05": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json",
+          "git_commit": "2123842 / 9cc448f",
+          "metrics": {
+            "pred_lufs": -18.039911885713035,
+            "target_lufs": -7.22295729859563,
+            "delta_lufs_abs": 10.816954587117404,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.07133491917078721,
+            "tp_violation_db_vs_neg030": 0.22866508082921277,
+            "pred_plr_db": 17.739912280251236,
+            "pred_ms_ratio_db": 14.031078509933483,
+            "delta_ms_ratio_db": 0.34909227928602604,
+            "spectral_convergence": 0.7931849360466003,
+            "log_spectral_distance_db": 11.212743759155273,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.0478324890136719,
+            "erb_de_harsh_loss": 0.0887041911482811
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": [
+              {
+                "param": "eq_b0_f0",
+                "dz": 0.0
+              },
+              {
+                "param": "eq_b0_gain_db",
+                "dz": 0.0
+              },
+              {
+                "param": "eq_b0_q",
+                "dz": 0.0
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8882,
+            "crossover_f_low_hz": 197.98,
+            "crossover_f_high_hz": 3170.95,
+            "imager_width_low": 1.023,
+            "imager_width_mid": 1.1119,
+            "imager_width_high": 1.1112,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V3c": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3C_ABLATION_PILOT_RESULTS.json",
+          "git_commit": "5709c3f",
+          "metrics": {
+            "pred_lufs": -18.03994973980732,
+            "target_lufs": -7.22295729859563,
+            "delta_lufs_abs": 10.816992441211688,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.07132011908380755,
+            "tp_violation_db_vs_neg030": 0.22867988091619246,
+            "pred_plr_db": 17.73995013434552,
+            "pred_ms_ratio_db": 14.033382640384978,
+            "delta_ms_ratio_db": 0.3467881488345306,
+            "spectral_convergence": 0.7931844592094421,
+            "log_spectral_distance_db": 11.212886810302734,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 1.0480155944824219,
+            "erb_de_harsh_loss": 0.08881329745054245
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.006266891956329346,
+            "l2_dz": 0.006275501674259843,
+            "top3_changed_params": [
+              {
+                "param": "imager_width_low",
+                "dz": -0.006266891956329346
+              },
+              {
+                "param": "imager_width_mid",
+                "dz": -0.00026154518127441406
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": -0.00018522143363952637
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8883,
+            "crossover_f_low_hz": 197.97,
+            "crossover_f_high_hz": 3170.96,
+            "imager_width_low": 1.0186,
+            "imager_width_mid": 1.1117,
+            "imager_width_high": 1.1112,
+            "limiter_push_gain_db": 0.0016
+          }
+        }
+      }
+    },
+    "track03": {
+      "track_prefix": "track03",
+      "mode": "same_track",
+      "seed": "12990700764526553868",
+      "target_lufs_bs1770": -6.896129906076177,
+      "duration_sec": 71.7845,
+      "mix_sha256": "e1aacbc4a46f31e4b21afd5b3fb83741444272b764334a7e07ca5fd869a1decd",
+      "ref_sha256": "f9a39b45e8469e0cc8384bea9490ccb9ae091b5aeb27632c593411b7862aca80",
+      "variants": {
+        "V0": {
+          "source_artifact": "docs/human_validation/SPRINT2_V0_REPRODUCIBILITY_MANIFEST.json",
+          "git_commit": "ffafb9848bea375195973795df83af6fe0970e86",
+          "metrics": {
+            "pred_lufs": -13.501674098654796,
+            "pred_sample_peak_dbfs": -0.29999746180957626,
+            "pred_true_peak_dbtp": 0.01771835714576905,
+            "pred_plr_db": 13.20167663684522,
+            "pred_ms_ratio_db": 6.798157217784318,
+            "stereo_correlation": 0.6542648711685923
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.027523398399353027,
+            "l2_dz": 0.02782071661115677,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_high",
+                "dz": -0.027523398399353027
+              },
+              {
+                "param": "crossover_f_low",
+                "dz": 0.0037032365798950195
+              },
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": -0.0012464523315429688
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8942,
+            "crossover_f_low_hz": 198.63,
+            "crossover_f_high_hz": 3337.77,
+            "imager_width_low": 1.0425,
+            "imager_width_mid": 1.1114,
+            "imager_width_high": 1.1108,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V0p": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -13.501711930690604,
+            "target_lufs": -6.896129906076177,
+            "delta_lufs_abs": 6.605582024614427,
+            "pred_sample_peak_dbfs": -0.29999692589660265,
+            "pred_true_peak_dbtp": -0.08680964419618657,
+            "tp_violation_db_vs_neg030": 0.2131903558038134,
+            "pred_plr_db": 13.201715004794002,
+            "pred_ms_ratio_db": 6.796530450440899,
+            "delta_ms_ratio_db": 1.4058773732394432,
+            "spectral_convergence": 0.6120709776878357,
+            "log_spectral_distance_db": 9.470205307006836,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 0.8180208206176758,
+            "erb_de_harsh_loss": 0.004626831971108913
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": []
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8938,
+            "crossover_f_low_hz": 197.55,
+            "crossover_f_high_hz": 3467.58,
+            "imager_width_low": 1.0425,
+            "imager_width_mid": 1.1117,
+            "imager_width_high": 1.1105,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V1": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -13.502043268608071,
+            "target_lufs": -6.896129906076177,
+            "delta_lufs_abs": 6.605913362531894,
+            "pred_sample_peak_dbfs": -0.29999692589660265,
+            "pred_true_peak_dbtp": -0.08615816339275417,
+            "tp_violation_db_vs_neg030": 0.21384183660724582,
+            "pred_plr_db": 13.20204634271147,
+            "pred_ms_ratio_db": 6.7982325900542495,
+            "delta_ms_ratio_db": 1.404175233626093,
+            "spectral_convergence": 0.6118790507316589,
+            "log_spectral_distance_db": 9.47009563446045,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 0.8208589553833008,
+            "erb_de_harsh_loss": 0.005020991433411837
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.00454634428024292,
+            "l2_dz": 0.006161601648542865,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_low",
+                "dz": 0.00454634428024292
+              },
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": 0.003649890422821045
+              },
+              {
+                "param": "comp_low_threshold_db",
+                "dz": 0.0009603500366210938
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8929,
+            "crossover_f_low_hz": 198.88,
+            "crossover_f_high_hz": 3464.77,
+            "imager_width_low": 1.0427,
+            "imager_width_mid": 1.1117,
+            "imager_width_high": 1.1109,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V1b": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -13.502014168558011,
+            "target_lufs": -6.896129906076177,
+            "delta_lufs_abs": 6.605884262481834,
+            "pred_sample_peak_dbfs": -0.29999692589660265,
+            "pred_true_peak_dbtp": -0.08629494117653887,
+            "tp_violation_db_vs_neg030": 0.21370505882346114,
+            "pred_plr_db": 13.202017242661409,
+            "pred_ms_ratio_db": 6.798156201384225,
+            "delta_ms_ratio_db": 1.4042516222961172,
+            "spectral_convergence": 0.611871600151062,
+            "log_spectral_distance_db": 9.470458030700684,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 0.8181247711181641,
+            "erb_de_harsh_loss": 0.00464098434895277
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.004512369632720947,
+            "l2_dz": 0.006089481103150402,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_low",
+                "dz": 0.004512369632720947
+              },
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": 0.003683030605316162
+              },
+              {
+                "param": "comp_low_threshold_db",
+                "dz": 0.0009606480598449707
+              }
+            ]
+          },
+          "diff_vs_V1_z": {
+            "max_abs_dz": 0.0007812380790710449,
+            "l2_dz": 0.0007855969502315712,
+            "top3_changed_params": [
+              {
+                "param": "eq_b3_f0",
+                "dz": -0.0007812380790710449
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": 4.5180320739746094e-05
+              },
+              {
+                "param": "crossover_f_low",
+                "dz": -3.3974647521972656e-05
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8929,
+            "crossover_f_low_hz": 198.87,
+            "crossover_f_high_hz": 3464.98,
+            "imager_width_low": 1.0427,
+            "imager_width_mid": 1.1117,
+            "imager_width_high": 1.1109,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V2": {
+          "source_artifact": "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
+          "git_commit": "427be98 / ea3f4ea",
+          "metrics": {
+            "pred_lufs": -13.500542593118347,
+            "target_lufs": -6.896129906076177,
+            "delta_lufs_abs": 6.60441268704217,
+            "pred_sample_peak_dbfs": -0.2999963899836622,
+            "pred_true_peak_dbtp": -0.04228445880856523,
+            "tp_violation_db_vs_neg030": 0.25771554119143475,
+            "pred_plr_db": 13.200546203134685,
+            "pred_ms_ratio_db": 6.802032045319919,
+            "delta_ms_ratio_db": 1.4003757783604236,
+            "spectral_convergence": 0.6124687790870667,
+            "log_spectral_distance_db": 9.45274829864502,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 0.8515920639038086,
+            "erb_de_harsh_loss": 0.010320947505533695
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.2197793424129486,
+            "l2_dz": 0.22072057643938683,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_high",
+                "dz": -0.2197793424129486
+              },
+              {
+                "param": "crossover_f_low",
+                "dz": 0.01677006483078003
+              },
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": -0.00849074125289917
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8935,
+            "crossover_f_low_hz": 202.5,
+            "crossover_f_high_hz": 2556.86,
+            "imager_width_low": 1.0423,
+            "imager_width_mid": 1.1094,
+            "imager_width_high": 1.1126,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V3a": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json",
+          "git_commit": "533549c",
+          "metrics": {
+            "pred_lufs": -13.502122933209703,
+            "target_lufs": -6.896129906076177,
+            "delta_lufs_abs": 6.605993027133526,
+            "pred_sample_peak_dbfs": -0.29999692588761173,
+            "pred_true_peak_dbtp": -0.08870884983214963,
+            "tp_violation_db_vs_neg030": 0.21129115016785036,
+            "pred_plr_db": 13.202126007313101,
+            "pred_ms_ratio_db": 6.79574405625279,
+            "delta_ms_ratio_db": 1.4066637674275526,
+            "spectral_convergence": 0.6120050549507141,
+            "log_spectral_distance_db": 9.471309661865234,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 0.8178911209106445,
+            "erb_de_harsh_loss": 0.004609204363077879
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0042724609375,
+            "l2_dz": 0.004386842217127382,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_low",
+                "dz": 0.0042724609375
+              },
+              {
+                "param": "eq_b5_gain_db",
+                "dz": -0.0005031228065490723
+              },
+              {
+                "param": "eq_b0_gain_db",
+                "dz": -0.0004988908767700195
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8906,
+            "crossover_f_low_hz": 198.8,
+            "crossover_f_high_hz": 3468.47,
+            "imager_width_low": 1.0426,
+            "imager_width_mid": 1.1118,
+            "imager_width_high": 1.1107,
+            "limiter_push_gain_db": 8.76
+          }
+        },
+        "V3b_B05": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json",
+          "git_commit": "2123842 / 9cc448f",
+          "metrics": {
+            "pred_lufs": -13.501711930690604,
+            "target_lufs": -6.896129906076177,
+            "delta_lufs_abs": 6.605582024614427,
+            "pred_sample_peak_dbfs": -0.29999692589660265,
+            "pred_true_peak_dbtp": -0.08680964419618657,
+            "tp_violation_db_vs_neg030": 0.2131903558038134,
+            "pred_plr_db": 13.201715004794002,
+            "pred_ms_ratio_db": 6.796530450440899,
+            "delta_ms_ratio_db": 1.4058773732394432,
+            "spectral_convergence": 0.6120709776878357,
+            "log_spectral_distance_db": 9.470205307006836,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 0.8180208206176758,
+            "erb_de_harsh_loss": 0.004626831971108913
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": [
+              {
+                "param": "eq_b0_f0",
+                "dz": 0.0
+              },
+              {
+                "param": "eq_b0_gain_db",
+                "dz": 0.0
+              },
+              {
+                "param": "eq_b0_q",
+                "dz": 0.0
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8938,
+            "crossover_f_low_hz": 197.55,
+            "crossover_f_high_hz": 3467.58,
+            "imager_width_low": 1.0425,
+            "imager_width_mid": 1.1117,
+            "imager_width_high": 1.1105,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V3c": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3C_ABLATION_PILOT_RESULTS.json",
+          "git_commit": "5709c3f",
+          "metrics": {
+            "pred_lufs": -13.501788681384848,
+            "target_lufs": -6.896129906076177,
+            "delta_lufs_abs": 6.6056587753086715,
+            "pred_sample_peak_dbfs": -0.29999692589660265,
+            "pred_true_peak_dbtp": -0.08379203396612307,
+            "tp_violation_db_vs_neg030": 0.21620796603387693,
+            "pred_plr_db": 13.201791755488246,
+            "pred_ms_ratio_db": 6.797740886056501,
+            "delta_ms_ratio_db": 1.4046669376238414,
+            "spectral_convergence": 0.6120250821113586,
+            "log_spectral_distance_db": 9.470297813415527,
+            "aggregate_spectral_distance": null,
+            "erb_presence_surplus_db": 0.8175764083862305,
+            "erb_de_harsh_loss": 0.004566570743918419
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0018146634101867676,
+            "l2_dz": 0.0020800491761257174,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_low",
+                "dz": 0.0018146634101867676
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": -0.0009205937385559082
+              },
+              {
+                "param": "imager_width_low",
+                "dz": -0.0003771781921386719
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8937,
+            "crossover_f_low_hz": 198.08,
+            "crossover_f_high_hz": 3463.16,
+            "imager_width_low": 1.0423,
+            "imager_width_mid": 1.1116,
+            "imager_width_high": 1.1105,
+            "limiter_push_gain_db": 0.0016
+          }
+        }
+      }
+    },
+    "track01_style": {
+      "track_prefix": "track01_style",
+      "mode": "stylistic",
+      "seed": "14887125631601849244",
+      "target_lufs_bs1770": -17.9875588318886,
+      "duration_sec": 63.895520833333336,
+      "mix_sha256": "56c57e4fe5cb799e6364056e7fa5cf795e28db7794196804bcd58ada3086203d",
+      "ref_sha256": "26e09df1912415aede598746293a5cce1d9f3410a09e3e1a4f1a0bdf48024e74",
+      "variants": {
+        "V0": {
+          "source_artifact": "docs/human_validation/SPRINT2_V0_REPRODUCIBILITY_MANIFEST.json",
+          "git_commit": "ffafb9848bea375195973795df83af6fe0970e86",
+          "metrics": {
+            "pred_lufs": -17.843856967069545,
+            "pred_sample_peak_dbfs": -2.3827494201937602,
+            "pred_true_peak_dbtp": -2.382749254520711,
+            "pred_plr_db": 15.461107546875784,
+            "pred_ms_ratio_db": 10.32825569991747,
+            "stereo_correlation": 0.8320064741909453
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.017179489135742188,
+            "l2_dz": 0.026470465371792602,
+            "top3_changed_params": [
+              {
+                "param": "imager_width_low",
+                "dz": -0.017179489135742188
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": 0.013545095920562744
+              },
+              {
+                "param": "comp_low_release_ms",
+                "dz": -0.01316767930984497
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": -1.9171,
+            "crossover_f_low_hz": 149.85,
+            "crossover_f_high_hz": 3513.51,
+            "imager_width_low": 0.9334,
+            "imager_width_mid": 0.8975,
+            "imager_width_high": 0.8951,
+            "limiter_push_gain_db": 0.0004
+          }
+        },
+        "V0p": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -17.83439605717931,
+            "target_lufs": -17.9875588318886,
+            "delta_lufs_abs": 0.15316277470929052,
+            "pred_sample_peak_dbfs": -2.419229751888925,
+            "pred_true_peak_dbtp": -2.419229586215877,
+            "tp_violation_db_vs_neg030": 0.0,
+            "pred_plr_db": 15.415166305290384,
+            "pred_ms_ratio_db": 10.296460322973786,
+            "delta_ms_ratio_db": 0.7646145787877927,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 1.112444281578064,
+            "erb_presence_surplus_db": 8.624582290649414,
+            "erb_de_harsh_loss": 62.0090446472168
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": []
+          },
+          "key_theta": {
+            "eq_mean_gain_db": -1.9185,
+            "crossover_f_low_hz": 149.32,
+            "crossover_f_high_hz": 3495.16,
+            "imager_width_low": 0.9455,
+            "imager_width_mid": 0.897,
+            "imager_width_high": 0.8938,
+            "limiter_push_gain_db": 0.0004
+          }
+        },
+        "V1": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -17.828908614368274,
+            "target_lufs": -17.9875588318886,
+            "delta_lufs_abs": 0.15865021752032504,
+            "pred_sample_peak_dbfs": -2.4551866979351664,
+            "pred_true_peak_dbtp": -2.4551865322621174,
+            "tp_violation_db_vs_neg030": 0.0,
+            "pred_plr_db": 15.373721916433107,
+            "pred_ms_ratio_db": 10.286819609593099,
+            "delta_ms_ratio_db": 0.7549738654071056,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 1.107173204421997,
+            "erb_presence_surplus_db": 8.516369819641113,
+            "erb_de_harsh_loss": 60.31650161743164
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.016298770904541016,
+            "l2_dz": 0.022856246650200154,
+            "top3_changed_params": [
+              {
+                "param": "eq_b3_f0",
+                "dz": 0.016298770904541016
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": 0.01356971263885498
+              },
+              {
+                "param": "imager_width_low",
+                "dz": -0.005601823329925537
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": -1.915,
+            "crossover_f_low_hz": 149.27,
+            "crossover_f_high_hz": 3488.99,
+            "imager_width_low": 0.9415,
+            "imager_width_mid": 0.8991,
+            "imager_width_high": 0.8933,
+            "limiter_push_gain_db": 0.0004
+          }
+        },
+        "V1b": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -16.86496129608631,
+            "target_lufs": -17.9875588318886,
+            "delta_lufs_abs": 1.1225975358022886,
+            "pred_sample_peak_dbfs": -2.3320747951608083,
+            "pred_true_peak_dbtp": -2.0967176322174113,
+            "tp_violation_db_vs_neg030": 0.0,
+            "pred_plr_db": 14.532886500925501,
+            "pred_ms_ratio_db": 9.076503952514013,
+            "delta_ms_ratio_db": 0.4553417916719802,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.9738386869430542,
+            "erb_presence_surplus_db": 5.871362686157227,
+            "erb_de_harsh_loss": 26.228355407714844
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.32112303376197815,
+            "l2_dz": 0.6170489505768997,
+            "top3_changed_params": [
+              {
+                "param": "eq_b2_gain_db",
+                "dz": 0.32112303376197815
+              },
+              {
+                "param": "eq_b3_f0",
+                "dz": 0.2827865481376648
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": -0.2651570439338684
+              }
+            ]
+          },
+          "diff_vs_V1_z": {
+            "max_abs_dz": 0.3187794089317322,
+            "l2_dz": 0.6130520392742543,
+            "top3_changed_params": [
+              {
+                "param": "eq_b2_gain_db",
+                "dz": 0.3187794089317322
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": -0.2787267565727234
+              },
+              {
+                "param": "eq_b3_f0",
+                "dz": 0.2664877772331238
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": -1.2625,
+            "crossover_f_low_hz": 161.57,
+            "crossover_f_high_hz": 3356.7,
+            "imager_width_low": 0.9338,
+            "imager_width_mid": 1.0695,
+            "imager_width_high": 0.8979,
+            "limiter_push_gain_db": 0.0004
+          }
+        },
+        "V2": {
+          "source_artifact": "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
+          "git_commit": "427be98 / ea3f4ea",
+          "metrics": {
+            "pred_lufs": -17.84820366895408,
+            "target_lufs": -17.9875588318886,
+            "delta_lufs_abs": 0.13935516293451755,
+            "pred_sample_peak_dbfs": -1.841986181514217,
+            "pred_true_peak_dbtp": -1.6298472052882014,
+            "tp_violation_db_vs_neg030": 0.0,
+            "pred_plr_db": 16.006217487439866,
+            "pred_ms_ratio_db": 10.348415218267938,
+            "delta_ms_ratio_db": 0.8165694740819447,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 1.11513090133667,
+            "erb_presence_surplus_db": 8.59243106842041,
+            "erb_de_harsh_loss": 61.503726959228516
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.10633188486099243,
+            "l2_dz": 0.13884948614793025,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_low",
+                "dz": -0.10633188486099243
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": 0.08262491226196289
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": 0.019284546375274658
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": -1.9188,
+            "crossover_f_low_hz": 127.63,
+            "crossover_f_high_hz": 3919.34,
+            "imager_width_low": 0.9327,
+            "imager_width_mid": 0.8989,
+            "imager_width_high": 0.8993,
+            "limiter_push_gain_db": 0.0004
+          }
+        },
+        "V3a": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json",
+          "git_commit": "533549c",
+          "metrics": {
+            "pred_lufs": -17.834353460031245,
+            "target_lufs": -17.9875588318886,
+            "delta_lufs_abs": 0.1532053718573536,
+            "pred_sample_peak_dbfs": -2.4191073167976245,
+            "pred_true_peak_dbtp": -2.419107151136051,
+            "tp_violation_db_vs_neg030": 0.0,
+            "pred_plr_db": 15.415246143222145,
+            "pred_ms_ratio_db": 10.296747964590862,
+            "delta_ms_ratio_db": 0.7649022204048688,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 1.1124290227890015,
+            "erb_presence_surplus_db": 8.626077651977539,
+            "erb_de_harsh_loss": 62.03260040283203
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.017582833766937256,
+            "l2_dz": 0.022599525308942523,
+            "top3_changed_params": [
+              {
+                "param": "comp_low_release_ms",
+                "dz": -0.017582833766937256
+              },
+              {
+                "param": "comp_high_threshold_db",
+                "dz": 0.011349081993103027
+              },
+              {
+                "param": "comp_mid_release_ms",
+                "dz": -0.007769644260406494
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": -1.9173,
+            "crossover_f_low_hz": 149.28,
+            "crossover_f_high_hz": 3494.07,
+            "imager_width_low": 0.9455,
+            "imager_width_mid": 0.8969,
+            "imager_width_high": 0.8937,
+            "limiter_push_gain_db": -4.88
+          }
+        },
+        "V3b_B05": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json",
+          "git_commit": "2123842 / 9cc448f",
+          "metrics": {
+            "pred_lufs": -17.83439605717931,
+            "target_lufs": -17.9875588318886,
+            "delta_lufs_abs": 0.15316277470929052,
+            "pred_sample_peak_dbfs": -2.419229751888925,
+            "pred_true_peak_dbtp": -2.419229586215877,
+            "tp_violation_db_vs_neg030": 0.0,
+            "pred_plr_db": 15.415166305290384,
+            "pred_ms_ratio_db": 10.296460322973786,
+            "delta_ms_ratio_db": 0.7646145787877927,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 1.112444281578064,
+            "erb_presence_surplus_db": 8.624582290649414,
+            "erb_de_harsh_loss": 62.0090446472168
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": [
+              {
+                "param": "eq_b0_f0",
+                "dz": 0.0
+              },
+              {
+                "param": "eq_b0_gain_db",
+                "dz": 0.0
+              },
+              {
+                "param": "eq_b0_q",
+                "dz": 0.0
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": -1.9185,
+            "crossover_f_low_hz": 149.32,
+            "crossover_f_high_hz": 3495.16,
+            "imager_width_low": 0.9455,
+            "imager_width_mid": 0.897,
+            "imager_width_high": 0.8938,
+            "limiter_push_gain_db": 0.0004
+          }
+        },
+        "V3c": {
+          "status": "EXCLUDED_IN_SPRINT3_PILOT",
+          "reason": "Stylistic sessions excluded from Sprint 3 V3c pilot due to conflict between V3cStereoCompatibilityLoss and stylistic cross-track stereo term."
+        }
+      }
+    },
+    "track02_style": {
+      "track_prefix": "track02_style",
+      "mode": "stylistic",
+      "seed": "3606996967096283602",
+      "target_lufs_bs1770": -9.036983959989,
+      "duration_sec": 71.47102083333333,
+      "mix_sha256": "e0994c556d819522de2be33ff8004a21aabe70f9af596d7ae4eaaf9db505ab3c",
+      "ref_sha256": "e51ee86b145ceac140655287ae9b27295edd5922d97ef95f0fd68a85f7f04e7d",
+      "variants": {
+        "V0": {
+          "source_artifact": "docs/human_validation/SPRINT2_V0_REPRODUCIBILITY_MANIFEST.json",
+          "git_commit": "ffafb9848bea375195973795df83af6fe0970e86",
+          "metrics": {
+            "pred_lufs": -18.052038117614106,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.07143560327738488,
+            "pred_plr_db": 17.752038512152307,
+            "pred_ms_ratio_db": 14.01530573545241,
+            "stereo_correlation": 0.9237002975475125
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.006506145000457764,
+            "l2_dz": 0.00912899932804301,
+            "top3_changed_params": [
+              {
+                "param": "comp_low_release_ms",
+                "dz": 0.006506145000457764
+              },
+              {
+                "param": "comp_low_threshold_db",
+                "dz": -0.005697190761566162
+              },
+              {
+                "param": "comp_low_attack_ms",
+                "dz": -0.0023581385612487793
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.872,
+            "crossover_f_low_hz": 200.38,
+            "crossover_f_high_hz": 3173.29,
+            "imager_width_low": 1.0434,
+            "imager_width_mid": 1.1126,
+            "imager_width_high": 1.1117,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V0p": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -18.052172851885356,
+            "target_lufs": -9.036983959989,
+            "delta_lufs_abs": 9.015188891896356,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.06687425716444463,
+            "tp_violation_db_vs_neg030": 0.23312574283555537,
+            "pred_plr_db": 17.752173246423556,
+            "pred_ms_ratio_db": 14.015332063674899,
+            "delta_ms_ratio_db": 2.3776429931662495,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.8442884683609009,
+            "erb_presence_surplus_db": 0.6200008392333984,
+            "erb_de_harsh_loss": 0.0
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": []
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8718,
+            "crossover_f_low_hz": 200.44,
+            "crossover_f_high_hz": 3177.98,
+            "imager_width_low": 1.0434,
+            "imager_width_mid": 1.1127,
+            "imager_width_high": 1.1116,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V1": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -18.05005888836471,
+            "target_lufs": -9.036983959989,
+            "delta_lufs_abs": 9.01307492837571,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.07116022052798532,
+            "tp_violation_db_vs_neg030": 0.22883977947201467,
+            "pred_plr_db": 17.75005928290291,
+            "pred_ms_ratio_db": 14.015311281507884,
+            "delta_ms_ratio_db": 2.3776637753332643,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.8429855108261108,
+            "erb_presence_surplus_db": 0.6226215362548828,
+            "erb_de_harsh_loss": 0.0
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.00433504581451416,
+            "l2_dz": 0.004843056475778112,
+            "top3_changed_params": [
+              {
+                "param": "eq_b5_gain_db",
+                "dz": 0.00433504581451416
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": -0.0019440650939941406
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": -0.0005107522010803223
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8804,
+            "crossover_f_low_hz": 200.44,
+            "crossover_f_high_hz": 3169.43,
+            "imager_width_low": 1.0436,
+            "imager_width_mid": 1.1126,
+            "imager_width_high": 1.1119,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V1b": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -18.050673105663485,
+            "target_lufs": -9.036983959989,
+            "delta_lufs_abs": 9.013689145674485,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.07510658572269227,
+            "tp_violation_db_vs_neg030": 0.22489341427730772,
+            "pred_plr_db": 17.750673500201685,
+            "pred_ms_ratio_db": 14.014654663093944,
+            "delta_ms_ratio_db": 2.378320393747204,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.8432203531265259,
+            "erb_presence_surplus_db": 0.617645263671875,
+            "erb_de_harsh_loss": 0.0
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.003554999828338623,
+            "l2_dz": 0.00472583293286696,
+            "top3_changed_params": [
+              {
+                "param": "eq_b5_gain_db",
+                "dz": 0.003554999828338623
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": -0.0026267170906066895
+              },
+              {
+                "param": "eq_b2_f0",
+                "dz": -0.0014227330684661865
+              }
+            ]
+          },
+          "diff_vs_V1_z": {
+            "max_abs_dz": 0.0009119808673858643,
+            "l2_dz": 0.001782073383741581,
+            "top3_changed_params": [
+              {
+                "param": "eq_b2_f0",
+                "dz": -0.0009119808673858643
+              },
+              {
+                "param": "eq_b5_gain_db",
+                "dz": -0.0007800459861755371
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": -0.0006826519966125488
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8787,
+            "crossover_f_low_hz": 200.41,
+            "crossover_f_high_hz": 3166.43,
+            "imager_width_low": 1.0436,
+            "imager_width_mid": 1.1126,
+            "imager_width_high": 1.1115,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V2": {
+          "source_artifact": "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
+          "git_commit": "427be98 / ea3f4ea",
+          "metrics": {
+            "pred_lufs": -18.048396332538662,
+            "target_lufs": -9.036983959989,
+            "delta_lufs_abs": 9.011412372549662,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.061804209665705614,
+            "tp_violation_db_vs_neg030": 0.2381957903342944,
+            "pred_plr_db": 17.748396727076862,
+            "pred_ms_ratio_db": 14.021763268962257,
+            "delta_ms_ratio_db": 2.3712117878788916,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.8399883508682251,
+            "erb_presence_surplus_db": 0.6388769149780273,
+            "erb_de_harsh_loss": 0.0
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.014097094535827637,
+            "l2_dz": 0.01822682955388556,
+            "top3_changed_params": [
+              {
+                "param": "eq_b5_gain_db",
+                "dz": 0.014097094535827637
+              },
+              {
+                "param": "comp_low_threshold_db",
+                "dz": 0.0061157941818237305
+              },
+              {
+                "param": "eq_b1_f0",
+                "dz": -0.005181789398193359
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8989,
+            "crossover_f_low_hz": 201.79,
+            "crossover_f_high_hz": 3167.62,
+            "imager_width_low": 1.0436,
+            "imager_width_mid": 1.1125,
+            "imager_width_high": 1.1125,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V3a": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json",
+          "git_commit": "533549c",
+          "metrics": {
+            "pred_lufs": -18.052273161186083,
+            "target_lufs": -9.036983959989,
+            "delta_lufs_abs": 9.015289201197083,
+            "pred_sample_peak_dbfs": -0.29999960545281024,
+            "pred_true_peak_dbtp": -0.0669548139890243,
+            "tp_violation_db_vs_neg030": 0.23304518601097568,
+            "pred_plr_db": 17.752273555724283,
+            "pred_ms_ratio_db": 14.015250769925931,
+            "delta_ms_ratio_db": 2.3777242869152175,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.8443106412887573,
+            "erb_presence_surplus_db": 0.6198272705078125,
+            "erb_de_harsh_loss": 0.0
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.019462108612060547,
+            "l2_dz": 0.030845457468306706,
+            "top3_changed_params": [
+              {
+                "param": "comp_low_threshold_db",
+                "dz": -0.019462108612060547
+              },
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": -0.017743229866027832
+              },
+              {
+                "param": "comp_high_threshold_db",
+                "dz": -0.015404701232910156
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8715,
+            "crossover_f_low_hz": 200.45,
+            "crossover_f_high_hz": 3177.98,
+            "imager_width_low": 1.0434,
+            "imager_width_mid": 1.1127,
+            "imager_width_high": 1.1117,
+            "limiter_push_gain_db": 6.06
+          }
+        },
+        "V3b_B05": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json",
+          "git_commit": "2123842 / 9cc448f",
+          "metrics": {
+            "pred_lufs": -18.052172851885356,
+            "target_lufs": -9.036983959989,
+            "delta_lufs_abs": 9.015188891896356,
+            "pred_sample_peak_dbfs": -0.29999960546180116,
+            "pred_true_peak_dbtp": -0.06687425716444463,
+            "tp_violation_db_vs_neg030": 0.23312574283555537,
+            "pred_plr_db": 17.752173246423556,
+            "pred_ms_ratio_db": 14.015332063674899,
+            "delta_ms_ratio_db": 2.3776429931662495,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.8442884683609009,
+            "erb_presence_surplus_db": 0.6200008392333984,
+            "erb_de_harsh_loss": 0.0
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": [
+              {
+                "param": "eq_b0_f0",
+                "dz": 0.0
+              },
+              {
+                "param": "eq_b0_gain_db",
+                "dz": 0.0
+              },
+              {
+                "param": "eq_b0_q",
+                "dz": 0.0
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.8718,
+            "crossover_f_low_hz": 200.44,
+            "crossover_f_high_hz": 3177.98,
+            "imager_width_low": 1.0434,
+            "imager_width_mid": 1.1127,
+            "imager_width_high": 1.1116,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V3c": {
+          "status": "EXCLUDED_IN_SPRINT3_PILOT",
+          "reason": "Stylistic sessions excluded from Sprint 3 V3c pilot due to conflict between V3cStereoCompatibilityLoss and stylistic cross-track stereo term."
+        }
+      }
+    },
+    "track03_style": {
+      "track_prefix": "track03_style",
+      "mode": "stylistic",
+      "seed": "15136152743686100324",
+      "target_lufs_bs1770": -6.463308295428326,
+      "duration_sec": 71.7845,
+      "mix_sha256": "e1aacbc4a46f31e4b21afd5b3fb83741444272b764334a7e07ca5fd869a1decd",
+      "ref_sha256": "174cc0c3f5ec63f87dfd75d53550bca58e33179f22d3bb9c0c2d2c8ae97aa5af",
+      "variants": {
+        "V0": {
+          "source_artifact": "docs/human_validation/SPRINT2_V0_REPRODUCIBILITY_MANIFEST.json",
+          "git_commit": "ffafb9848bea375195973795df83af6fe0970e86",
+          "metrics": {
+            "pred_lufs": -13.520421677141318,
+            "pred_sample_peak_dbfs": -0.29999746180957626,
+            "pred_true_peak_dbtp": 0.04956222834554356,
+            "pred_plr_db": 13.220424215331741,
+            "pred_ms_ratio_db": 6.799297167478996,
+            "stereo_correlation": 0.6543400488828967
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.00757211446762085,
+            "l2_dz": 0.009153178898170501,
+            "top3_changed_params": [
+              {
+                "param": "eq_b5_gain_db",
+                "dz": -0.00757211446762085
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": 0.00441741943359375
+              },
+              {
+                "param": "comp_mid_attack_ms",
+                "dz": 0.0015580058097839355
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.7661,
+            "crossover_f_low_hz": 197.83,
+            "crossover_f_high_hz": 3355.88,
+            "imager_width_low": 1.0422,
+            "imager_width_mid": 1.1104,
+            "imager_width_high": 1.11,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V0p": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -13.518033443210248,
+            "target_lufs": -6.463308295428326,
+            "delta_lufs_abs": 7.054725147781922,
+            "pred_sample_peak_dbfs": -0.29999746180957626,
+            "pred_true_peak_dbtp": 0.06347274218394888,
+            "tp_violation_db_vs_neg030": 0.36347274218394887,
+            "pred_plr_db": 13.218035981400671,
+            "pred_ms_ratio_db": 6.79856412203435,
+            "delta_ms_ratio_db": 1.0648849341440485,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.9778972864151001,
+            "erb_presence_surplus_db": 2.0960798263549805,
+            "erb_de_harsh_loss": 1.8119308948516846
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": []
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.7811,
+            "crossover_f_low_hz": 197.48,
+            "crossover_f_high_hz": 3335.39,
+            "imager_width_low": 1.0422,
+            "imager_width_mid": 1.1104,
+            "imager_width_high": 1.1101,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V1": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -13.519546317163096,
+            "target_lufs": -6.463308295428326,
+            "delta_lufs_abs": 7.05623802173477,
+            "pred_sample_peak_dbfs": -0.29999746180957626,
+            "pred_true_peak_dbtp": 0.0466397271335018,
+            "tp_violation_db_vs_neg030": 0.3466397271335018,
+            "pred_plr_db": 13.21954885535352,
+            "pred_ms_ratio_db": 6.798991973738118,
+            "delta_ms_ratio_db": 1.0644570824402804,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.9778432846069336,
+            "erb_presence_surplus_db": 2.095791816711426,
+            "erb_de_harsh_loss": 1.8111555576324463
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.004117012023925781,
+            "l2_dz": 0.00530965334579814,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_high",
+                "dz": 0.004117012023925781
+              },
+              {
+                "param": "eq_b5_gain_db",
+                "dz": -0.002724289894104004
+              },
+              {
+                "param": "crossover_f_low",
+                "dz": 0.0011606216430664062
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.7752,
+            "crossover_f_low_hz": 197.82,
+            "crossover_f_high_hz": 3354.48,
+            "imager_width_low": 1.0422,
+            "imager_width_mid": 1.1104,
+            "imager_width_high": 1.1101,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V1b": {
+          "source_artifact": "docs/sprint3/SPRINT3_V1_HARMONIZED_RESULTS.json",
+          "git_commit": "ea3f4ea",
+          "metrics": {
+            "pred_lufs": -13.520574646655334,
+            "target_lufs": -6.463308295428326,
+            "delta_lufs_abs": 7.057266351227008,
+            "pred_sample_peak_dbfs": -0.29999746180957626,
+            "pred_true_peak_dbtp": 0.04810093630453563,
+            "tp_violation_db_vs_neg030": 0.34810093630453565,
+            "pred_plr_db": 13.220577184845757,
+            "pred_ms_ratio_db": 6.798727279224979,
+            "delta_ms_ratio_db": 1.0647217769534194,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.9778562784194946,
+            "erb_presence_surplus_db": 2.078280448913574,
+            "erb_de_harsh_loss": 1.764328956604004
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.005340993404388428,
+            "l2_dz": 0.008016648240660774,
+            "top3_changed_params": [
+              {
+                "param": "eq_b5_gain_db",
+                "dz": -0.005340993404388428
+              },
+              {
+                "param": "crossover_f_high",
+                "dz": 0.004318654537200928
+              },
+              {
+                "param": "eq_b3_f0",
+                "dz": -0.003678739070892334
+              }
+            ]
+          },
+          "diff_vs_V1_z": {
+            "max_abs_dz": 0.004678636789321899,
+            "l2_dz": 0.00541250474144201,
+            "top3_changed_params": [
+              {
+                "param": "eq_b3_f0",
+                "dz": -0.004678636789321899
+              },
+              {
+                "param": "eq_b5_gain_db",
+                "dz": -0.002616703510284424
+              },
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": 0.00037658214569091797
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.7697,
+            "crossover_f_low_hz": 197.83,
+            "crossover_f_high_hz": 3355.42,
+            "imager_width_low": 1.0422,
+            "imager_width_mid": 1.1106,
+            "imager_width_high": 1.1099,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V2": {
+          "source_artifact": "docs/sprint3/SPRINT3_V2_ABLATION_RESULTS.json",
+          "git_commit": "427be98 / ea3f4ea",
+          "metrics": {
+            "pred_lufs": -13.490566081083358,
+            "target_lufs": -6.463308295428326,
+            "delta_lufs_abs": 7.027257785655032,
+            "pred_sample_peak_dbfs": -0.2999963899836622,
+            "pred_true_peak_dbtp": -0.060591769982342766,
+            "tp_violation_db_vs_neg030": 0.2394082300176572,
+            "pred_plr_db": 13.190569691099697,
+            "pred_ms_ratio_db": 6.797593054481803,
+            "delta_ms_ratio_db": 1.065856001696595,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.9793815612792969,
+            "erb_presence_surplus_db": 2.166677474975586,
+            "erb_de_harsh_loss": 2.0069751739501953
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.19802197813987732,
+            "l2_dz": 0.20933598817424906,
+            "top3_changed_params": [
+              {
+                "param": "crossover_f_high",
+                "dz": -0.19802197813987732
+              },
+              {
+                "param": "eq_b5_gain_db",
+                "dz": 0.06403243541717529
+              },
+              {
+                "param": "comp_mid_release_ms",
+                "dz": 0.012438803911209106
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.9091,
+            "crossover_f_low_hz": 200.54,
+            "crossover_f_high_hz": 2534.7,
+            "imager_width_low": 1.0425,
+            "imager_width_mid": 1.1101,
+            "imager_width_high": 1.1145,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V3a": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3A_ABLATION_RESULTS.json",
+          "git_commit": "533549c",
+          "metrics": {
+            "pred_lufs": -13.518157566426346,
+            "target_lufs": -6.463308295428326,
+            "delta_lufs_abs": 7.05484927099802,
+            "pred_sample_peak_dbfs": -0.2999974618005853,
+            "pred_true_peak_dbtp": 0.06391990021993083,
+            "tp_violation_db_vs_neg030": 0.3639199002199308,
+            "pred_plr_db": 13.21816010461677,
+            "pred_ms_ratio_db": 6.798513779748246,
+            "delta_ms_ratio_db": 1.0649352764301518,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.9778913259506226,
+            "erb_presence_surplus_db": 2.0958919525146484,
+            "erb_de_harsh_loss": 1.8114250898361206
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.01975935697555542,
+            "l2_dz": 0.02313743296240229,
+            "top3_changed_params": [
+              {
+                "param": "comp_mid_threshold_db",
+                "dz": -0.01975935697555542
+              },
+              {
+                "param": "comp_low_threshold_db",
+                "dz": -0.011418402194976807
+              },
+              {
+                "param": "comp_mid_release_ms",
+                "dz": 0.002666264772415161
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.7803,
+            "crossover_f_low_hz": 197.48,
+            "crossover_f_high_hz": 3335.25,
+            "imager_width_low": 1.0422,
+            "imager_width_mid": 1.1104,
+            "imager_width_high": 1.1101,
+            "limiter_push_gain_db": 8.33
+          }
+        },
+        "V3b_B05": {
+          "source_artifact": "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json",
+          "git_commit": "2123842 / 9cc448f",
+          "metrics": {
+            "pred_lufs": -13.518033443210248,
+            "target_lufs": -6.463308295428326,
+            "delta_lufs_abs": 7.054725147781922,
+            "pred_sample_peak_dbfs": -0.29999746180957626,
+            "pred_true_peak_dbtp": 0.06347274218394888,
+            "tp_violation_db_vs_neg030": 0.36347274218394887,
+            "pred_plr_db": 13.218035981400671,
+            "pred_ms_ratio_db": 6.79856412203435,
+            "delta_ms_ratio_db": 1.0648849341440485,
+            "spectral_convergence": null,
+            "log_spectral_distance_db": null,
+            "aggregate_spectral_distance": 0.9778972864151001,
+            "erb_presence_surplus_db": 2.0960798263549805,
+            "erb_de_harsh_loss": 1.8119308948516846
+          },
+          "diff_vs_V0p_z": {
+            "max_abs_dz": 0.0,
+            "l2_dz": 0.0,
+            "top3_changed_params": [
+              {
+                "param": "eq_b0_f0",
+                "dz": 0.0
+              },
+              {
+                "param": "eq_b0_gain_db",
+                "dz": 0.0
+              },
+              {
+                "param": "eq_b0_q",
+                "dz": 0.0
+              }
+            ]
+          },
+          "key_theta": {
+            "eq_mean_gain_db": 1.7811,
+            "crossover_f_low_hz": 197.48,
+            "crossover_f_high_hz": 3335.39,
+            "imager_width_low": 1.0422,
+            "imager_width_mid": 1.1104,
+            "imager_width_high": 1.1101,
+            "limiter_push_gain_db": 0.0016
+          }
+        },
+        "V3c": {
+          "status": "EXCLUDED_IN_SPRINT3_PILOT",
+          "reason": "Stylistic sessions excluded from Sprint 3 V3c pilot due to conflict between V3cStereoCompatibilityLoss and stylistic cross-track stereo term."
+        }
+      }
+    }
+  }
+}
