@@ -46,6 +46,68 @@ except ImportError:
     _HAS_PY_CORE_DSP = False
 
 
+# Explicitly approved Sprint 4 True Peak Hardening DSP allowlist (committed at db4a7bf).
+# No other DSP, optimizer, loss, param_space, or historical Sprint 3 artifact may differ.
+SPRINT4_APPROVED_DSP_ALLOWLIST = frozenset(
+    {
+        "cpp/bindings/py_core_dsp.cpp",
+        "cpp/core_dsp/include/core_dsp/Constants.hpp",
+        "cpp/core_dsp/include/core_dsp/LookaheadLimiter.hpp",
+        "cpp/core_dsp/include/core_dsp/MasteringChain.hpp",
+        "python/ddsp_mastering/dsp/limiter.py",
+        "python/ddsp_mastering/dsp/chain.py",
+        "scripts/human_validation/offline_renderer.py",
+    }
+)
+SPRINT4_TP_APPROVED_COMMIT_SHA = "db4a7bf26db50ecf0401bcac77374eabd535050e"
+
+
+def _assert_paths_frozen_with_sprint4_allowlist(
+    repo_root: Path,
+    base_sha: str,
+    protected_paths: list[str],
+    allowlist: frozenset[str] = SPRINT4_APPROVED_DSP_ALLOWLIST,
+) -> None:
+    """Assert protected paths have zero uncommitted changes and only allowlisted diffs vs base_sha."""
+    for rel in protected_paths:
+        st_res = subprocess.run(
+            ["git", "status", "--porcelain", "--", rel],
+            capture_output=True, text=True, check=True, cwd=str(repo_root),
+        )
+        assert st_res.stdout.strip() == "", f"Uncommitted change in protected path {rel}: {st_res.stdout}"
+        df_res = subprocess.run(
+            ["git", "diff", "--name-only", f"{base_sha}..HEAD", "--", rel],
+            capture_output=True, text=True, check=True, cwd=str(repo_root),
+        )
+        changed = [line.strip() for line in df_res.stdout.splitlines() if line.strip()]
+        unexpected = [path for path in changed if path not in allowlist]
+        assert not unexpected, (
+            f"Forbidden diff vs {base_sha} in protected path {rel} "
+            f"(outside Sprint 4 allowlist): {unexpected}"
+        )
+
+
+def _assert_sprint4_allowlist_unchanged_since_commit(
+    repo_root: Path,
+    approved_sha: str = SPRINT4_TP_APPROVED_COMMIT_SHA,
+    allowlist: frozenset[str] = SPRINT4_APPROVED_DSP_ALLOWLIST,
+) -> None:
+    """Verify approved Sprint 4 True Peak files have zero further edits since approved_sha."""
+    for rel in sorted(allowlist):
+        st_res = subprocess.run(
+            ["git", "status", "--porcelain", "--", rel],
+            capture_output=True, text=True, check=True, cwd=str(repo_root),
+        )
+        assert st_res.stdout.strip() == "", f"Uncommitted edit in Sprint 4 TP file {rel}: {st_res.stdout}"
+        df_res = subprocess.run(
+            ["git", "diff", "--name-only", f"{approved_sha}..HEAD", "--", rel],
+            capture_output=True, text=True, check=True, cwd=str(repo_root),
+        )
+        assert df_res.stdout.strip() == "", (
+            f"Unapproved post-Sprint-4 modification vs {approved_sha} in {rel}: {df_res.stdout}"
+        )
+
+
 def _make_tone_stereo(
     freq_hz: float = 1000.0,
     num_samples: int = 48000,
@@ -364,33 +426,21 @@ def test_gate_7_frozen_modules_zero_diff_and_v0p_v3b_isolation():
     protected_paths = [
         "python/ddsp_mastering/loss/dynamic_prior.py",
         "python/ddsp_mastering/param_space.py",
+        "cpp/core_dsp/include/core_dsp/ParameterSpec.hpp",
         "python/ddsp_mastering/dsp",
         "cpp/core_dsp",
     ]
-    for rel in protected_paths:
-        st_res = subprocess.run(
-            ["git", "status", "--porcelain", "--", rel],
-            capture_output=True, text=True, check=True, cwd=str(repo_root),
-        )
-        assert st_res.stdout.strip() == "", f"Uncommitted change in protected path {rel}: {st_res.stdout}"
-        df_res = subprocess.run(
-            ["git", "diff", "--name-only", f"{baseline_sha}..HEAD", "--", rel],
-            capture_output=True, text=True, check=True, cwd=str(repo_root),
-        )
-        assert df_res.stdout.strip() == "", f"Historical diff in protected path {rel}: {df_res.stdout}"
+    _assert_paths_frozen_with_sprint4_allowlist(repo_root, baseline_sha, protected_paths)
+    _assert_sprint4_allowlist_unchanged_since_commit(repo_root)
 
     # Verify stereo_prior.py remains frozen relative to Phase 0 baseline commit
     v3c_baseline_sha = "1bf4954584c70f639484d8318c1990aeabe29040"
-    sp_st = subprocess.run(
-        ["git", "status", "--porcelain", "--", "python/ddsp_mastering/loss/stereo_prior.py"],
-        capture_output=True, text=True, check=True, cwd=str(repo_root),
+    _assert_paths_frozen_with_sprint4_allowlist(
+        repo_root,
+        v3c_baseline_sha,
+        ["python/ddsp_mastering/loss/stereo_prior.py"],
+        allowlist=frozenset(),
     )
-    assert sp_st.stdout.strip() == "", f"Uncommitted change in stereo_prior.py: {sp_st.stdout}"
-    sp_df = subprocess.run(
-        ["git", "diff", "--name-only", f"{v3c_baseline_sha}..HEAD", "--", "python/ddsp_mastering/loss/stereo_prior.py"],
-        capture_output=True, text=True, check=True, cwd=str(repo_root),
-    )
-    assert sp_df.stdout.strip() == "", f"Forbidden diff in stereo_prior.py: {sp_df.stdout}"
 
     # Verify AutoMasteringOptimizer keeps V3c disabled by default with zero V3c coupling
     from ddsp_mastering.dsp.chain import DifferentiableMasteringChain
@@ -799,20 +849,12 @@ def test_gate_9_optimizer_v3c_integration_all_checks():
         "python/ddsp_mastering/loss/stereo_prior.py",
         "python/ddsp_mastering/loss/dynamic_prior.py",
         "python/ddsp_mastering/param_space.py",
+        "cpp/core_dsp/include/core_dsp/ParameterSpec.hpp",
         "python/ddsp_mastering/dsp",
         "cpp/core_dsp",
     ]
-    for rel in locked_paths:
-        st_l = subprocess.run(
-            ["git", "status", "--porcelain", "--", rel],
-            capture_output=True, text=True, check=True, cwd=str(repo_root),
-        )
-        assert st_l.stdout.strip() == "", f"Uncommitted change in locked path {rel}: {st_l.stdout}"
-        df_l = subprocess.run(
-            ["git", "diff", "--name-only", f"{base_sha}..HEAD", "--", rel],
-            capture_output=True, text=True, check=True, cwd=str(repo_root),
-        )
-        assert df_l.stdout.strip() == "", f"Forbidden diff in locked path {rel}: {df_l.stdout}"
+    _assert_paths_frozen_with_sprint4_allowlist(repo_root, base_sha, locked_paths)
+    _assert_sprint4_allowlist_unchanged_since_commit(repo_root)
 
 
 def test_gate_10_v3c_ablation_pilot_and_blind_pack_integrity():
@@ -1003,6 +1045,7 @@ def test_gate_10_v3c_ablation_pilot_and_blind_pack_integrity():
         "python/ddsp_mastering/loss/stereo_prior.py",
         "python/ddsp_mastering/loss/dynamic_prior.py",
         "python/ddsp_mastering/param_space.py",
+        "cpp/core_dsp/include/core_dsp/ParameterSpec.hpp",
         "python/ddsp_mastering/dsp",
         "cpp/core_dsp",
         "docs/sprint3/SPRINT3_V3C_PREFLIGHT_RESULTS.json",
@@ -1010,17 +1053,8 @@ def test_gate_10_v3c_ablation_pilot_and_blind_pack_integrity():
         "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json",
         "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_REPORT.md",
     ]
-    for rel in locked_phase2_paths:
-        st_p = subprocess.run(
-            ["git", "status", "--porcelain", "--", rel],
-            capture_output=True, text=True, check=True, cwd=str(repo_root),
-        )
-        assert st_p.stdout.strip() == "", f"Uncommitted change in locked Phase 2 path {rel}: {st_p.stdout}"
-        df_p = subprocess.run(
-            ["git", "diff", "--name-only", f"{phase1_sha}..HEAD", "--", rel],
-            capture_output=True, text=True, check=True, cwd=str(repo_root),
-        )
-        assert df_p.stdout.strip() == "", f"Forbidden diff in locked Phase 2 path {rel}: {df_p.stdout}"
+    _assert_paths_frozen_with_sprint4_allowlist(repo_root, phase1_sha, locked_phase2_paths)
+    _assert_sprint4_allowlist_unchanged_since_commit(repo_root)
 
 
 def test_gate_11_v3c_pilot_errata_and_blind_pack_v2_integrity():
@@ -1102,20 +1136,12 @@ def test_gate_11_v3c_pilot_errata_and_blind_pack_v2_integrity():
         "python/ddsp_mastering/loss/stereo_prior.py",
         "python/ddsp_mastering/loss/dynamic_prior.py",
         "python/ddsp_mastering/param_space.py",
+        "cpp/core_dsp/include/core_dsp/ParameterSpec.hpp",
         "python/ddsp_mastering/dsp",
         "cpp/core_dsp",
     ]
-    for rel in immutable_since_phase2:
-        st = subprocess.run(
-            ["git", "status", "--porcelain", "--", rel],
-            capture_output=True, text=True, check=True, cwd=str(repo_root),
-        )
-        assert st.stdout.strip() == "", f"Uncommitted change in protected path {rel}: {st.stdout}"
-        df = subprocess.run(
-            ["git", "diff", "--name-only", f"{phase2_sha}..HEAD", "--", rel],
-            capture_output=True, text=True, check=True, cwd=str(repo_root),
-        )
-        assert df.stdout.strip() == "", f"Forbidden diff vs {phase2_sha} in protected path {rel}: {df.stdout}"
+    _assert_paths_frozen_with_sprint4_allowlist(repo_root, phase2_sha, immutable_since_phase2)
+    _assert_sprint4_allowlist_unchanged_since_commit(repo_root)
 
     # 11.3 Opaque manifest V2 & zero leakage checks
     manifest_v2_raw = manifest_v2_json_path.read_text(encoding="utf-8")
