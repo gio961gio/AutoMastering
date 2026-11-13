@@ -1,0 +1,38 @@
+{
+  "track01": {
+    "session": "track01",
+    "seed": "5405783196615117109",
+    "files": {
+      "track01_variant_A.wav": "Control_V0p",
+      "track01_variant_B.wav": "Treatment_V3c"
+    },
+    "variant_mapping": {
+      "Control_V0p": "variant_A",
+      "Treatment_V3c": "variant_B"
+    }
+  },
+  "track02": {
+    "session": "track02",
+    "seed": "3048363069421082382",
+    "files": {
+      "track02_variant_A.wav": "Treatment_V3c",
+      "track02_variant_B.wav": "Control_V0p"
+    },
+    "variant_mapping": {
+      "Control_V0p": "variant_B",
+      "Treatment_V3c": "variant_A"
+    }
+  },
+  "track03": {
+    "session": "track03",
+    "seed": "12990700764526553868",
+    "files": {
+      "track03_variant_A.wav": "Treatment_V3c",
+      "track03_variant_B.wav": "Control_V0p"
+    },
+    "variant_mapping": {
+      "Control_V0p": "variant_B",
+      "Treatment_V3c": "variant_A"
+    }
+  }
+}

@@ -813,3 +813,212 @@ def test_gate_9_optimizer_v3c_integration_all_checks():
             capture_output=True, text=True, check=True, cwd=str(repo_root),
         )
         assert df_l.stdout.strip() == "", f"Forbidden diff in locked path {rel}: {df_l.stdout}"
+
+
+def test_gate_10_v3c_ablation_pilot_and_blind_pack_integrity():
+    """
+    Gate 10: Post-pilot verification of Phase 2 deliverables:
+      - Strictly 3 same_track sessions (track01..track03), zero stylistic runs;
+      - All floats finite, Control V0p parity < 1e-5 vs V3b harmonized baseline,
+        41D map_z_to_theta/map_theta_to_z roundtrip < 1e-5 on both arms;
+      - Explicit separation of V0p vs V3c objectives + v3c_eval_on_v0p;
+      - All 6 WAVs on disk (48 kHz, 2 ch, PCM_24, SHA-256, BS.1770 LUFS) match manifest;
+      - Secret-free blind evaluator zip excludes mapping JSON;
+      - Zero diff vs Phase 1 baseline (a98c2d6) on optimizer, stereo_prior, DSP,
+        V3c preflight artifacts, and historical baselines.
+    """
+    import hashlib
+    import json
+    import math
+    import subprocess
+    import zipfile
+    import soundfile as sf
+
+    from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
+    from ddsp_mastering.param_space import PARAM_SPECS, map_theta_to_z, map_z_to_theta
+
+    repo_root = Path(__file__).resolve().parents[1]
+    docs_dir = repo_root / "docs" / "sprint3"
+
+    results_path = docs_dir / "SPRINT3_V3C_ABLATION_PILOT_RESULTS.json"
+    report_path = docs_dir / "SPRINT3_V3C_ABLATION_PILOT_REPORT.md"
+    manifest_json_path = docs_dir / "SPRINT3_V3C_BLIND_AUDIO_MANIFEST.json"
+    manifest_md_path = docs_dir / "SPRINT3_V3C_BLIND_AUDIO_MANIFEST.md"
+    worksheet_path = docs_dir / "SPRINT3_V3C_BLIND_LISTENING_WORKSHEET.md"
+    mapping_path = docs_dir / "SPRINT3_V3C_BLIND_MAPPING.json"
+    wav_dir = docs_dir / "blind_v3c_pilot_wavs"
+    zip_path = docs_dir / "blind_v3c_pilot_evaluator_pack.zip"
+    v3b_results_path = docs_dir / "SPRINT3_V3B_V0P_ABLATION_RESULTS.json"
+
+    for p in (
+        results_path,
+        report_path,
+        manifest_json_path,
+        manifest_md_path,
+        worksheet_path,
+        mapping_path,
+        zip_path,
+        v3b_results_path,
+    ):
+        assert p.exists(), f"Missing required Phase 2 / baseline artifact: {p}"
+
+    results = json.loads(results_path.read_text(encoding="utf-8"))
+    v3b_results = json.loads(v3b_results_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_json_path.read_text(encoding="utf-8"))
+    mapping = json.loads(mapping_path.read_text(encoding="utf-8"))
+
+    # 10.1 Recursive finite check (no NaN/Inf anywhere in pilot JSON)
+    def _assert_all_finite(obj, path="root"):
+        if isinstance(obj, float):
+            assert math.isfinite(obj), f"Non-finite float at {path}: {obj}"
+        elif isinstance(obj, dict):
+            for k, v in obj.items():
+                _assert_all_finite(v, f"{path}.{k}")
+        elif isinstance(obj, list):
+            for idx, v in enumerate(obj):
+                _assert_all_finite(v, f"{path}[{idx}]")
+
+    _assert_all_finite(results)
+
+    # 10.2 Scope & session checks: strictly 3 same_track sessions, zero stylistic
+    expected_tracks = ["track01", "track02", "track03"]
+    assert results["authorized_scope_sessions"] == expected_tracks
+    assert results["excluded_stylistic_sessions"] == ["track01_style", "track02_style", "track03_style"]
+    sessions = results["sessions"]
+    assert len(sessions) == 3
+    assert [s["track_prefix"] for s in sessions] == expected_tracks
+    for s in sessions:
+        assert s["mode"] == "same_track"
+        assert s["num_steps"] == 30
+
+    # 10.3 Control V0p parity (< 1e-5 vs V3b harmonized baseline), roundtrip & separate losses
+    v3b_by_id = {
+        entry["track_prefix"]: entry
+        for entry in v3b_results["sessions"]
+        if entry.get("mode") == "same_track"
+    }
+    param_names = [spec.name for spec in PARAM_SPECS]
+    assert len(param_names) == 41
+
+    for s in sessions:
+        tid = s["track_prefix"]
+        assert s["v0p_harmonized_baseline_max_diff_z"] < 1e-5
+        ctrl = s["control_v0p"]
+        treat = s["treatment_v3c"]
+
+        ref_z = torch.tensor(v3b_by_id[tid]["control_v0p"]["normalized_z_opt"], dtype=torch.float64)
+        ctrl_z = torch.tensor(ctrl["normalized_z_opt"], dtype=torch.float64)
+        assert float(torch.max(torch.abs(ctrl_z - ref_z)).item()) < 1e-5
+
+        for arm_name, arm in (("control_v0p", ctrl), ("treatment_v3c", treat)):
+            z_vec = torch.tensor(arm["normalized_z_opt"], dtype=torch.float32)
+            assert z_vec.numel() == 41
+            theta_dict = arm["physical_parameters_theta"]
+            theta_from_dict = torch.tensor([theta_dict[name] for name in param_names], dtype=torch.float32)
+            theta_mapped = map_z_to_theta(z_vec)
+            assert float(torch.max(torch.abs(theta_mapped - theta_from_dict)).item()) < 1e-5, (
+                f"{tid}.{arm_name} theta mismatch"
+            )
+            z_roundtrip = map_theta_to_z(theta_from_dict)
+            assert float(torch.max(torch.abs(z_roundtrip - z_vec)).item()) < 1e-5, (
+                f"{tid}.{arm_name} z roundtrip mismatch"
+            )
+
+        # Objective separation: V0p total and V3c weighted total never conflated
+        assert "loss_v0p_total" in ctrl["final_evaluation"]["v0p_objective_iir"]
+        assert "loss_v3c_total_weighted" in ctrl["v3c_eval_on_v0p"]
+        assert abs(
+            ctrl["final_evaluation"]["v3c_objective_and_stereo_iir"]["loss_v3c_total_weighted"]
+            - ctrl["v3c_eval_on_v0p"]["loss_v3c_total_weighted"]
+        ) < 1e-7
+        assert "loss_v0p_total" in treat["final_evaluation"]["v0p_objective_iir"]
+        assert "loss_v3c_total_weighted" in treat["final_evaluation"]["v3c_objective_and_stereo_iir"]
+        assert len(ctrl["loss_history"]["loss"]) == 30 and len(treat["loss_history"]["loss"]) == 30
+        assert len(treat["loss_history"]["v3c_loss_total"]) == 30
+
+    # 10.4 Report check (metrics present + distinction proxy vs unperformed human listening)
+    report_txt = report_path.read_text(encoding="utf-8")
+    assert "V0p" in report_txt and "V3c" in report_txt
+    assert "Guardrail" in report_txt and "-0.30" in report_txt
+    assert "ascolto" in report_txt.lower() and "proxy" in report_txt.lower()
+    assert "track01_style" in report_txt  # mentioned only in excluded note, zero rows in tables
+    assert "| **`track01_style`**" not in report_txt
+
+    # 10.5 Blind audio manifest, 6 WAVs on disk, zero key leakage
+    assert manifest["wav_count"] == 6
+    assert manifest["scope_sessions"] == expected_tracks
+    assert manifest["expected_sample_rate_hz"] == 48000
+    assert manifest["expected_channels"] == 2
+    assert manifest["expected_subtype"] == "PCM_24"
+    assert manifest["contains_secret_mapping"] is False
+    assert manifest["max_abs_delta_lufs_across_pairs"] < 0.1
+
+    manifest_raw = manifest_json_path.read_text(encoding="utf-8")
+    manifest_md_raw = manifest_md_path.read_text(encoding="utf-8")
+    worksheet_raw = worksheet_path.read_text(encoding="utf-8")
+    for text_blob in (manifest_raw, manifest_md_raw, worksheet_raw):
+        assert "Control_V0p" not in text_blob
+        assert "Treatment_V3c" not in text_blob
+
+    files = manifest["files"]
+    assert len(files) == 6
+    for entry in files:
+        wav_p = wav_dir / entry["file_name"]
+        assert wav_p.exists(), f"Missing blind WAV: {wav_p}"
+        assert wav_p.stat().st_size == entry["bytes"]
+        sha = hashlib.sha256(wav_p.read_bytes()).hexdigest()
+        assert sha == entry["sha256"]
+        info = sf.info(str(wav_p))
+        assert info.samplerate == 48000
+        assert info.channels == 2
+        assert info.subtype == "PCM_24"
+        assert info.frames == entry["frames"]
+        audio, sr = sf.read(str(wav_p), dtype="float32", always_2d=True)
+        assert sr == 48000
+        tensor_audio = torch.from_numpy(audio.T).unsqueeze(0).to(torch.float64)
+        lufs = float(calculate_integrated_loudness_bs1770(tensor_audio, sample_rate=float(sr)))
+        assert abs(lufs - entry["integrated_lufs_bs1770"]) < 1e-3
+
+    # 10.6 Blind mapping completeness & evaluator zip secret exclusion
+    assert set(mapping.keys()) == set(expected_tracks)
+    for tid in expected_tracks:
+        pair = mapping[tid]
+        assert set(pair["variant_mapping"].keys()) == {"Control_V0p", "Treatment_V3c"}
+        assert set(pair["variant_mapping"].values()) == {"variant_A", "variant_B"}
+        assert set(pair["files"].values()) == {"Control_V0p", "Treatment_V3c"}
+
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        names = set(zf.namelist())
+        expected_zip_entries = {f"blind_v3c_pilot_wavs/{e['file_name']}" for e in files} | {
+            "SPRINT3_V3C_BLIND_LISTENING_WORKSHEET.md",
+            "SPRINT3_V3C_BLIND_AUDIO_MANIFEST.md",
+        }
+        assert names == expected_zip_entries
+        assert all("MAPPING" not in n.upper() for n in names)
+
+    # 10.7 Immutability vs Phase 1 baseline commit a98c2d67b87d798d449a1018157d50d2a2e7be20
+    phase1_sha = "a98c2d67b87d798d449a1018157d50d2a2e7be20"
+    locked_phase2_paths = [
+        "python/ddsp_mastering/optimize/optimizer.py",
+        "python/ddsp_mastering/loss/stereo_prior.py",
+        "python/ddsp_mastering/loss/dynamic_prior.py",
+        "python/ddsp_mastering/param_space.py",
+        "python/ddsp_mastering/dsp",
+        "cpp/core_dsp",
+        "docs/sprint3/SPRINT3_V3C_PREFLIGHT_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3C_PREFLIGHT_REPORT.md",
+        "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3B_V0P_ABLATION_REPORT.md",
+    ]
+    for rel in locked_phase2_paths:
+        st_p = subprocess.run(
+            ["git", "status", "--porcelain", "--", rel],
+            capture_output=True, text=True, check=True, cwd=str(repo_root),
+        )
+        assert st_p.stdout.strip() == "", f"Uncommitted change in locked Phase 2 path {rel}: {st_p.stdout}"
+        df_p = subprocess.run(
+            ["git", "diff", "--name-only", f"{phase1_sha}..HEAD", "--", rel],
+            capture_output=True, text=True, check=True, cwd=str(repo_root),
+        )
+        assert df_p.stdout.strip() == "", f"Forbidden diff in locked Phase 2 path {rel}: {df_p.stdout}"
+
