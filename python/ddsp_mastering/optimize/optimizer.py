@@ -10,7 +10,7 @@ Supports both:
 """
 
 import json
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -19,7 +19,8 @@ from ddsp_mastering.dsp.chain import DifferentiableMasteringChain
 from ddsp_mastering.loss.combined import MasteringPerceptualLoss
 from ddsp_mastering.loss.stylistic import AggregatePerceptualLoss
 from ddsp_mastering.loss.eq_prior import CompositeEQPriorLoss
-from ddsp_mastering.loss.dynamic_prior import V3bDynamicPriorLoss
+from ddsp_mastering.loss.dynamic_prior import TOTAL_DSP_DELAY_SAMPLES, V3bDynamicPriorLoss
+from ddsp_mastering.loss.stereo_prior import V3cStereoCompatibilityLoss
 from ddsp_mastering.param_space import (
     PARAM_SPECS,
     NUM_PARAMS,
@@ -68,6 +69,19 @@ class AutoMasteringOptimizer:
         v3b_delta_max: float = 3.0,
         v3b_delta_m: float = 1.25,
         v3b_delta_ref: float = 3.0,
+        enable_v3c: bool = False,
+        v3c_tau_drop_db: float = 0.50,
+        v3c_tau_corr: Tuple[float, float, float] = (0.03, 0.05, 0.08),
+        v3c_tau_smr_db: Tuple[float, float, float] = (2.0, 2.0, 2.0),
+        v3c_tau_sub_db: float = 0.50,
+        v3c_alpha_sub: float = 1.0,
+        v3c_tau_w_low_max: float = 1.00,
+        v3c_tau_w_mid: float = 0.15,
+        v3c_tau_w_high: float = 0.15,
+        v3c_w_mono_drop: float = 1.00,
+        v3c_w_band_corr: float = 10.00,
+        v3c_w_band_smr: float = 0.05,
+        v3c_w_width_param: float = 0.25,
     ):
         self.sample_rate = sample_rate
         self.lr = lr
@@ -116,6 +130,40 @@ class AutoMasteringOptimizer:
             w_diff=v3b_w_diff,
             w_conflict=v3b_w_conflict,
         )
+
+        self.enable_v3c = bool(enable_v3c)
+        self.v3c_tau_drop_db = float(v3c_tau_drop_db)
+        self.v3c_tau_corr = tuple(float(v) for v in v3c_tau_corr)
+        self.v3c_tau_smr_db = tuple(float(v) for v in v3c_tau_smr_db)
+        self.v3c_tau_sub_db = float(v3c_tau_sub_db)
+        self.v3c_alpha_sub = float(v3c_alpha_sub)
+        self.v3c_tau_w_low_max = float(v3c_tau_w_low_max)
+        self.v3c_tau_w_mid = float(v3c_tau_w_mid)
+        self.v3c_tau_w_high = float(v3c_tau_w_high)
+        self.v3c_w_mono_drop = float(v3c_w_mono_drop)
+        self.v3c_w_band_corr = float(v3c_w_band_corr)
+        self.v3c_w_band_smr = float(v3c_w_band_smr)
+        self.v3c_w_width_param = float(v3c_w_width_param)
+
+        if self.enable_v3c:
+            self.v3c_prior_loss: Optional[V3cStereoCompatibilityLoss] = V3cStereoCompatibilityLoss(
+                sample_rate=sample_rate,
+                delay_dsp_samples=TOTAL_DSP_DELAY_SAMPLES,
+                tau_drop_db=self.v3c_tau_drop_db,
+                tau_corr=self.v3c_tau_corr,
+                tau_smr_db=self.v3c_tau_smr_db,
+                tau_sub_db=self.v3c_tau_sub_db,
+                alpha_sub=self.v3c_alpha_sub,
+                tau_w_low_max=self.v3c_tau_w_low_max,
+                tau_w_mid=self.v3c_tau_w_mid,
+                tau_w_high=self.v3c_tau_w_high,
+                w_mono_drop=self.v3c_w_mono_drop,
+                w_band_corr=self.v3c_w_band_corr,
+                w_band_smr=self.v3c_w_band_smr,
+                w_width_param=self.v3c_w_width_param,
+            )
+        else:
+            self.v3c_prior_loss = None
 
         self.chain = DifferentiableMasteringChain(sample_rate=sample_rate)
         self.eq_prior_loss = CompositeEQPriorLoss(
@@ -175,6 +223,48 @@ class AutoMasteringOptimizer:
         )
         self.benchmark = MasteringBenchmarkSuite(sample_rate=sample_rate)
 
+    def _validate_v3c_mode(self, reference_mode: str) -> None:
+        if self.enable_v3c and reference_mode != "same_track":
+            raise ValueError(
+                f"V3cStereoCompatibilityLoss is only authorized for reference_mode='same_track' "
+                f"(got reference_mode='{reference_mode}'). Stylistic mode is explicitly blocked."
+            )
+
+    def _compute_v3c_chunk_contribution(
+        self,
+        mix_k: torch.Tensor,
+        pred_ext_k: torch.Tensor,
+        z: torch.Tensor,
+        n_pre_k: int,
+        compute_diagnostics: bool = False,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        assert self.v3c_prior_loss is not None
+        return self.v3c_prior_loss(
+            mix_ext=mix_k,
+            pred_ext=pred_ext_k,
+            z=z,
+            n_pre=n_pre_k,
+            delay_samples=TOTAL_DSP_DELAY_SAMPLES,
+            compute_diagnostics=compute_diagnostics,
+        )
+
+    def _extract_v3c_scalars(self, v3c_m_k: Dict[str, Any]) -> Dict[str, float]:
+        mono_raw = float(v3c_m_k["loss_mono_drop"])
+        corr_raw = float(v3c_m_k["loss_band_corr"])
+        smr_raw = float(v3c_m_k["loss_band_smr"])
+        wparam_raw = float(v3c_m_k["loss_width_param"])
+        return {
+            "v3c_loss_total": float(v3c_m_k["loss_v3c_total"]),
+            "v3c_mono_drop_raw": mono_raw,
+            "v3c_mono_drop_weighted": self.v3c_w_mono_drop * mono_raw,
+            "v3c_band_corr_raw": corr_raw,
+            "v3c_band_corr_weighted": self.v3c_w_band_corr * corr_raw,
+            "v3c_band_smr_raw": smr_raw,
+            "v3c_band_smr_weighted": self.v3c_w_band_smr * smr_raw,
+            "v3c_width_param_raw": wparam_raw,
+            "v3c_width_param_weighted": self.v3c_w_width_param * wparam_raw,
+        }
+
     def optimize_multi_chunk(
         self,
         mix_chunks: List[torch.Tensor],
@@ -210,6 +300,7 @@ class AutoMasteringOptimizer:
         Returns:
             Tuple of (optimal_z, list_of_mastered_chunks, loss_history).
         """
+        self._validate_v3c_mode(reference_mode)
         assert len(mix_chunks) > 0, "Expected at least 1 audio chunk"
         for i, c in enumerate(mix_chunks):
             assert c.dim() == 3 and c.shape[0] == 1, f"Chunk {i} must have shape (1, 2, T)"
@@ -278,6 +369,16 @@ class AutoMasteringOptimizer:
             history["v3b_l_diff_weighted"] = []
             history["v3b_l_conflict_raw"] = []
             history["v3b_l_conflict_weighted"] = []
+        if self.enable_v3c:
+            history["v3c_loss_total"] = []
+            history["v3c_mono_drop_raw"] = []
+            history["v3c_mono_drop_weighted"] = []
+            history["v3c_band_corr_raw"] = []
+            history["v3c_band_corr_weighted"] = []
+            history["v3c_band_smr_raw"] = []
+            history["v3c_band_smr_weighted"] = []
+            history["v3c_width_param_raw"] = []
+            history["v3c_width_param_weighted"] = []
 
         for step in range(self.num_steps):
             optimizer.zero_grad()
@@ -303,6 +404,18 @@ class AutoMasteringOptimizer:
                 step_v3b_diff_w = 0.0
                 step_v3b_conf_raw = 0.0
                 step_v3b_conf_w = 0.0
+            if self.enable_v3c:
+                step_v3c_scalars: Dict[str, float] = {
+                    "v3c_loss_total": 0.0,
+                    "v3c_mono_drop_raw": 0.0,
+                    "v3c_mono_drop_weighted": 0.0,
+                    "v3c_band_corr_raw": 0.0,
+                    "v3c_band_corr_weighted": 0.0,
+                    "v3c_band_smr_raw": 0.0,
+                    "v3c_band_smr_weighted": 0.0,
+                    "v3c_width_param_raw": 0.0,
+                    "v3c_width_param_weighted": 0.0,
+                }
 
             for k in range(K):
                 mix_k = mix_chunks[k]
@@ -367,6 +480,18 @@ class AutoMasteringOptimizer:
                     step_v3b_conf_raw += weights[k] * float(v3b_m_k["loss_conflict"])
                     step_v3b_conf_w += weights[k] * (self.v3b_w_conflict * float(v3b_m_k["loss_conflict"]))
 
+                if self.enable_v3c and self.v3c_prior_loss is not None:
+                    l_v3c_k, v3c_m_k = self._compute_v3c_chunk_contribution(
+                        mix_k=mix_k,
+                        pred_ext_k=pred_ext_k,
+                        z=z,
+                        n_pre_k=n_pre_k,
+                        compute_diagnostics=False,
+                    )
+                    chunk_loss = chunk_loss + l_v3c_k.to(chunk_loss.dtype)
+                    for v3c_key, v3c_val in self._extract_v3c_scalars(v3c_m_k).items():
+                        step_v3c_scalars[v3c_key] += weights[k] * v3c_val
+
                 step_loss = step_loss + weights[k] * chunk_loss
                 step_lufs += weights[k] * chunk_metrics.get("lufs_pred", 0.0)
 
@@ -401,6 +526,9 @@ class AutoMasteringOptimizer:
                 history["v3b_l_diff_weighted"].append(step_v3b_diff_w)
                 history["v3b_l_conflict_raw"].append(step_v3b_conf_raw)
                 history["v3b_l_conflict_weighted"].append(step_v3b_conf_w)
+            if self.enable_v3c:
+                for v3c_key, v3c_val in step_v3c_scalars.items():
+                    history[v3c_key].append(v3c_val)
 
             if verbose and (step % 5 == 0 or step == self.num_steps - 1):
                 print(
@@ -432,8 +560,10 @@ class AutoMasteringOptimizer:
         ref_ext_chunks: Optional[List[torch.Tensor]] = None,
         ref_preroll_list: Optional[List[int]] = None,
         align_latency: bool = True,
-    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        compute_v3c_diagnostics: bool = False,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """Evaluate full composite objective in IIR mode across chunks with single EQ prior evaluation."""
+        self._validate_v3c_mode(reference_mode)
         if z is None:
             z = Z_NEUTRAL.to(device=mix_chunks[0].device)
         K = len(mix_chunks)
@@ -441,7 +571,8 @@ class AutoMasteringOptimizer:
         preroll_counts = [0] * K if mix_preroll_samples is None else [max(0, int(n)) for n in mix_preroll_samples]
 
         tot_loss = torch.tensor(0.0, device=mix_chunks[0].device, dtype=torch.float32)
-        agg_metrics: Dict[str, float] = {}
+        agg_metrics: Dict[str, Any] = {}
+        v3c_diag_chunks: List[Dict[str, Any]] = []
 
         for k in range(K):
             mk = mix_chunks[k]
@@ -494,9 +625,26 @@ class AutoMasteringOptimizer:
                 for v_key, v_val in v3b_m_k.items():
                     agg_metrics[f"v3b_{v_key}"] = agg_metrics.get(f"v3b_{v_key}", 0.0) + weights[k] * float(v_val)
 
+            if self.enable_v3c and self.v3c_prior_loss is not None:
+                l_v3c_k, v3c_m_k = self._compute_v3c_chunk_contribution(
+                    mix_k=mk,
+                    pred_ext_k=y_ext,
+                    z=z,
+                    n_pre_k=n_pre,
+                    compute_diagnostics=compute_v3c_diagnostics,
+                )
+                lk = lk + l_v3c_k.to(lk.dtype)
+                for v3c_key, v3c_val in self._extract_v3c_scalars(v3c_m_k).items():
+                    agg_metrics[v3c_key] = agg_metrics.get(v3c_key, 0.0) + weights[k] * v3c_val
+                if compute_v3c_diagnostics:
+                    v3c_diag_chunks.append(v3c_m_k)
+
             tot_loss = tot_loss + weights[k] * lk
             for mk_key, mk_val in mk_dict.items():
                 agg_metrics[mk_key] = agg_metrics.get(mk_key, 0.0) + weights[k] * float(mk_val)
+
+        if self.enable_v3c and compute_v3c_diagnostics:
+            agg_metrics["v3c_diagnostics_per_chunk"] = v3c_diag_chunks
 
         if self.weight_eq_prior > 0.0:
             eq_val, eq_metrics = self.eq_prior_loss(z)
@@ -507,6 +655,36 @@ class AutoMasteringOptimizer:
 
         agg_metrics["total_loss"] = float(tot_loss.item())
         return tot_loss, agg_metrics
+
+    def evaluate_loss_iir(
+        self,
+        z: Optional[torch.Tensor],
+        mix_chunks: List[torch.Tensor],
+        ref_chunks: Optional[List[torch.Tensor]] = None,
+        preroll_samples: Optional[List[int]] = None,
+        target_lufs: Optional[float] = None,
+        reference_mode: str = "same_track",
+        ref_ext_chunks: Optional[List[torch.Tensor]] = None,
+        ref_preroll_list: Optional[List[int]] = None,
+        compute_v3c_diagnostics: bool = False,
+        chunk_weights: Optional[List[float]] = None,
+        align_latency: bool = True,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """Public wrapper for full composite objective evaluation in IIR mode."""
+        self._validate_v3c_mode(reference_mode)
+        return self._eval_loss_iir(
+            mix_chunks=mix_chunks,
+            ref_chunks=ref_chunks,
+            z=z,
+            reference_mode=reference_mode,
+            chunk_weights=chunk_weights,
+            target_lufs=target_lufs,
+            mix_preroll_samples=preroll_samples,
+            ref_ext_chunks=ref_ext_chunks,
+            ref_preroll_list=ref_preroll_list,
+            align_latency=align_latency,
+            compute_v3c_diagnostics=compute_v3c_diagnostics,
+        )
 
     def optimize(
         self,

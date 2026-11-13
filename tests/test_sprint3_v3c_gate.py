@@ -362,7 +362,6 @@ def test_gate_7_frozen_modules_zero_diff_and_v0p_v3b_isolation():
     repo_root = Path(__file__).resolve().parents[1]
     baseline_sha = "9b1fd9115cce6deaffe637c649c4bb7d6159a195"
     protected_paths = [
-        "python/ddsp_mastering/optimize/optimizer.py",
         "python/ddsp_mastering/loss/dynamic_prior.py",
         "python/ddsp_mastering/param_space.py",
         "python/ddsp_mastering/dsp",
@@ -380,7 +379,20 @@ def test_gate_7_frozen_modules_zero_diff_and_v0p_v3b_isolation():
         )
         assert df_res.stdout.strip() == "", f"Historical diff in protected path {rel}: {df_res.stdout}"
 
-    # Verify AutoMasteringOptimizer has zero V3c coupling
+    # Verify stereo_prior.py remains frozen relative to Phase 0 baseline commit
+    v3c_baseline_sha = "1bf4954584c70f639484d8318c1990aeabe29040"
+    sp_st = subprocess.run(
+        ["git", "status", "--porcelain", "--", "python/ddsp_mastering/loss/stereo_prior.py"],
+        capture_output=True, text=True, check=True, cwd=str(repo_root),
+    )
+    assert sp_st.stdout.strip() == "", f"Uncommitted change in stereo_prior.py: {sp_st.stdout}"
+    sp_df = subprocess.run(
+        ["git", "diff", "--name-only", f"{v3c_baseline_sha}..HEAD", "--", "python/ddsp_mastering/loss/stereo_prior.py"],
+        capture_output=True, text=True, check=True, cwd=str(repo_root),
+    )
+    assert sp_df.stdout.strip() == "", f"Forbidden diff in stereo_prior.py: {sp_df.stdout}"
+
+    # Verify AutoMasteringOptimizer keeps V3c disabled by default with zero V3c coupling
     from ddsp_mastering.dsp.chain import DifferentiableMasteringChain
     from ddsp_mastering.loss.combined import MasteringPerceptualLoss
     from ddsp_mastering.loss.dynamic_prior import V3bDynamicPriorLoss
@@ -388,7 +400,7 @@ def test_gate_7_frozen_modules_zero_diff_and_v0p_v3b_isolation():
 
     opt = AutoMasteringOptimizer(v3b_w_lim=0.50, v3b_w_diff=0.02, v3b_w_conflict=0.02)
     assert hasattr(opt, "v3b_prior_loss")
-    assert not hasattr(opt, "v3c_prior_loss")
+    assert opt.enable_v3c is False and opt.v3c_prior_loss is None
 
     # Deterministic bit-identity check before & after invoking V3cStereoCompatibilityLoss
     n_pre = 4800
@@ -577,3 +589,227 @@ def test_gate_8_predicted_subthreshold_and_silent_when_mix_active():
     for i in range(len(losses_across) - 1):
         assert abs(losses_across[i][0] - losses_across[i + 1][0]) < 1e-6
         assert abs(losses_across[i][1] - losses_across[i + 1][1]) < 1e-6
+
+
+# ==============================================================================
+# Gate 9: Opt-in Integration of V3c into AutoMasteringOptimizer
+# ==============================================================================
+def test_gate_9_optimizer_v3c_integration_all_checks():
+    from ddsp_mastering.optimize import AutoMasteringOptimizer
+
+    # 9.1 Default opt-in guard: enable_v3c=False and no V3cStereoCompatibilityLoss instantiated
+    opt_default = AutoMasteringOptimizer()
+    assert opt_default.enable_v3c is False
+    assert opt_default.v3c_prior_loss is None
+
+    # Build deterministic 2-chunk stereo audio with pre-roll + DSP delay margin
+    sr = 48000.0
+    n_pre = 4800
+    t_eval = 9600
+    t_post = t_eval + TOTAL_DSP_DELAY_SAMPLES
+    n_tot = n_pre + t_post
+    t_vec = torch.arange(n_tot, dtype=torch.float32) / sr
+
+    sig_l = 0.20 * torch.sin(2.0 * math.pi * 110.0 * t_vec) + 0.15 * torch.sin(2.0 * math.pi * 880.0 * t_vec)
+    sig_r = 0.18 * torch.sin(2.0 * math.pi * 110.0 * t_vec + 0.25) + 0.14 * torch.cos(2.0 * math.pi * 880.0 * t_vec)
+    chunk_0 = torch.stack([sig_l, sig_r], dim=0).unsqueeze(0)
+    chunk_1 = torch.stack([0.85 * sig_l, 0.90 * sig_r], dim=0).unsqueeze(0)
+    mix_chunks = [chunk_0, chunk_1]
+    ref_chunks = [c[..., n_pre:].clone() for c in mix_chunks]
+    prerolls = [n_pre, n_pre]
+
+    z_wide = Z_NEUTRAL.clone().to(torch.float32)
+    z_wide[35] = 0.99  # imager_width_low > 1.0
+    z_wide[36] = 0.99  # imager_width_mid ~ 1.39 > 1.15
+    z_wide[37] = 0.99  # imager_width_high ~ 1.39 > 1.15
+
+    # 9.2 Bit-identity of V0p path when enable_v3c=False (both same_track and stylistic)
+    for mode in ("same_track", "stylistic"):
+        opt_a = AutoMasteringOptimizer(
+            sample_rate=sr, lr=0.02, num_steps=2, target_lufs=-14.0, use_hybrid_eq=False
+        )
+        assert opt_a.enable_v3c is False and opt_a.v3c_prior_loss is None
+        z_a, out_a, hist_a = opt_a.optimize_multi_chunk(
+            mix_chunks, ref_chunks, reference_mode=mode, initial_z=z_wide, mix_preroll_samples=prerolls
+        )
+        assert set(hist_a.keys()) == {"loss", "stft_loss", "lufs", "lr"}
+
+        # Run an interleaved enable_v3c=True same_track pass between V0p snapshots
+        opt_inter = AutoMasteringOptimizer(
+            sample_rate=sr, lr=0.02, num_steps=2, target_lufs=-14.0, use_hybrid_eq=False, enable_v3c=True
+        )
+        opt_inter.optimize_multi_chunk(
+            mix_chunks, ref_chunks, reference_mode="same_track", initial_z=z_wide, mix_preroll_samples=prerolls
+        )
+
+        opt_b = AutoMasteringOptimizer(
+            sample_rate=sr, lr=0.02, num_steps=2, target_lufs=-14.0, use_hybrid_eq=False
+        )
+        z_b, out_b, hist_b = opt_b.optimize_multi_chunk(
+            mix_chunks, ref_chunks, reference_mode=mode, initial_z=z_wide, mix_preroll_samples=prerolls
+        )
+        assert torch.max(torch.abs(z_a - z_b)).item() == 0.0
+        for ca, cb in zip(out_a, out_b):
+            assert torch.max(torch.abs(ca - cb)).item() == 0.0
+        for k_hist in hist_a:
+            assert hist_a[k_hist] == hist_b[k_hist]
+
+    # 9.3 enable_v3c=True in same_track adds V3c contribution, populates history, yields finite grads
+    opt_v0p = AutoMasteringOptimizer(
+        sample_rate=sr, lr=0.02, num_steps=2, target_lufs=-14.0, use_hybrid_eq=False, enable_v3c=False
+    )
+    opt_v3c = AutoMasteringOptimizer(
+        sample_rate=sr, lr=0.02, num_steps=2, target_lufs=-14.0, use_hybrid_eq=False, enable_v3c=True
+    )
+    assert opt_v3c.enable_v3c is True
+    assert isinstance(opt_v3c.v3c_prior_loss, V3cStereoCompatibilityLoss)
+    assert opt_v3c.v3c_prior_loss.tau_drop_db == CANDIDATE_A_THRESHOLDS["tau_drop_db"]
+    assert opt_v3c.v3c_prior_loss.w_mono_drop == PILOT_SAME_TRACK_WEIGHTS["w_mono_drop"]
+    assert opt_v3c.v3c_prior_loss.w_band_corr == PILOT_SAME_TRACK_WEIGHTS["w_band_corr"]
+    assert opt_v3c.v3c_prior_loss.w_band_smr == PILOT_SAME_TRACK_WEIGHTS["w_band_smr"]
+    assert opt_v3c.v3c_prior_loss.w_width_param == PILOT_SAME_TRACK_WEIGHTS["w_width_param"]
+
+    z_0, _, hist_0 = opt_v0p.optimize_multi_chunk(
+        mix_chunks, ref_chunks, reference_mode="same_track", initial_z=z_wide, mix_preroll_samples=prerolls
+    )
+    z_c, _, hist_c = opt_v3c.optimize_multi_chunk(
+        mix_chunks, ref_chunks, reference_mode="same_track", initial_z=z_wide, mix_preroll_samples=prerolls
+    )
+    expected_v3c_keys = {
+        "v3c_loss_total",
+        "v3c_mono_drop_raw", "v3c_mono_drop_weighted",
+        "v3c_band_corr_raw", "v3c_band_corr_weighted",
+        "v3c_band_smr_raw", "v3c_band_smr_weighted",
+        "v3c_width_param_raw", "v3c_width_param_weighted",
+    }
+    assert expected_v3c_keys.issubset(hist_c.keys())
+    for k_v3c in expected_v3c_keys:
+        assert len(hist_c[k_v3c]) == 2
+        assert all(math.isfinite(val) for val in hist_c[k_v3c])
+    assert hist_c["v3c_loss_total"][0] > 0.0
+    assert hist_c["loss"][0] > hist_0["loss"][0]
+    assert torch.isfinite(z_c).all()
+    assert torch.max(torch.abs(z_c - z_0)).item() > 0.0
+
+    # 9.4 enable_v3c=True explicitly blocks reference_mode="stylistic"
+    with pytest.raises(ValueError, match="same_track"):
+        opt_v3c.optimize_multi_chunk(
+            mix_chunks, ref_chunks, reference_mode="stylistic", initial_z=z_wide, mix_preroll_samples=prerolls
+        )
+    with pytest.raises(ValueError, match="same_track"):
+        opt_v3c.evaluate_loss_iir(
+            z_wide, mix_chunks, ref_chunks, prerolls, -14.0, reference_mode="stylistic"
+        )
+    with pytest.raises(ValueError, match="same_track"):
+        opt_v3c._eval_loss_iir(
+            mix_chunks, ref_chunks, z=z_wide, reference_mode="stylistic", mix_preroll_samples=prerolls
+        )
+
+    # 9.5 Spy on opt.v3c_prior_loss.forward: verify full mix_k, pred_ext_k, n_pre_k, delay=159, compute_diagnostics=False
+    recorded_calls = []
+    orig_forward = opt_v3c.v3c_prior_loss.forward
+
+    def _spy_forward(*args, **kwargs):
+        mix_arg = kwargs["mix_ext"] if "mix_ext" in kwargs else args[0]
+        pred_arg = kwargs["pred_ext"] if "pred_ext" in kwargs else args[1]
+        recorded_calls.append({
+            "mix_len": int(mix_arg.shape[-1]),
+            "pred_len": int(pred_arg.shape[-1]),
+            "n_pre": int(kwargs.get("n_pre", args[4] if len(args) > 4 else 0)),
+            "delay_samples": kwargs.get("delay_samples"),
+            "compute_diagnostics": kwargs.get("compute_diagnostics"),
+        })
+        return orig_forward(*args, **kwargs)
+
+    opt_v3c.v3c_prior_loss.forward = _spy_forward
+    try:
+        opt_v3c.optimize_multi_chunk(
+            mix_chunks, ref_chunks, reference_mode="same_track", initial_z=z_wide, mix_preroll_samples=prerolls
+        )
+    finally:
+        opt_v3c.v3c_prior_loss.forward = orig_forward
+
+    assert len(recorded_calls) == 4  # 2 steps x 2 chunks
+    for rc in recorded_calls:
+        assert rc["mix_len"] == n_tot
+        assert rc["pred_len"] == n_tot
+        assert rc["n_pre"] == n_pre
+        assert rc["delay_samples"] == TOTAL_DSP_DELAY_SAMPLES == 159
+        assert rc["compute_diagnostics"] is False
+
+    # 9.6 Consistency between optimize_multi_chunk (eq_mode="iir") and evaluate_loss_iir
+    z_chk = torch.clamp(z_wide, 1e-4, 1.0 - 1e-4)
+    z_chk = torch.sigmoid(torch.log(z_chk / (1.0 - z_chk)))
+    for en_v3c in (False, True):
+        opt_chk = AutoMasteringOptimizer(
+            sample_rate=sr, lr=0.02, num_steps=1, target_lufs=-14.0, use_hybrid_eq=False, enable_v3c=en_v3c
+        )
+        _, _, h_chk = opt_chk.optimize_multi_chunk(
+            mix_chunks, ref_chunks, reference_mode="same_track", initial_z=z_chk, mix_preroll_samples=prerolls
+        )
+        eval_tot, eval_metrics = opt_chk.evaluate_loss_iir(
+            z_chk, mix_chunks, ref_chunks, prerolls, -14.0, reference_mode="same_track"
+        )
+        assert abs(h_chk["loss"][0] - float(eval_tot.item())) < 1e-6
+        assert abs(eval_metrics["total_loss"] - float(eval_tot.item())) < 1e-6
+
+    # 9.7 Non-multiplication of loss_width_param by number of chunks K = 4
+    # Pure mono active signal (L == R): loss_mono_drop = loss_band_corr = loss_band_smr = 0.0
+    mono_sig = 0.25 * (torch.sin(2.0 * math.pi * 100.0 * t_vec) + torch.sin(2.0 * math.pi * 1000.0 * t_vec))
+    mono_chunk = torch.stack([mono_sig, mono_sig], dim=0).unsqueeze(0)
+    k4_mix = [mono_chunk.clone() for _ in range(4)]
+    k4_ref = [mono_chunk[..., n_pre:].clone() for _ in range(4)]
+    k4_pre = [n_pre] * 4
+
+    # Note: imager_width_low has max=1.1 in PARAM_SPECS ([0.4, 1.1]); choose w_low=1.08 -> 1x weighted = 0.25 * 0.08^2 = 0.0016
+    z_mono_w = Z_NEUTRAL.clone().to(torch.float32)
+    z_mono_w[35] = (1.08 - 0.4) / 0.7  # w_low = 1.08 > tau_w_low_max=1.00; w_mid=w_high=1.00
+
+    opt_k4_off = AutoMasteringOptimizer(
+        sample_rate=sr, lr=0.01, num_steps=1, target_lufs=-14.0, use_hybrid_eq=False, enable_v3c=False
+    )
+    opt_k4_on = AutoMasteringOptimizer(
+        sample_rate=sr, lr=0.01, num_steps=1, target_lufs=-14.0, use_hybrid_eq=False, enable_v3c=True
+    )
+    _, _, h_k4_off = opt_k4_off.optimize_multi_chunk(
+        k4_mix, k4_ref, reference_mode="same_track", initial_z=z_mono_w, mix_preroll_samples=k4_pre
+    )
+    _, _, h_k4_on = opt_k4_on.optimize_multi_chunk(
+        k4_mix, k4_ref, reference_mode="same_track", initial_z=z_mono_w, mix_preroll_samples=k4_pre
+    )
+    assert h_k4_on["v3c_mono_drop_raw"][0] == 0.0
+    assert h_k4_on["v3c_band_corr_raw"][0] == 0.0
+    assert h_k4_on["v3c_band_smr_raw"][0] == 0.0
+    expected_single_width = 0.25 * ((1.08 - 1.00) ** 2)  # 0.0016 (1x, NOT 4x = 0.0064)
+    observed_delta = h_k4_on["loss"][0] - h_k4_off["loss"][0]
+    assert abs(observed_delta - expected_single_width) < 1e-6
+    assert abs(observed_delta - 4.0 * expected_single_width) > 0.004
+
+    # 9.8 Isolation from V1, V2, V3a, V3b and zero diff on frozen modules vs 1bf4954..HEAD
+    assert opt_v3c.weight_erb == 0.0
+    assert opt_v3c.weight_de_harsh == 0.0
+    assert opt_v3c.weight_trans == 0.0
+    assert opt_v3c.plr_mode == "box"
+    assert opt_v3c.weight_eq_prior == 0.0
+    assert opt_v3c.enable_v3b is False
+
+    repo_root = Path(__file__).resolve().parents[1]
+    base_sha = "1bf4954584c70f639484d8318c1990aeabe29040"
+    locked_paths = [
+        "python/ddsp_mastering/loss/stereo_prior.py",
+        "python/ddsp_mastering/loss/dynamic_prior.py",
+        "python/ddsp_mastering/param_space.py",
+        "python/ddsp_mastering/dsp",
+        "cpp/core_dsp",
+    ]
+    for rel in locked_paths:
+        st_l = subprocess.run(
+            ["git", "status", "--porcelain", "--", rel],
+            capture_output=True, text=True, check=True, cwd=str(repo_root),
+        )
+        assert st_l.stdout.strip() == "", f"Uncommitted change in locked path {rel}: {st_l.stdout}"
+        df_l = subprocess.run(
+            ["git", "diff", "--name-only", f"{base_sha}..HEAD", "--", rel],
+            capture_output=True, text=True, check=True, cwd=str(repo_root),
+        )
+        assert df_l.stdout.strip() == "", f"Forbidden diff in locked path {rel}: {df_l.stdout}"
