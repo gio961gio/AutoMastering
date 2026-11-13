@@ -18,11 +18,30 @@ namespace core_dsp {
 // Catena Completa di Mastering DDSP White-Box
 class MasteringChain {
 public:
-    explicit MasteringChain(double sample_rate = DEFAULT_SAMPLE_RATE)
+    explicit MasteringChain(
+        double sample_rate = DEFAULT_SAMPLE_RATE,
+        LimiterDetectorMode limiter_mode = LimiterDetectorMode::TruePeak4x
+    )
         : sample_rate_(sample_rate),
-          limiter_(sample_rate)
+          limiter_(sample_rate, limiter_mode)
     {
         reset();
+    }
+
+    void set_limiter_detector_mode(LimiterDetectorMode mode) noexcept {
+        limiter_.set_detector_mode(mode);
+    }
+
+    [[nodiscard]] LimiterDetectorMode get_limiter_detector_mode() const noexcept {
+        return limiter_.get_detector_mode();
+    }
+
+    void set_limiter_ceiling_db(double ceiling_db) noexcept {
+        limiter_.set_ceiling_db(ceiling_db);
+    }
+
+    [[nodiscard]] double get_limiter_ceiling_db() const noexcept {
+        return limiter_.get_ceiling_db();
     }
 
     void reset() noexcept {

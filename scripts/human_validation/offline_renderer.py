@@ -9,12 +9,15 @@ internal pipeline delay, and slices `[latency : latency + T]` so that:
 4. Consecutive renders are 100% state-independent.
 """
 
+import hashlib
+import logging
 import math
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import soundfile as sf
 
 # Ensure python/ is importable
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -89,6 +92,7 @@ def render_offline_with_tail_flush(
     sample_rate: float = 48000.0,
     flush_samples: Optional[int] = None,
     allow_mono: bool = True,
+    limiter_detector_mode: str = "true_peak_4x",
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
     """Render audio offline through a fresh C++20 MasteringChain with tail flush and PDC slice.
 
@@ -121,7 +125,7 @@ def render_offline_with_tail_flush(
             )
 
     # Create a brand-new C++20 MasteringChain instance and reset state
-    chain = py_core_dsp.MasteringChain(float(sample_rate))
+    chain = py_core_dsp.MasteringChain(float(sample_rate), limiter_detector_mode)
     chain.reset()
 
     if mode == "bypass":
@@ -176,5 +180,132 @@ def render_offline_with_tail_flush(
         "extracted_start_sample": latency,
         "extracted_end_sample": latency + num_samples,
         "latency_compensated_once": True,
+        "limiter_detector_mode": str(chain.get_limiter_detector_mode()),
+        "limiter_ceiling_db": float(chain.get_limiter_ceiling_db()),
     }
     return aligned_out, render_meta
+
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def export_validated_pcm24_wav(
+    out_path: Union[str, Path],
+    audio: np.ndarray,
+    sample_rate: int = 48000,
+    target_max_dbtp: float = -0.30,
+    max_emergency_trim_db: float = 0.05,
+    keep_failed_file: bool = False,
+) -> Dict[str, Any]:
+    """Export PCM_24 WAV and verify on-disk 4x True Peak and Sample Peak (Solution 2 Safety Guard).
+
+    Workflow:
+      1. Validate finite stereo array [2, T].
+      2. Write PCM_24 WAV to disk.
+      3. Re-read WAV from disk, check subtype/sample_rate/frames, measure 4x True Peak & Sample Peak.
+      4. Enforce TP <= target_max_dbtp (-0.30 dBTP) and SP <= target_max_dbtp:
+         - If compliant on first write: return validated metadata (trim_applied_db = 0.0).
+         - If overshoot <= max_emergency_trim_db (0.05 dB): apply linear emergency trim, rewrite PCM_24,
+           re-read from disk & re-verify, log pre/post metrics and return metadata.
+         - If overshoot > max_emergency_trim_db: delete unsafe artifact (unless keep_failed_file=True)
+           and raise RuntimeError with diagnostic report (never silently mask large overshoot).
+    """
+    dst = Path(out_path)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    stereo, mono_dup = validate_audio_array(audio, allow_mono=True)
+    if not np.all(np.isfinite(stereo)):
+        raise ValueError(f"Cannot export non-finite samples to {dst}")
+
+    sr_int = int(round(sample_rate))
+    expected_frames = int(stereo.shape[1])
+
+    def _write_and_measure_disk(buf_2xT: np.ndarray) -> Tuple[float, float, str]:
+        sf.write(str(dst), np.ascontiguousarray(buf_2xT.T, dtype=np.float64), sr_int, subtype="PCM_24")
+        info = sf.info(str(dst))
+        if info.subtype != "PCM_24" or info.samplerate != sr_int or info.channels != 2 or info.frames != expected_frames:
+            raise RuntimeError(
+                f"Disk PCM_24 header mismatch on {dst}: subtype={info.subtype}, sr={info.samplerate}, "
+                f"ch={info.channels}, frames={info.frames} (expected {expected_frames})"
+            )
+        disk_raw, disk_sr = sf.read(str(dst), dtype="float32", always_2d=True)
+        disk_2xT = np.ascontiguousarray(disk_raw.T, dtype=np.float64)
+        tp = float(calculate_true_peak_dbtp(disk_2xT, sample_rate=float(disk_sr)))
+        sp = float(calculate_sample_peak_dbfs(disk_2xT))
+        sha = _file_sha256(dst)
+        return tp, sp, sha
+
+    pre_tp, pre_sp, sha = _write_and_measure_disk(stereo)
+    pre_worst = max(pre_tp if math.isfinite(pre_tp) else -999.0, pre_sp if math.isfinite(pre_sp) else -999.0)
+
+    if pre_worst <= target_max_dbtp:
+        return {
+            "status": "pass",
+            "path": str(dst),
+            "sample_rate": sr_int,
+            "subtype": "PCM_24",
+            "num_samples": expected_frames,
+            "mono_duplicated_to_stereo": bool(mono_dup),
+            "target_max_dbtp": float(target_max_dbtp),
+            "max_emergency_trim_db": float(max_emergency_trim_db),
+            "emergency_trim_applied": False,
+            "trim_applied_db": 0.0,
+            "pre_trim_true_peak_dbtp": pre_tp,
+            "pre_trim_sample_peak_dbfs": pre_sp,
+            "post_trim_true_peak_dbtp": pre_tp,
+            "post_trim_sample_peak_dbfs": pre_sp,
+            "wav_sha256": sha,
+        }
+
+    # Exceeded target ceiling: check whether tiny emergency micro-trim (<= 0.05 dB) covers rounding/quantization
+    safety_eps_db = 0.002
+    needed_trim_db = float((pre_worst - target_max_dbtp) + safety_eps_db)
+    if needed_trim_db > max_emergency_trim_db:
+        if not keep_failed_file and dst.exists():
+            dst.unlink()
+        raise RuntimeError(
+            f"PCM_24 export safety guard FAILED on {dst}: disk TP={pre_tp:.4f} dBTP, "
+            f"SP={pre_sp:.4f} dBFS exceed target {target_max_dbtp:.4f} dBTP; "
+            f"needed linear trim {needed_trim_db:.4f} dB > max_emergency_trim_db {max_emergency_trim_db:.4f} dB."
+        )
+
+    linear_gain = float(10.0 ** (-needed_trim_db / 20.0))
+    trimmed = np.ascontiguousarray(stereo * linear_gain, dtype=np.float64)
+    post_tp, post_sp, post_sha = _write_and_measure_disk(trimmed)
+    post_worst = max(post_tp if math.isfinite(post_tp) else -999.0, post_sp if math.isfinite(post_sp) else -999.0)
+    if post_worst > target_max_dbtp:
+        if not keep_failed_file and dst.exists():
+            dst.unlink()
+        raise RuntimeError(
+            f"PCM_24 post-trim verification FAILED on {dst}: post TP={post_tp:.4f} dBTP, "
+            f"post SP={post_sp:.4f} dBFS still > {target_max_dbtp:.4f} dBTP."
+        )
+
+    _LOGGER.warning(
+        "PCM_24 export micro-trim applied on %s: trim=-%.4f dB | pre(TP=%.4f, SP=%.4f) -> post(TP=%.4f, SP=%.4f)",
+        dst, needed_trim_db, pre_tp, pre_sp, post_tp, post_sp,
+    )
+    return {
+        "status": "pass_with_micro_trim",
+        "path": str(dst),
+        "sample_rate": sr_int,
+        "subtype": "PCM_24",
+        "num_samples": expected_frames,
+        "mono_duplicated_to_stereo": bool(mono_dup),
+        "target_max_dbtp": float(target_max_dbtp),
+        "max_emergency_trim_db": float(max_emergency_trim_db),
+        "emergency_trim_applied": True,
+        "trim_applied_db": -needed_trim_db,
+        "pre_trim_true_peak_dbtp": pre_tp,
+        "pre_trim_sample_peak_dbfs": pre_sp,
+        "post_trim_true_peak_dbtp": post_tp,
+        "post_trim_sample_peak_dbfs": post_sp,
+        "wav_sha256": post_sha,
+    }

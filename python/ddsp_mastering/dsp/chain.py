@@ -21,11 +21,17 @@ class DifferentiableMasteringChain(nn.Module):
       3. Compressore Multibanda 3-Bande con Log-Domain Ballistics
       4. Stereo Imager M/S 3-Bande & Summing
       5. Saturatore Armonico con Oversampling 2x e Dry Delay di 15 campioni
-      6. Lookahead Brickwall Limiter con finestra NL=144 campioni e ceiling -0.3 dBFS
+      6. Lookahead Brickwall Limiter (NL=144 campioni, default True Peak 4x a -0.50 dBTP)
 
     Latenza Totale della Catena: esattamente 159 campioni (15 sat + 144 limiter).
     """
-    def __init__(self, sample_rate: float = 48000.0, default_eq_mode: str = "iir"):
+    def __init__(
+        self,
+        sample_rate: float = 48000.0,
+        default_eq_mode: str = "iir",
+        limiter_detector_mode: str = "true_peak_4x",
+        limiter_ceiling_db: Optional[float] = None,
+    ):
         super().__init__()
         self.sample_rate = float(sample_rate)
         self.default_eq_mode = default_eq_mode
@@ -35,7 +41,11 @@ class DifferentiableMasteringChain(nn.Module):
         self.compressor = DifferentiableMultibandCompressor(sample_rate=self.sample_rate)
         self.imager = DifferentiableMidSideImager()
         self.saturator = DifferentiableHarmonicSaturator()
-        self.limiter = DifferentiableLookaheadLimiter(sample_rate=self.sample_rate)
+        self.limiter = DifferentiableLookaheadLimiter(
+            sample_rate=self.sample_rate,
+            detector_mode=limiter_detector_mode,
+            ceiling_db=limiter_ceiling_db,
+        )
 
     @property
     def latency_samples(self) -> int:

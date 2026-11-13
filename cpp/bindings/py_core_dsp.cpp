@@ -67,6 +67,24 @@ std::vector<double> py_get_fir_halfband_coeffs() {
     return std::vector<double>(FIR_HALFBAND_COEFFS.begin(), FIR_HALFBAND_COEFFS.end());
 }
 
+std::vector<double> py_get_true_peak_fir_coeffs() {
+    return std::vector<double>(TP_FIR_PROTOTYPE_COEFFS.begin(), TP_FIR_PROTOTYPE_COEFFS.end());
+}
+
+LimiterDetectorMode parse_limiter_detector_mode(const std::string& mode) {
+    if (mode == "true_peak_4x" || mode == "true_peak") {
+        return LimiterDetectorMode::TruePeak4x;
+    }
+    if (mode == "legacy_sample_1x" || mode == "legacy") {
+        return LimiterDetectorMode::LegacySample1x;
+    }
+    throw std::invalid_argument("Unsupported limiter detector_mode: '" + mode + "' (expected 'true_peak_4x' or 'legacy_sample_1x')");
+}
+
+std::string limiter_detector_mode_to_string(LimiterDetectorMode mode) {
+    return (mode == LimiterDetectorMode::LegacySample1x) ? "legacy_sample_1x" : "true_peak_4x";
+}
+
 // Wrapper Python per BiquadCascade6Band
 class PyBiquadCascade6Band {
 public:
@@ -361,8 +379,11 @@ private:
 // Wrapper Python per LookaheadLimiter
 class PyLookaheadLimiter {
 public:
-    PyLookaheadLimiter(double sample_rate = DEFAULT_SAMPLE_RATE)
-        : limiter_(sample_rate) {}
+    PyLookaheadLimiter(
+        double sample_rate = DEFAULT_SAMPLE_RATE,
+        const std::string& detector_mode = "true_peak_4x"
+    )
+        : limiter_(sample_rate, parse_limiter_detector_mode(detector_mode)) {}
 
     void reset() {
         limiter_.reset();
@@ -378,6 +399,30 @@ public:
 
     double get_push_gain_db() const {
         return limiter_.get_push_gain_db();
+    }
+
+    void set_detector_mode(const std::string& detector_mode) {
+        limiter_.set_detector_mode(parse_limiter_detector_mode(detector_mode));
+    }
+
+    std::string get_detector_mode() const {
+        return limiter_detector_mode_to_string(limiter_.get_detector_mode());
+    }
+
+    void set_ceiling_db(double ceiling_db) {
+        limiter_.set_ceiling_db(ceiling_db);
+    }
+
+    double get_ceiling_db() const {
+        return limiter_.get_ceiling_db();
+    }
+
+    size_t get_boxcar_samples() const {
+        return limiter_.get_boxcar_samples();
+    }
+
+    size_t get_lookahead_samples() const {
+        return limiter_.get_lookahead_samples();
     }
 
     py::array_t<float> process(py::array_t<float> input) {
@@ -404,8 +449,11 @@ private:
 // Wrapper Python per MasteringChain
 class PyMasteringChain {
 public:
-    PyMasteringChain(double sample_rate = DEFAULT_SAMPLE_RATE)
-        : chain_(sample_rate) {}
+    PyMasteringChain(
+        double sample_rate = DEFAULT_SAMPLE_RATE,
+        const std::string& detector_mode = "true_peak_4x"
+    )
+        : chain_(sample_rate, parse_limiter_detector_mode(detector_mode)) {}
 
     void reset() {
         chain_.reset();
@@ -413,6 +461,22 @@ public:
 
     void set_sample_rate(double sample_rate) {
         chain_.set_sample_rate(sample_rate);
+    }
+
+    void set_limiter_detector_mode(const std::string& detector_mode) {
+        chain_.set_limiter_detector_mode(parse_limiter_detector_mode(detector_mode));
+    }
+
+    std::string get_limiter_detector_mode() const {
+        return limiter_detector_mode_to_string(chain_.get_limiter_detector_mode());
+    }
+
+    void set_limiter_ceiling_db(double ceiling_db) {
+        chain_.set_limiter_ceiling_db(ceiling_db);
+    }
+
+    double get_limiter_ceiling_db() const {
+        return chain_.get_limiter_ceiling_db();
     }
 
     void set_parameters_theta(const std::vector<double>& theta) {
@@ -467,11 +531,21 @@ PYBIND11_MODULE(py_core_dsp, m) {
     m.attr("TOTAL_CHAIN_LATENCY_SAMPLES") = TOTAL_CHAIN_LATENCY_SAMPLES;
     m.attr("FIR_HALFBAND_LATENCY") = FIR_HALFBAND_LATENCY;
     m.attr("LIMITER_LOOKAHEAD_SAMPLES") = LIMITER_LOOKAHEAD_SAMPLES;
+    m.attr("LIMITER_BOXCAR_SAMPLES") = LIMITER_BOXCAR_SAMPLES;
+    m.attr("LIMITER_CEILING_DBFS") = LIMITER_CEILING_DBFS;
+    m.attr("LIMITER_INTERNAL_CEILING_DBTP") = LIMITER_INTERNAL_CEILING_DBTP;
+    m.attr("LIMITER_DELIVERY_CEILING_DBTP") = LIMITER_DELIVERY_CEILING_DBTP;
+    m.attr("TP_OVERSAMPLE_FACTOR") = TP_OVERSAMPLE_FACTOR;
+    m.attr("TP_FIR_TAPS_PER_PHASE") = TP_FIR_TAPS_PER_PHASE;
+    m.attr("TP_FIR_PROTOTYPE_TAPS") = TP_FIR_PROTOTYPE_TAPS;
+    m.attr("TP_FIR_GROUP_DELAY_BASE_SAMPLES") = TP_FIR_GROUP_DELAY_BASE_SAMPLES;
+    m.attr("TP_FIR_ALIGNED_SAMPLE_DELAY") = TP_FIR_ALIGNED_SAMPLE_DELAY;
 
     m.def("map_z_to_theta", &py_map_z_to_theta, "Converte z in (0, 1) nello spazio parametri fisici theta");
     m.def("map_theta_to_z", &py_map_theta_to_z, "Converte theta nello spazio normalizzato z");
     m.def("get_param_specs", &py_get_param_specs, "Restituisce le specifiche dei 41 parametri");
     m.def("get_fir_halfband_coeffs", &py_get_fir_halfband_coeffs, "Restituisce i 31 coefficienti FIR Half-Band");
+    m.def("get_true_peak_fir_coeffs", &py_get_true_peak_fir_coeffs, "Restituisce i 48 coefficienti prototipo FIR polifase 4x True Peak");
     m.def("get_theta_neutral", &py_get_theta_neutral, "Restituisce il vettore THETA_NEUTRAL C++");
     m.def("get_default_mastering_parameters_theta", &py_get_default_mastering_parameters_theta, "Restituisce theta generato da MasteringParameters default");
 
@@ -521,17 +595,31 @@ PYBIND11_MODULE(py_core_dsp, m) {
         .def("process", &PyMultibandCompressor3Band::process);
 
     py::class_<PyLookaheadLimiter>(m, "LookaheadLimiter")
-        .def(py::init<double>(), py::arg("sample_rate") = DEFAULT_SAMPLE_RATE)
+        .def(py::init<double, const std::string&>(),
+             py::arg("sample_rate") = DEFAULT_SAMPLE_RATE,
+             py::arg("detector_mode") = "true_peak_4x")
         .def("reset", &PyLookaheadLimiter::reset)
         .def("set_sample_rate", &PyLookaheadLimiter::set_sample_rate, py::arg("sample_rate"))
         .def("set_push_gain_db", &PyLookaheadLimiter::set_push_gain_db, py::arg("push_db"))
         .def("get_push_gain_db", &PyLookaheadLimiter::get_push_gain_db)
+        .def("set_detector_mode", &PyLookaheadLimiter::set_detector_mode, py::arg("detector_mode"))
+        .def("get_detector_mode", &PyLookaheadLimiter::get_detector_mode)
+        .def("set_ceiling_db", &PyLookaheadLimiter::set_ceiling_db, py::arg("ceiling_db"))
+        .def("get_ceiling_db", &PyLookaheadLimiter::get_ceiling_db)
+        .def("get_boxcar_samples", &PyLookaheadLimiter::get_boxcar_samples)
+        .def("get_lookahead_samples", &PyLookaheadLimiter::get_lookahead_samples)
         .def("process", &PyLookaheadLimiter::process);
 
     py::class_<PyMasteringChain>(m, "MasteringChain")
-        .def(py::init<double>(), py::arg("sample_rate") = DEFAULT_SAMPLE_RATE)
+        .def(py::init<double, const std::string&>(),
+             py::arg("sample_rate") = DEFAULT_SAMPLE_RATE,
+             py::arg("detector_mode") = "true_peak_4x")
         .def("reset", &PyMasteringChain::reset)
         .def("set_sample_rate", &PyMasteringChain::set_sample_rate, py::arg("sample_rate"))
+        .def("set_limiter_detector_mode", &PyMasteringChain::set_limiter_detector_mode, py::arg("detector_mode"))
+        .def("get_limiter_detector_mode", &PyMasteringChain::get_limiter_detector_mode)
+        .def("set_limiter_ceiling_db", &PyMasteringChain::set_limiter_ceiling_db, py::arg("ceiling_db"))
+        .def("get_limiter_ceiling_db", &PyMasteringChain::get_limiter_ceiling_db)
         .def("set_parameters_theta", &PyMasteringChain::set_parameters_theta, py::arg("theta"))
         .def("set_parameters_z", &PyMasteringChain::set_parameters_z, py::arg("z"))
         .def("get_latency_samples", &PyMasteringChain::get_latency_samples)
