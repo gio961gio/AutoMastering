@@ -1022,3 +1022,216 @@ def test_gate_10_v3c_ablation_pilot_and_blind_pack_integrity():
         )
         assert df_p.stdout.strip() == "", f"Forbidden diff in locked Phase 2 path {rel}: {df_p.stdout}"
 
+
+def test_gate_11_v3c_pilot_errata_and_blind_pack_v2_integrity():
+    """
+    Gate 11: Audit errata & True-Peak-compliant Blind Pack V2 verification:
+      - Separate errata doc SPRINT3_V3C_ABLATION_PILOT_AUDIT_ERRATA.md exists with
+        exact corrected figures, leaving Phase 2 results/report & V1 artifacts untouched;
+      - Zero diff on frozen DSP/optimizer/V1 artifacts vs Phase 2 HEAD (5709c3f);
+      - 6 opaque PCM_24/48kHz stereo WAVs in docs/sprint3/blind_v3c_pilot_wavs_v2/
+        (PAIR01..03_A/B.wav) match manifest V2 (bytes, frames, duration, SHA-256);
+      - Independent 4x True Peak on disk <= -0.35 dBTP on every V2 WAV;
+      - Identical common pair attenuation verified both in manifest metadata and
+        sample-by-sample against V1 WAVs (< 5e-7 PCM_24 quantization tolerance);
+      - Pair |delta LUFS| <= 0.01 LU reported accurately without independent LUFS norm;
+      - Evaluator ZIP strictly contains ONLY the 6 opaque WAVs + worksheet V2 +
+        manifest V2 MD, with zero mapping/seed/Control_V0p/Treatment_V3c/track0x leaks;
+      - Private mapping V2 resides strictly in gitignored human_validation/private/.
+    """
+    import hashlib
+    import json
+    import subprocess
+    import zipfile
+    import numpy as np
+    import soundfile as sf
+
+    from ddsp_mastering.loss.loudness import calculate_integrated_loudness_bs1770
+    from ddsp_mastering.optimize.metrics import calculate_true_peak_dbtp
+
+    repo_root = Path(__file__).resolve().parents[1]
+    docs_dir = repo_root / "docs" / "sprint3"
+    private_dir = repo_root / "human_validation" / "private"
+
+    errata_path = docs_dir / "SPRINT3_V3C_ABLATION_PILOT_AUDIT_ERRATA.md"
+    manifest_v2_json_path = docs_dir / "SPRINT3_V3C_BLIND_AUDIO_MANIFEST_V2.json"
+    manifest_v2_md_path = docs_dir / "SPRINT3_V3C_BLIND_AUDIO_MANIFEST_V2.md"
+    worksheet_v2_path = docs_dir / "SPRINT3_V3C_BLIND_LISTENING_WORKSHEET_V2.md"
+    wav_v2_dir = docs_dir / "blind_v3c_pilot_wavs_v2"
+    wav_v1_dir = docs_dir / "blind_v3c_pilot_wavs"
+    private_mapping_v2_path = private_dir / "SPRINT3_V3C_BLIND_MAPPING_V2.json"
+    zip_v2_path = private_dir / "blind_v3c_pilot_evaluator_pack_v2.zip"
+
+    for p in (
+        errata_path,
+        manifest_v2_json_path,
+        manifest_v2_md_path,
+        worksheet_v2_path,
+        private_mapping_v2_path,
+        zip_v2_path,
+    ):
+        assert p.exists(), f"Missing required V2/Errata artifact: {p}"
+
+    # 11.1 Audit Errata checks
+    errata_txt = errata_path.read_text(encoding="utf-8")
+    for required_token in (
+        "5709c3f",
+        "-7.1535%",
+        "-9.8410%",
+        "-2.3375%",
+        "-49.974",
+        "0.001739",
+        "1.08",
+        "0.0016",
+        "NON DISPONIBILI",
+    ):
+        assert required_token in errata_txt, f"Errata missing expected correction token: {required_token}"
+
+    # 11.2 Immutability of Phase 2 baseline (5709c3f) & DSP/optimizer modules
+    phase2_sha = "5709c3f402e434855a28c51e3de4c4b8ae532473"
+    immutable_since_phase2 = [
+        "docs/sprint3/SPRINT3_V3C_ABLATION_PILOT_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3C_ABLATION_PILOT_REPORT.md",
+        "docs/sprint3/SPRINT3_V3C_BLIND_AUDIO_MANIFEST.json",
+        "docs/sprint3/SPRINT3_V3C_BLIND_AUDIO_MANIFEST.md",
+        "docs/sprint3/SPRINT3_V3C_BLIND_MAPPING.json",
+        "docs/sprint3/SPRINT3_V3C_BLIND_LISTENING_WORKSHEET.md",
+        "docs/sprint3/SPRINT3_V3C_PREFLIGHT_RESULTS.json",
+        "docs/sprint3/SPRINT3_V3C_PREFLIGHT_REPORT.md",
+        "python/ddsp_mastering/optimize/optimizer.py",
+        "python/ddsp_mastering/loss/stereo_prior.py",
+        "python/ddsp_mastering/loss/dynamic_prior.py",
+        "python/ddsp_mastering/param_space.py",
+        "python/ddsp_mastering/dsp",
+        "cpp/core_dsp",
+    ]
+    for rel in immutable_since_phase2:
+        st = subprocess.run(
+            ["git", "status", "--porcelain", "--", rel],
+            capture_output=True, text=True, check=True, cwd=str(repo_root),
+        )
+        assert st.stdout.strip() == "", f"Uncommitted change in protected path {rel}: {st.stdout}"
+        df = subprocess.run(
+            ["git", "diff", "--name-only", f"{phase2_sha}..HEAD", "--", rel],
+            capture_output=True, text=True, check=True, cwd=str(repo_root),
+        )
+        assert df.stdout.strip() == "", f"Forbidden diff vs {phase2_sha} in protected path {rel}: {df.stdout}"
+
+    # 11.3 Opaque manifest V2 & zero leakage checks
+    manifest_v2_raw = manifest_v2_json_path.read_text(encoding="utf-8")
+    manifest_v2_md_raw = manifest_v2_md_path.read_text(encoding="utf-8")
+    worksheet_v2_raw = worksheet_v2_path.read_text(encoding="utf-8")
+    for blob in (manifest_v2_raw, manifest_v2_md_raw, worksheet_v2_raw):
+        for forbidden in ("Control_V0p", "Treatment_V3c", "track01", "track02", "track03", "variant_"):
+            assert forbidden not in blob, f"Forbidden leak token '{forbidden}' found in V2 evaluator-facing text"
+
+    manifest_v2 = json.loads(manifest_v2_raw)
+    assert manifest_v2["wav_count"] == 6
+    assert manifest_v2["expected_sample_rate_hz"] == 48000
+    assert manifest_v2["expected_channels"] == 2
+    assert manifest_v2["expected_subtype"] == "PCM_24"
+    assert manifest_v2["target_true_peak_dbtp"] == -0.35
+    assert manifest_v2["independent_lufs_normalization_applied"] is False
+    assert manifest_v2["common_pair_attenuation_only"] is True
+    assert manifest_v2["contains_secret_mapping"] is False
+
+    expected_opaque_names = {f"PAIR0{i}_{lbl}.wav" for i in (1, 2, 3) for lbl in ("A", "B")}
+    files_v2 = manifest_v2["files"]
+    assert len(files_v2) == 6
+    assert {f["file_name"] for f in files_v2} == expected_opaque_names
+
+    # 11.4 Private mapping V2 gitignore check & bijective completeness
+    ig = subprocess.run(
+        ["git", "check-ignore", "-q", str(private_mapping_v2_path)],
+        cwd=str(repo_root),
+    )
+    assert ig.returncode == 0, "Private V2 mapping must be gitignored!"
+    tracked = subprocess.run(
+        ["git", "ls-files", str(private_mapping_v2_path)],
+        capture_output=True, text=True, check=True, cwd=str(repo_root),
+    )
+    assert tracked.stdout.strip() == "", "Private V2 mapping must NOT be tracked by git!"
+    build_script_txt = (repo_root / "scripts" / "sprint3" / "build_v3c_blind_pack_v2.py").read_text(encoding="utf-8")
+    assert "secrets.SystemRandom" in build_script_txt and "import random\n" not in build_script_txt
+    priv_map = json.loads(private_mapping_v2_path.read_text(encoding="utf-8"))
+    assert "independent" in priv_map.get("randomization_source", "")
+    assert set(priv_map["pairs"].keys()) == {"PAIR01", "PAIR02", "PAIR03"}
+    assert {p["session"] for p in priv_map["pairs"].values()} == {"track01", "track02", "track03"}
+    for pid, pinfo in priv_map["pairs"].items():
+        assert set(pinfo["label_to_arm"].keys()) == {"A", "B"}
+        assert set(pinfo["label_to_arm"].values()) == {"Control_V0p", "Treatment_V3c"}
+
+    # 11.5 Disk verification of all 6 V2 WAVs: format, SHA-256, TP <= -0.35 dBTP,
+    #      common pair attenuation (manifest + sample-by-sample vs V1), LUFS <= 0.01 LU
+    pair_lufs_disk = {}
+    pair_atten_meta = {}
+    for entry in files_v2:
+        fname = entry["file_name"]
+        pid = entry["pair_id"]
+        wav_p = wav_v2_dir / fname
+        assert wav_p.exists(), f"Missing V2 blind WAV: {wav_p}"
+        assert wav_p.stat().st_size == entry["bytes"]
+        assert hashlib.sha256(wav_p.read_bytes()).hexdigest() == entry["sha256"]
+
+        info = sf.info(str(wav_p))
+        assert info.samplerate == 48000
+        assert info.channels == 2
+        assert info.subtype == "PCM_24"
+        assert info.frames == entry["frames"]
+        assert abs((info.frames / 48000.0) - entry["duration_sec"]) < 1e-4
+
+        audio_v2, sr = sf.read(str(wav_p), dtype="float64", always_2d=True)
+        assert sr == 48000
+        t_v2 = torch.from_numpy(audio_v2.T.copy()).unsqueeze(0).to(torch.float64)
+        tp_disk = float(calculate_true_peak_dbtp(t_v2, sample_rate=48000.0))
+        lufs_disk = float(calculate_integrated_loudness_bs1770(t_v2, sample_rate=48000.0))
+
+        assert tp_disk <= -0.35, f"{fname} exceeds -0.35 dBTP guardrail: {tp_disk:.6f} dBTP"
+        assert abs(tp_disk - entry["true_peak_4x_after_dbtp"]) < 1e-4
+        assert abs(lufs_disk - entry["integrated_lufs_after_bs1770"]) < 1e-4
+
+        pair_lufs_disk.setdefault(pid, {})[entry["blind_label"]] = lufs_disk
+        pair_atten_meta.setdefault(pid, []).append(
+            (entry["common_attenuation_db"], entry["common_linear_gain"])
+        )
+
+        # Sample-by-sample common gain verification against V1 source WAV
+        src_v1_name = priv_map["pairs"][pid]["files"][fname]["source_v1_wav"]
+        src_v1_path = wav_v1_dir / src_v1_name
+        assert src_v1_path.exists(), f"Missing V1 source WAV: {src_v1_path}"
+        audio_v1, _ = sf.read(str(src_v1_path), dtype="float64", always_2d=True)
+        assert audio_v1.shape == audio_v2.shape
+        gain_lin = entry["common_linear_gain"]
+        max_sample_err = float(np.max(np.abs(audio_v2 - (audio_v1 * gain_lin))))
+        assert max_sample_err < 5e-7, (
+            f"{fname} deviates from common linear gain * V1 source by {max_sample_err}"
+        )
+
+    for pid in ("PAIR01", "PAIR02", "PAIR03"):
+        (att_a, g_a), (att_b, g_b) = pair_atten_meta[pid]
+        assert att_a == att_b and abs(g_a - g_b) < 1e-12, f"{pid} attenuation differs between A and B"
+        delta_lu_disk = abs(pair_lufs_disk[pid]["A"] - pair_lufs_disk[pid]["B"])
+        assert delta_lu_disk <= 0.01, f"{pid} |delta LUFS|={delta_lu_disk:.6f} > 0.01 LU"
+        p_sum = next(p for p in manifest_v2["pair_summary"] if p["pair_id"] == pid)
+        assert abs(delta_lu_disk - p_sum["abs_delta_lufs"]) < 1e-4
+
+    # 11.6 Evaluator ZIP V2 strict contents and zero leaks
+    with zipfile.ZipFile(zip_v2_path, "r") as zf:
+        z_names = set(zf.namelist())
+        expected_zip_v2 = {f"blind_v3c_pilot_wavs_v2/{fname}" for fname in expected_opaque_names} | {
+            "SPRINT3_V3C_BLIND_LISTENING_WORKSHEET_V2.md",
+            "SPRINT3_V3C_BLIND_AUDIO_MANIFEST_V2.md",
+        }
+        assert z_names == expected_zip_v2
+        assert all("MAPPING" not in n.upper() and "RESULTS" not in n.upper() for n in z_names)
+        for md_name in (
+            "SPRINT3_V3C_BLIND_LISTENING_WORKSHEET_V2.md",
+            "SPRINT3_V3C_BLIND_AUDIO_MANIFEST_V2.md",
+        ):
+            inner_txt = zf.read(md_name).decode("utf-8")
+            for forbidden in ("Control_V0p", "Treatment_V3c", "track01", "track02", "track03", "seed"):
+                assert forbidden.lower() not in inner_txt.lower(), (
+                    f"Forbidden token '{forbidden}' inside zipped {md_name}"
+                )
+
+
