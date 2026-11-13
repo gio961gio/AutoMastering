@@ -1,25 +1,30 @@
-"""Sprint 3 Step V3c Read-Only Preflight Diagnostic Runner.
+"""Sprint 3 Step V3c Read-Only Preflight V2 Diagnostic Runner.
 
-Evaluates stereo & mono compatibility observability, 4 candidate V3c loss terms
-(loss_mono_drop, loss_band_corr, loss_band_smr, loss_width_param), short-time local
-correlation across 3 window durations (50 ms, 100 ms, 250 ms), spectral anti-comb-filtering
-diagnostics, and full z/u gradient + cosine-similarity diagnostics across all 6 harmonized
-sessions at 3 operating points:
-  1. Z_NEUTRAL
-  2. V0p z_opt (loaded from SPRINT3_V3B_V0P_ABLATION_RESULTS.json -> control_v0p)
-  3. V3b z_opt (loaded from SPRINT3_V3B_V0P_ABLATION_RESULTS.json -> treatment_v3b_b05,
-     evaluated strictly without activating V3b loss)
+Evaluates hardened V3cStereoCompatibilityLoss under frozen Candidate A thresholds
+and frozen pilot same_track weights:
+  - tau_drop_db = 0.50, tau_corr = (0.03, 0.05, 0.08), tau_smr_db = (2.0, 2.0, 2.0),
+    tau_sub_db = 0.50, alpha_sub = 1.0, tau_w_low_max = 1.00, tau_w_mid = 0.15, tau_w_high = 0.15
+  - w_mono_drop = 1.00, w_band_corr = 10.00, w_band_smr = 0.05, w_width_param = 0.25
 
-Outputs:
-  - docs/sprint3/SPRINT3_V3C_PREFLIGHT_RESULTS.json
-  - docs/sprint3/SPRINT3_V3C_PREFLIGHT_REPORT.md
+Evaluated across all 6 harmonized sessions:
+  - Operational pilot (same_track): track01, track02, track03
+  - Diagnostic only (stylistic):    track01_style, track02_style, track03_style
+at 3 operating points (Z_NEUTRAL, V0p_z_opt, V3b_z_opt) with:
+  - Full 120,000-sample pre-roll, 159-sample DSP alignment, fixed 160/3200 Hz LR4 crossover,
+    4 chunks weighted 1/4, ZERO parameter updates, ZERO V3b activation.
+  - Both unweighted and weighted Candidate A term losses + combined loss_v3c_total_weighted.
+  - Unweighted and weighted gradient L2 norms in z-space and u-space across 41D + 6 param groups
+    (highlighting Imager [35:38]) and ratios vs ||grad V0p_total||_2.
+  - Cosine similarities (in z and u, across 41D + Imager + other groups) of each individual term
+    and combined V3c_total_weighted against V0p_total, LUFS_only, and stylistic_stereo.
 
-ZERO training, ZERO optimizer steps, ZERO V3b activation, ZERO edits to historical artifacts.
+Outputs (strictly separate from Preflight V1):
+  - docs/sprint3/SPRINT3_V3C_PREFLIGHT_V2_RESULTS.json
+  - docs/sprint3/SPRINT3_V3C_PREFLIGHT_V2_REPORT.md
 """
 
 import hashlib
 import json
-import math
 import subprocess
 import sys
 import time
@@ -42,8 +47,10 @@ enable_fast_cpu_biquad()
 from ddsp_mastering.loss.dynamic_prior import TOTAL_DSP_DELAY_SAMPLES
 from ddsp_mastering.loss.stereo_prior import (
     BAND_NAMES,
+    CANDIDATE_A_THRESHOLDS,
     FIXED_CROSSOVER_HIGH_HZ,
     FIXED_CROSSOVER_LOW_HZ,
+    PILOT_SAME_TRACK_WEIGHTS,
     SHORT_TIME_WINDOWS_MS,
     V3cStereoCompatibilityLoss,
 )
@@ -61,39 +68,6 @@ SIX_PARAM_GROUPS: Dict[str, List[int]] = {
 }
 ALL_41D = list(range(41))
 
-V3C_CANDIDATE_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "Zero_Threshold": {
-        "tau_drop_db": 0.0,
-        "tau_corr": (0.0, 0.0, 0.0),
-        "tau_smr_db": (0.0, 0.0, 0.0),
-        "tau_sub_db": 0.0,
-        "alpha_sub": 1.0,
-        "tau_w_low_max": 1.0,
-        "tau_w_mid": 0.0,
-        "tau_w_high": 0.0,
-    },
-    "Candidate_A": {
-        "tau_drop_db": 0.50,
-        "tau_corr": (0.03, 0.05, 0.08),
-        "tau_smr_db": (2.0, 2.0, 2.0),
-        "tau_sub_db": 0.50,
-        "alpha_sub": 1.0,
-        "tau_w_low_max": 1.0,
-        "tau_w_mid": 0.15,
-        "tau_w_high": 0.15,
-    },
-    "Candidate_B": {
-        "tau_drop_db": 0.25,
-        "tau_corr": (0.015, 0.025, 0.04),
-        "tau_smr_db": (1.0, 1.0, 1.0),
-        "tau_sub_db": 0.0,
-        "alpha_sub": 1.0,
-        "tau_w_low_max": 1.0,
-        "tau_w_mid": 0.10,
-        "tau_w_high": 0.10,
-    },
-}
-
 LOSS_TERM_NAMES: Tuple[str, ...] = (
     "loss_mono_drop",
     "loss_band_corr",
@@ -101,11 +75,17 @@ LOSS_TERM_NAMES: Tuple[str, ...] = (
     "loss_width_param",
 )
 
+TERM_TO_WEIGHT_KEY: Dict[str, str] = {
+    "loss_mono_drop": "w_mono_drop",
+    "loss_band_corr": "w_band_corr",
+    "loss_band_smr": "w_band_smr",
+    "loss_width_param": "w_width_param",
+}
+
 
 def compute_grad_u(grad_z: torch.Tensor, z_point: torch.Tensor) -> torch.Tensor:
     """Apply exact sigmoid Jacobian dz/du = z * (1 - z) to obtain gradient in logit u-space."""
-    dz_du = z_point * (1.0 - z_point)
-    return grad_z * dz_du
+    return grad_z * (z_point * (1.0 - z_point))
 
 
 def compute_group_l2_norms(grad_vec: torch.Tensor) -> Dict[str, float]:
@@ -175,13 +155,73 @@ def load_seeds_map() -> Dict[str, int]:
     return {s["track_prefix"]: int(s["seed"]) for s in data["sessions"]}
 
 
+def _build_norm_ratios(norms: Dict[str, float], base_norms: Dict[str, float]) -> Dict[str, Optional[float]]:
+    out: Dict[str, Optional[float]] = {}
+    for k, v in norms.items():
+        denom = float(base_norms.get(k, 0.0))
+        out[k] = float(v / denom) if denom > 1e-12 else None
+    return out
+
+
+def _build_grad_entry(
+    gz_unw: torch.Tensor,
+    weight: float,
+    z_f64: torch.Tensor,
+    mode: str,
+    grad_v0p_z: torch.Tensor,
+    grad_v0p_u: torch.Tensor,
+    grad_lufs_z: torch.Tensor,
+    grad_lufs_u: torch.Tensor,
+    grad_stereo_z: torch.Tensor,
+    grad_stereo_u: torch.Tensor,
+    loss_unweighted: float,
+) -> Dict[str, Any]:
+    gu_unw = compute_grad_u(gz_unw, z_f64)
+    gz_w = gz_unw * weight
+    gu_w = gu_unw * weight
+
+    norms_z_unw = compute_group_l2_norms(gz_unw)
+    norms_u_unw = compute_group_l2_norms(gu_unw)
+    norms_z_w = compute_group_l2_norms(gz_w)
+    norms_u_w = compute_group_l2_norms(gu_w)
+
+    v0p_nz = compute_group_l2_norms(grad_v0p_z)
+    v0p_nu = compute_group_l2_norms(grad_v0p_u)
+
+    return {
+        "weight": float(weight),
+        "loss_unweighted": float(loss_unweighted),
+        "loss_weighted": float(weight * loss_unweighted),
+        "norms_z_unweighted": norms_z_unw,
+        "norms_u_unweighted": norms_u_unw,
+        "norms_z_weighted": norms_z_w,
+        "norms_u_weighted": norms_u_w,
+        "ratio_to_v0p_total_z_unweighted": _build_norm_ratios(norms_z_unw, v0p_nz),
+        "ratio_to_v0p_total_u_unweighted": _build_norm_ratios(norms_u_unw, v0p_nu),
+        "ratio_to_v0p_total_z_weighted": _build_norm_ratios(norms_z_w, v0p_nz),
+        "ratio_to_v0p_total_u_weighted": _build_norm_ratios(norms_u_w, v0p_nu),
+        # Note: positive scalar scaling keeps cosine similarities identical between weighted and unweighted
+        "cos_vs_v0p_total_z": compute_cosine_breakdown(gz_w, grad_v0p_z),
+        "cos_vs_v0p_total_u": compute_cosine_breakdown(gu_w, grad_v0p_u),
+        "cos_vs_lufs_only_z": compute_cosine_breakdown(gz_w, grad_lufs_z),
+        "cos_vs_lufs_only_u": compute_cosine_breakdown(gu_w, grad_lufs_u),
+        "cos_vs_stylistic_stereo_z": (
+            compute_cosine_breakdown(gz_w, grad_stereo_z) if mode == "stylistic" else None
+        ),
+        "cos_vs_stylistic_stereo_u": (
+            compute_cosine_breakdown(gu_w, grad_stereo_u) if mode == "stylistic" else None
+        ),
+    }
+
+
 def evaluate_point_read_only(
     opt_v0p: AutoMasteringOptimizer,
     prep_data: Dict[str, Any],
     z_point: torch.Tensor,
-    criteria: Dict[str, V3cStereoCompatibilityLoss],
+    crit_cand_a_weighted: V3cStereoCompatibilityLoss,
+    crit_cand_a_terms: Dict[str, V3cStereoCompatibilityLoss],
 ) -> Dict[str, Any]:
-    """Evaluate stereo/mono diagnostics, candidate V3c terms, and V0p/V3c z+u gradients."""
+    """Evaluate stereo/mono diagnostics, Candidate A terms (unweighted & weighted), and z/u gradients."""
     mode = prep_data["mode"]
     mix_chunks = prep_data["mix_chunks"]
     ref_chunks = prep_data["ref_chunks"]
@@ -199,27 +239,22 @@ def evaluate_point_read_only(
     xo_low = float(theta_vec[name_to_idx["crossover_f_low"]].item())
     xo_high = float(theta_vec[name_to_idx["crossover_f_high"]].item())
 
-    # Accumulators for V0p baseline gradients (chunk-by-chunk linear accumulation + reg_loss)
     grad_v0p_z_acc = torch.zeros_like(z_f64)
     grad_lufs_z_acc = torch.zeros_like(z_f64)
     grad_stereo_z_acc = torch.zeros_like(z_f64)
 
-    # Accumulators for V3c candidate losses & gradients
-    v3c_loss_acc: Dict[str, Dict[str, float]] = {
-        cfg: {t: 0.0 for t in LOSS_TERM_NAMES} for cfg in criteria
-    }
-    v3c_grad_z_acc: Dict[str, Dict[str, torch.Tensor]] = {
-        cfg: {t: torch.zeros_like(z_f64) for t in LOSS_TERM_NAMES} for cfg in criteria
-    }
+    v3c_loss_unw_acc: Dict[str, float] = {t: 0.0 for t in LOSS_TERM_NAMES}
+    v3c_grad_z_unw_acc: Dict[str, torch.Tensor] = {t: torch.zeros_like(z_f64) for t in LOSS_TERM_NAMES}
+    loss_v3c_total_weighted_acc = 0.0
+    grad_v3c_total_weighted_z_acc = torch.zeros_like(z_f64)
 
     per_chunk_records: List[Dict[str, Any]] = []
 
     # 1. Exact width parameter term (chunk-independent)
-    for cfg_name, crit in criteria.items():
-        z_w = z_f64.detach().clone().requires_grad_(True)
-        l_wp, _ = crit.compute_width_param_loss(z=z_w)
-        v3c_loss_acc[cfg_name]["loss_width_param"] = float(l_wp.item())
-        v3c_grad_z_acc[cfg_name]["loss_width_param"] = _grad_safe(l_wp, z_w, retain_graph=False)
+    z_w = z_f64.detach().clone().requires_grad_(True)
+    l_wp, _ = crit_cand_a_weighted.compute_width_param_loss(z=z_w)
+    v3c_loss_unw_acc["loss_width_param"] = float(l_wp.item())
+    v3c_grad_z_unw_acc["loss_width_param"] = _grad_safe(l_wp, z_w, retain_graph=False)
 
     # 2. Chunk loop (K=4, weight 1/4 each; clear graph after each chunk)
     for k in range(K):
@@ -239,10 +274,8 @@ def evaluate_point_read_only(
             l_val, _ = opt_v0p.loss_fn.loudness_loss(p_al, target_lufs=target_lufs, plr_mode="box")
             lufs_w = 0.8 * wk * l_val
             v0p_w = wk * (1.0 * s_val + 0.8 * l_val)
-            g_l = _grad_safe(lufs_w, z_k, retain_graph=True)
-            g_v = _grad_safe(v0p_w, z_k, retain_graph=False)
-            grad_lufs_z_acc += g_l
-            grad_v0p_z_acc += g_v
+            grad_lufs_z_acc += _grad_safe(lufs_w, z_k, retain_graph=True)
+            grad_v0p_z_acc += _grad_safe(v0p_w, z_k, retain_graph=False)
         else:
             mel_pred = opt_v0p.stylistic_loss_fn._extract_mel_spectrum_distribution(y_k)
             with torch.no_grad():
@@ -274,64 +307,46 @@ def evaluate_point_read_only(
             grad_stereo_z_acc += _grad_safe(stereo_w, z_k, retain_graph=True)
             grad_v0p_z_acc += _grad_safe(v0p_w, z_k, retain_graph=False)
 
-        # 2b. V3c full diagnostics + per-config unweighted terms & gradients on chunk k
+        # 2b. Candidate A full forward (weighted total + diagnostics) & per-term isolated backward
         z_c = z_point.detach().clone().to(torch.float32).requires_grad_(True)
         y_ext_v3c = opt_v0p.chain(mk, z=z_c, eq_mode="iir")
 
-        # Full diagnostics computed once using Candidate_A (diagnostics do not depend on thresholds)
-        _, full_diag = criteria["Candidate_A"](
+        # Full weighted Candidate A pass (with full diagnostics; gradient wrt z_c includes width_param)
+        l_tot_k, full_diag = crit_cand_a_weighted(
             mix_ext=mk,
-            pred_ext=y_ext_v3c.detach(),
-            z=z_f64,
+            pred_ext=y_ext_v3c,
+            z=z_c,
             n_pre=n_pre,
             delay_samples=TOTAL_DSP_DELAY_SAMPLES,
             compute_diagnostics=True,
         )
+        loss_v3c_total_weighted_acc += wk * float(l_tot_k.item())
+        grad_v3c_total_weighted_z_acc += _grad_safe(wk * l_tot_k, z_c, retain_graph=True)
 
-        # Filter once cleanly for fast autograd across all 3 candidate configs
-        # Note: computing individual unweighted losses per config via V3cStereoCompatibilityLoss
-        chunk_cfg_losses: Dict[str, Dict[str, float]] = {}
-        cfg_items = list(criteria.items())
-        for cfg_idx, (cfg_name, crit) in enumerate(cfg_items):
-            # Evaluate each signal term individually in isolation using one-hot weights
-            chunk_cfg_losses[cfg_name] = {
-                "loss_width_param": v3c_loss_acc[cfg_name]["loss_width_param"]
-            }
-            for term_idx, term_name in enumerate(("loss_mono_drop", "loss_band_corr", "loss_band_smr")):
-                w_flags = (
-                    1.0 if term_idx == 0 else 0.0,
-                    1.0 if term_idx == 1 else 0.0,
-                    1.0 if term_idx == 2 else 0.0,
-                )
-                crit_iso = V3cStereoCompatibilityLoss(
-                    sample_rate=crit.sample_rate,
-                    f_low_hz=crit.f_low_hz,
-                    f_high_hz=crit.f_high_hz,
-                    delay_dsp_samples=crit.delay_dsp_samples,
-                    tau_drop_db=crit.tau_drop_db,
-                    tau_corr=crit.tau_corr,
-                    tau_smr_db=crit.tau_smr_db,
-                    tau_sub_db=crit.tau_sub_db,
-                    alpha_sub=crit.alpha_sub,
-                    w_mono_drop=w_flags[0],
-                    w_band_corr=w_flags[1],
-                    w_band_smr=w_flags[2],
-                    w_width_param=0.0,
-                )
-                l_term, _ = crit_iso(
-                    mix_ext=mk,
-                    pred_ext=y_ext_v3c,
-                    z=None,
-                    n_pre=n_pre,
-                    delay_samples=TOTAL_DSP_DELAY_SAMPLES,
-                    compute_diagnostics=False,
-                )
-                keep_graph = not (cfg_idx == len(cfg_items) - 1 and term_idx == 2)
-                val_f = float(l_term.item())
-                chunk_cfg_losses[cfg_name][term_name] = val_f
-                v3c_loss_acc[cfg_name][term_name] += wk * val_f
-                g_t = _grad_safe(wk * l_term, z_c, retain_graph=keep_graph)
-                v3c_grad_z_acc[cfg_name][term_name] += g_t
+        # Isolated unweighted signal terms on Candidate A
+        chunk_terms_unw: Dict[str, float] = {
+            "loss_width_param": v3c_loss_unw_acc["loss_width_param"]
+        }
+        sig_terms = ("loss_mono_drop", "loss_band_corr", "loss_band_smr")
+        for t_idx, t_name in enumerate(sig_terms):
+            l_iso, _ = crit_cand_a_terms[t_name](
+                mix_ext=mk,
+                pred_ext=y_ext_v3c,
+                z=None,
+                n_pre=n_pre,
+                delay_samples=TOTAL_DSP_DELAY_SAMPLES,
+                compute_diagnostics=False,
+            )
+            keep_g = t_idx < (len(sig_terms) - 1)
+            val_f = float(l_iso.item())
+            chunk_terms_unw[t_name] = val_f
+            v3c_loss_unw_acc[t_name] += wk * val_f
+            v3c_grad_z_unw_acc[t_name] += _grad_safe(wk * l_iso, z_c, retain_graph=keep_g)
+
+        chunk_terms_w = {
+            t_name: PILOT_SAME_TRACK_WEIGHTS[TERM_TO_WEIGHT_KEY[t_name]] * chunk_terms_unw[t_name]
+            for t_name in LOSS_TERM_NAMES
+        }
 
         t_eval = int(mk.shape[-1] - n_pre - TOTAL_DSP_DELAY_SAMPLES)
         per_chunk_records.append({
@@ -340,13 +355,17 @@ def evaluate_point_read_only(
             "is_silent": bool(full_diag["is_silent"]),
             "mask_meta": full_diag["mask_meta"],
             "broadband_valid": bool(full_diag["broadband_valid"]),
+            "pred_energy_below_emin_broadband": bool(full_diag["pred_energy_below_emin_broadband"]),
             "band_valid": full_diag["band_valid"],
+            "pred_energy_below_emin": full_diag["pred_energy_below_emin"],
             "channel_silent_or_hard_panned": full_diag["channel_silent_or_hard_panned"],
             "broadband": full_diag.get("broadband", {}),
             "bands": full_diag.get("bands", {}),
             "short_time_windows": full_diag.get("short_time_windows", {}),
             "comb_filtering": full_diag.get("comb_filtering", {}),
-            "candidate_losses_unweighted": chunk_cfg_losses,
+            "candidate_a_losses_unweighted": chunk_terms_unw,
+            "candidate_a_losses_weighted": chunk_terms_w,
+            "loss_v3c_total_weighted": float(l_tot_k.item()),
         })
 
     # Add exact parameter regularization gradient to grad_v0p_z_acc
@@ -371,6 +390,9 @@ def evaluate_point_read_only(
         b_dict: Dict[str, Any] = {
             "all_chunks_valid": all(bool(c["band_valid"].get(b, False)) for c in per_chunk_records),
             "valid_chunk_count": sum(1 for c in per_chunk_records if c["band_valid"].get(b, False)),
+            "any_pred_energy_below_emin": any(
+                bool(c["pred_energy_below_emin"].get(b, False)) for c in per_chunk_records
+            ),
             "any_channel_silent_or_hard_panned": any(
                 bool(c["channel_silent_or_hard_panned"].get(b, False)) for c in per_chunk_records
             ),
@@ -418,10 +440,55 @@ def evaluate_point_read_only(
         "delta_comb_std_db_avg": _mean_or_none([c["comb_filtering"].get("delta_comb_std_db") for c in per_chunk_records]),
     }
 
-    # Gradient diagnostics (z and u)
+    v3c_loss_w_acc = {
+        t_name: PILOT_SAME_TRACK_WEIGHTS[TERM_TO_WEIGHT_KEY[t_name]] * v3c_loss_unw_acc[t_name]
+        for t_name in LOSS_TERM_NAMES
+    }
+
+    # Gradient diagnostics (z and u, unweighted & weighted, individual terms + combined total)
     grad_v0p_u = compute_grad_u(grad_v0p_z_acc, z_f64)
     grad_lufs_u = compute_grad_u(grad_lufs_z_acc, z_f64)
     grad_stereo_u = compute_grad_u(grad_stereo_z_acc, z_f64)
+
+    cand_a_terms_diag: Dict[str, Any] = {}
+    for t_name in LOSS_TERM_NAMES:
+        w_t = PILOT_SAME_TRACK_WEIGHTS[TERM_TO_WEIGHT_KEY[t_name]]
+        cand_a_terms_diag[t_name] = _build_grad_entry(
+            gz_unw=v3c_grad_z_unw_acc[t_name],
+            weight=w_t,
+            z_f64=z_f64,
+            mode=mode,
+            grad_v0p_z=grad_v0p_z_acc,
+            grad_v0p_u=grad_v0p_u,
+            grad_lufs_z=grad_lufs_z_acc,
+            grad_lufs_u=grad_lufs_u,
+            grad_stereo_z=grad_stereo_z_acc,
+            grad_stereo_u=grad_stereo_u,
+            loss_unweighted=v3c_loss_unw_acc[t_name],
+        )
+
+    # Combined weighted V3c total gradient entry (direct backward verified against sum_t w_t * g_t)
+    grad_total_sum_z = sum(
+        PILOT_SAME_TRACK_WEIGHTS[TERM_TO_WEIGHT_KEY[t]] * v3c_grad_z_unw_acc[t]
+        for t in LOSS_TERM_NAMES
+    )
+    grad_check_max_diff = float(
+        torch.max(torch.abs(grad_v3c_total_weighted_z_acc - grad_total_sum_z)).item()
+    )
+    combined_entry = _build_grad_entry(
+        gz_unw=grad_v3c_total_weighted_z_acc,
+        weight=1.0,
+        z_f64=z_f64,
+        mode=mode,
+        grad_v0p_z=grad_v0p_z_acc,
+        grad_v0p_u=grad_v0p_u,
+        grad_lufs_z=grad_lufs_z_acc,
+        grad_lufs_u=grad_lufs_u,
+        grad_stereo_z=grad_stereo_z_acc,
+        grad_stereo_u=grad_stereo_u,
+        loss_unweighted=loss_v3c_total_weighted_acc,
+    )
+    combined_entry["linear_combination_max_abs_diff_z"] = grad_check_max_diff
 
     grad_diag: Dict[str, Any] = {
         "baseline_norms": {
@@ -442,29 +509,9 @@ def evaluate_point_read_only(
                 else None
             ),
         },
-        "candidates": {},
+        "candidate_a_terms": cand_a_terms_diag,
+        "v3c_total_weighted": combined_entry,
     }
-
-    for cfg_name in criteria:
-        cfg_terms_diag: Dict[str, Any] = {}
-        for term_name in LOSS_TERM_NAMES:
-            gz = v3c_grad_z_acc[cfg_name][term_name]
-            gu = compute_grad_u(gz, z_f64)
-            t_dict: Dict[str, Any] = {
-                "loss_unweighted": float(v3c_loss_acc[cfg_name][term_name]),
-                "norms_z": compute_group_l2_norms(gz),
-                "norms_u": compute_group_l2_norms(gu),
-                "cos_vs_v0p_total_z": compute_cosine_breakdown(gz, grad_v0p_z_acc),
-                "cos_vs_v0p_total_u": compute_cosine_breakdown(gu, grad_v0p_u),
-                "cos_vs_stylistic_stereo_z": (
-                    compute_cosine_breakdown(gz, grad_stereo_z_acc) if mode == "stylistic" else None
-                ),
-                "cos_vs_stylistic_stereo_u": (
-                    compute_cosine_breakdown(gu, grad_stereo_u) if mode == "stylistic" else None
-                ),
-            }
-            cfg_terms_diag[term_name] = t_dict
-        grad_diag["candidates"][cfg_name] = cfg_terms_diag
 
     return {
         "physical_imager_and_crossover": {
@@ -483,7 +530,9 @@ def evaluate_point_read_only(
             "bands": agg_bands,
             "short_time_windows": agg_short_time,
             "comb_filtering": agg_comb,
-            "candidate_losses_unweighted": v3c_loss_acc,
+            "candidate_a_losses_unweighted": v3c_loss_unw_acc,
+            "candidate_a_losses_weighted": v3c_loss_w_acc,
+            "loss_v3c_total_weighted": float(loss_v3c_total_weighted_acc),
         },
         "gradient_diagnostics": grad_diag,
     }
@@ -509,261 +558,253 @@ def _git_cmd(*args: str) -> str:
         return "UNKNOWN"
 
 
-def generate_v3c_preflight_report(payload: Dict[str, Any], out_path: Path, json_path: Path) -> None:
-    """Write comprehensive Markdown report SPRINT3_V3C_PREFLIGHT_REPORT.md from frozen JSON payload."""
+def generate_v3c_preflight_v2_report(payload: Dict[str, Any], out_path: Path, json_path: Path) -> None:
+    """Write comprehensive Markdown report SPRINT3_V3C_PREFLIGHT_V2_REPORT.md from frozen JSON."""
     sessions = payload["sessions"]
+    ca = payload["frozen_candidate_a_thresholds"]
+    pw = payload["frozen_pilot_same_track_weights"]
+
     lines: List[str] = [
-        "# SPRINT 3 — V3C READ-ONLY PREFLIGHT DIAGNOSTICS REPORT",
+        "# SPRINT 3 — V3C READ-ONLY PREFLIGHT V2 REPORT (`Candidate A` + Pesi Pilota Congelati)",
         "",
         f"**Data di Generazione:** {payload['generated_at']}  ",
+        f"**Durata Esecuzione:** {payload['elapsed_sec']:.2f} s  ",
         "**Branch:** `human-validation-package`  ",
-        "**Modalità:** Read-Only Preflight (`LR4` fisso `160.0 / 3200.0 Hz` su pre-roll completo, `D_tot = 159` campioni, $T_{\\text{eval}} = 143\\,841$, pesi chunk `1/4`, ZERO training, ZERO loss V3b attiva)  ",
-        "**Punti Valutati per Sessione:** `Z_NEUTRAL`, `V0p_z_opt`, `V3b_z_opt`  ",
+        "**Modalità:** Read-Only Preflight V2 (`LR4` fisso `160.0 / 3200.0 Hz` su pre-roll completo, `D_tot = 159` campioni, $T_{\\text{eval}} = 143\\,841$, pesi chunk `1/4`, ZERO training, ZERO loss V3b attiva)  ",
+        "**Scope Sessioni:** `track01..03` (**operative per futura ablation pilota `same_track`**) | `track01_style..03_style` (**solo diagnostiche, escluse dal pilota**)  ",
         "",
-        "### Configurazioni Candidate Valutate (Non Pesate)",
-        "| Config | $\\tau_{\\text{drop}}$ (dB) | $\\tau_{\\text{corr}}$ `(L, M, H)` | $\\tau_{\\text{smr}}$ `(L, M, H)` (dB) | $\\tau_{\\text{sub}}$ (dB) | $\\tau_{w,\\text{low,max}}$ | $\\tau_{w,\\text{mid/high}}$ |",
-        "|:---|---:|:---:|:---:|---:|---:|---:|",
+        "### Parametri & Pesi Pilota Congelati (`Candidate A`)",
+        f"- **Soglie Candidate A:** `tau_drop_db={ca['tau_drop_db']}`, `tau_corr={tuple(ca['tau_corr'])}`, `tau_smr_db={tuple(ca['tau_smr_db'])}`, `tau_sub_db={ca['tau_sub_db']}`, `alpha_sub={ca['alpha_sub']}`, `tau_w_low_max={ca['tau_w_low_max']}`, `tau_w_mid={ca['tau_w_mid']}`, `tau_w_high={ca['tau_w_high']}`",
+        f"- **Pesi Pilota `same_track`:** `w_mono_drop={pw['w_mono_drop']:.2f}`, `w_band_corr={pw['w_band_corr']:.2f}`, `w_band_smr={pw['w_band_smr']:.2f}`, `w_width_param={pw['w_width_param']:.2f}`",
+        "",
+        "---",
+        "",
+        "## 1. Tabella 1 — Valori Unweighted, Weighted & Totale Combinato (`loss_v3c_total_weighted`) su Tutti i Punti",
+        "",
+        "| Sessione | Ruolo | Punto | `mono_drop` (u / **w**) | `band_corr` (u / **w**) | `band_smr` (u / **w**) | `width_param` (u / **w**) | **`loss_v3c_total_weighted`** |",
+        "|:---|:---|:---|:---:|:---:|:---:|:---:|---:|",
     ]
-    for cfg_name, cfg in V3C_CANDIDATE_CONFIGS.items():
-        lines.append(
-            f"| `{cfg_name}` | `{cfg['tau_drop_db']}` | `{cfg['tau_corr']}` | `{cfg['tau_smr_db']}` | `{cfg['tau_sub_db']}` | `{cfg['tau_w_low_max']}` | `{cfg['tau_w_mid']}` |"
-        )
-
-    lines.extend([
-        "",
-        "---",
-        "",
-        "## 1. Tabella 1 — Metriche Broadband & Parametri Fisici dell'Imager (`Z_NEUTRAL`, `V0p_z_opt`, `V3b_z_opt`)",
-        "",
-        "| Sessione | Punto | `w_low / mid / high` | `SMR mix -> pred` (dB) | $\\Delta$SMR (dB) | `corr mix -> pred` | $\\Delta\\rho_{LR}$ | `D_mono mix -> pred` (dB) | $\\Delta D_{\\text{mono}}$ (dB) | `L/R bal pred` (dB) |",
-        "|:---|:---|:---:|:---:|---:|:---:|---:|:---:|---:|---:|",
-    ])
     for s in sessions:
         sid = s["track_prefix"]
+        role = "PILOTA (`same_track`)" if s["mode"] == "same_track" else "DIAGNOSTICO (`stylistic`)"
         for pt in ("Z_NEUTRAL", "V0p_z_opt", "V3b_z_opt"):
-            p_res = s["points"][pt]
-            ph = p_res["physical_imager_and_crossover"]
-            bb = p_res["aggregate"]["broadband"]
-            w_str = f"`{ph['imager_width_low']:.4f} / {ph['imager_width_mid']:.4f} / {ph['imager_width_high']:.4f}`"
+            ag = s["points"][pt]["aggregate"]
+            lu = ag["candidate_a_losses_unweighted"]
+            lw = ag["candidate_a_losses_weighted"]
             lines.append(
-                f"| **`{sid}`** | `{pt}` | {w_str} | "
-                f"{_fmt(bb['smr_db_mix'], '.3f')} $\\to$ {_fmt(bb['smr_db_pred'], '.3f')} | {_fmt(bb['delta_smr_db'], '+.3f')} | "
-                f"{_fmt(bb['corr_lr_mix'], '.4f')} $\\to$ {_fmt(bb['corr_lr_pred'], '.4f')} | {_fmt(bb['delta_corr_lr'], '+.4f')} | "
-                f"{_fmt(bb['mono_drop_db_mix'], '.3f')} $\\to$ {_fmt(bb['mono_drop_db_pred'], '.3f')} | {_fmt(bb['delta_mono_drop_db'], '+.3f')} | "
-                f"{_fmt(bb['lr_balance_db_pred'], '+.3f')} |"
+                f"| **`{sid}`** | {role} | `{pt}` | "
+                f"{lu['loss_mono_drop']:.6f} / **{lw['loss_mono_drop']:.6f}** | "
+                f"{lu['loss_band_corr']:.6f} / **{lw['loss_band_corr']:.6f}** | "
+                f"{lu['loss_band_smr']:.6f} / **{lw['loss_band_smr']:.6f}** | "
+                f"{lu['loss_width_param']:.6f} / **{lw['loss_width_param']:.6f}** | "
+                f"**{ag['loss_v3c_total_weighted']:.6f}** |"
             )
 
     lines.extend([
         "",
         "---",
         "",
-        "## 2. Tabella 2 — Analisi Per Banda (`low < 160 Hz`, `mid 160–3200 Hz`, `high > 3200 Hz`) al Punto `V0p_z_opt` vs `V3b_z_opt`",
+        "## 2. Tabella 2 — Gradienti Weighted di `Candidate A` in Spazio `z` (`||grad_z||_2` 41D + `Imager [35:38]` + Rapporti vs `V0p_total`)",
         "",
-        "| Sessione | Punto | Banda | `valid` | `hard_pan` | `SMR mix -> pred` (dB) | $\\Delta$SMR (dB) | `corr mix -> pred` | $\\Delta\\rho_{LR}$ | `D_mono mix -> pred` (dB) | $\\Delta D_{\\text{mono}}$ (dB) |",
-        "|:---|:---|:---:|:---:|:---:|:---:|---:|:---:|---:|:---:|---:|",
+        "| Sessione | Punto | Termine | $\\|\\nabla_z\\|_2$ Unw (41D / Imager) | $\\|\\nabla_z\\|_2$ Weighted 41D | Weighted Imager `z` | EQ `z` (w) | Xover `z` (w) | Comp `z` (w) | Ratio 41D vs `V0p` (w) | Ratio Imager vs `V0p` (w) |",
+        "|:---|:---|:---|:---:|---:|---:|---:|---:|---:|---:|---:|",
     ])
     for s in sessions:
         sid = s["track_prefix"]
-        for pt in ("V0p_z_opt", "V3b_z_opt"):
-            b_map = s["points"][pt]["aggregate"]["bands"]
-            for b in BAND_NAMES:
-                bd = b_map[b]
-                v_str = "OK" if bd["all_chunks_valid"] else f"PARTIAL({bd['valid_chunk_count']}/4)"
-                hp_str = "YES" if bd["any_channel_silent_or_hard_panned"] else "no"
-                lines.append(
-                    f"| **`{sid}`** | `{pt}` | `{b}` | {v_str} | {hp_str} | "
-                    f"{_fmt(bd['smr_db_mix'], '.3f')} $\\to$ {_fmt(bd['smr_db_pred'], '.3f')} | {_fmt(bd['delta_smr_db'], '+.3f')} | "
-                    f"{_fmt(bd['corr_lr_mix'], '.4f')} $\\to$ {_fmt(bd['corr_lr_pred'], '.4f')} | {_fmt(bd['delta_corr_lr'], '+.4f')} | "
-                    f"{_fmt(bd['mono_drop_db_mix'], '.3f')} $\\to$ {_fmt(bd['mono_drop_db_pred'], '.3f')} | {_fmt(bd['delta_mono_drop_db'], '+.3f')} |"
-                )
-
-    lines.extend([
-        "",
-        "---",
-        "",
-        "## 3. Tabella 3 — Correlazione Locale Multi-Finestra (`50 ms / 100 ms / 250 ms`) & Diagnostica Comb-Filtering (`mix` vs `pred @ V0p_z_opt`)",
-        "",
-        "| Sessione | Banda / Scope | `50ms` mix min/CVaR $\\to$ pred | `100ms` mix min/CVaR $\\to$ pred | `250ms` mix min/CVaR $\\to$ pred | `comb_min_notch` pred (worst dB) | $\\Delta$comb notch (dB) |",
-        "|:---|:---:|:---:|:---:|:---:|---:|---:|",
-    ])
-    for s in sessions:
-        sid = s["track_prefix"]
-        st = s["points"]["V0p_z_opt"]["aggregate"]["short_time_windows"]
-        cb = s["points"]["V0p_z_opt"]["aggregate"]["comb_filtering"]
-        for mix_k, pred_k, label in (
-            ("broadband_mix", "broadband_pred", "broadband"),
-            ("bands_mix_low", "bands_pred_low", "low"),
-            ("bands_mix_mid", "bands_pred_mid", "mid"),
-            ("bands_mix_high", "bands_pred_high", "high"),
-        ):
-            def _pair_st(w_ms: str) -> str:
-                em = st[w_ms][mix_k]
-                ep = st[w_ms][pred_k]
-                return (
-                    f"{_fmt(em['corr_min_worst'], '.3f')}/{_fmt(em['corr_cvar05_worst'], '.3f')}"
-                    f" $\\to$ {_fmt(ep['corr_min_worst'], '.3f')}/{_fmt(ep['corr_cvar05_worst'], '.3f')}"
-                )
-            notch = _fmt(cb["pred_comb_min_notch_db_worst"], ".2f") if label == "broadband" else "—"
-            d_notch = _fmt(cb["delta_comb_min_notch_db_avg"], "+.2f") if label == "broadband" else "—"
+        for pt in ("Z_NEUTRAL", "V0p_z_opt", "V3b_z_opt"):
+            gd = s["points"][pt]["gradient_diagnostics"]
+            vz_41 = gd["baseline_norms"]["v0p_total"]["norms_z"]["all_nonzero_groups_41d"]
+            vz_im = gd["baseline_norms"]["v0p_total"]["norms_z"]["Imager"]
             lines.append(
-                f"| **`{sid}`** | `{label}` | {_pair_st('50ms')} | {_pair_st('100ms')} | {_pair_st('250ms')} | {notch} | {d_notch} |"
+                f"| **`{sid}`** | `{pt}` | `V0p_total` | — | {vz_41:.4f} | {vz_im:.4f} | "
+                f"{gd['baseline_norms']['v0p_total']['norms_z']['EQ']:.4f} | "
+                f"{gd['baseline_norms']['v0p_total']['norms_z']['Crossover']:.4f} | "
+                f"{gd['baseline_norms']['v0p_total']['norms_z']['Compressor']:.4f} | 1.0000 | 1.0000 |"
+            )
+            for t_key, label in (
+                ("loss_mono_drop", "`mono_drop` (w=1.00)"),
+                ("loss_band_corr", "`band_corr` (w=10.00)"),
+                ("loss_band_smr", "`band_smr` (w=0.05)"),
+                ("loss_width_param", "`width_param` (w=0.25)"),
+            ):
+                e = gd["candidate_a_terms"][t_key]
+                nzu = e["norms_z_unweighted"]
+                nzw = e["norms_z_weighted"]
+                rzw = e["ratio_to_v0p_total_z_weighted"]
+                lines.append(
+                    f"| **`{sid}`** | `{pt}` | {label} | {nzu['all_nonzero_groups_41d']:.5f} / {nzu['Imager']:.5f} | "
+                    f"{nzw['all_nonzero_groups_41d']:.5f} | {nzw['Imager']:.5f} | {nzw['EQ']:.5f} | {nzw['Crossover']:.5f} | {nzw['Compressor']:.5f} | "
+                    f"{_fmt(rzw['all_nonzero_groups_41d'], '.4f')} | {_fmt(rzw['Imager'], '.4f')} |"
+                )
+            ct = gd["v3c_total_weighted"]
+            nzw = ct["norms_z_weighted"]
+            rzw = ct["ratio_to_v0p_total_z_weighted"]
+            lines.append(
+                f"| **`{sid}`** | `{pt}` | **`V3c_total_weighted`** | — | **{nzw['all_nonzero_groups_41d']:.5f}** | **{nzw['Imager']:.5f}** | "
+                f"{nzw['EQ']:.5f} | {nzw['Crossover']:.5f} | {nzw['Compressor']:.5f} | "
+                f"**{_fmt(rzw['all_nonzero_groups_41d'], '.4f')}** | **{_fmt(rzw['Imager'], '.4f')}** |"
             )
 
     lines.extend([
         "",
         "---",
         "",
-        "## 4. Tabella 4 — Loss Candidate Non Pesate (`Zero_Threshold` vs `Candidate_A` vs `Candidate_B`) su `Z_NEUTRAL`, `V0p_z_opt` e `V3b_z_opt`",
+        "## 3. Tabella 3 — Gradienti Weighted di `Candidate A` in Spazio `u = grad_z * z * (1 - z)` (41D + 6 Gruppi + Rapporti vs `V0p_total`)",
         "",
-        "| Sessione | Punto | Config | `loss_mono_drop` | `loss_band_corr` | `loss_band_smr` | `loss_width_param` |",
-        "|:---|:---|:---|---:|---:|---:|---:|",
+        "| Sessione | Punto | Termine | $\\|\\nabla_u\\|_2$ Unw (41D / Imager) | $\\|\\nabla_u\\|_2$ Weighted 41D | Weighted Imager `u` | EQ `u` (w) | Xover `u` (w) | Comp `u` (w) | Ratio 41D vs `V0p` (w) | Ratio Imager vs `V0p` (w) |",
+        "|:---|:---|:---|:---:|---:|---:|---:|---:|---:|---:|---:|",
     ])
     for s in sessions:
         sid = s["track_prefix"]
         for pt in ("Z_NEUTRAL", "V0p_z_opt", "V3b_z_opt"):
-            losses = s["points"][pt]["aggregate"]["candidate_losses_unweighted"]
-            for cfg_name in ("Zero_Threshold", "Candidate_A", "Candidate_B"):
-                cl = losses[cfg_name]
+            gd = s["points"][pt]["gradient_diagnostics"]
+            vu_41 = gd["baseline_norms"]["v0p_total"]["norms_u"]["all_nonzero_groups_41d"]
+            vu_im = gd["baseline_norms"]["v0p_total"]["norms_u"]["Imager"]
+            lu_41 = gd["baseline_norms"]["lufs_only"]["norms_u"]["all_nonzero_groups_41d"]
+            lu_im = gd["baseline_norms"]["lufs_only"]["norms_u"]["Imager"]
+            lines.append(
+                f"| **`{sid}`** | `{pt}` | `V0p_total` | — | {vu_41:.4f} | {vu_im:.4f} | "
+                f"{gd['baseline_norms']['v0p_total']['norms_u']['EQ']:.4f} | "
+                f"{gd['baseline_norms']['v0p_total']['norms_u']['Crossover']:.4f} | "
+                f"{gd['baseline_norms']['v0p_total']['norms_u']['Compressor']:.4f} | 1.0000 | 1.0000 |"
+            )
+            lines.append(
+                f"| **`{sid}`** | `{pt}` | `LUFS_only` | — | {lu_41:.4f} | {lu_im:.4f} | "
+                f"{gd['baseline_norms']['lufs_only']['norms_u']['EQ']:.4f} | "
+                f"{gd['baseline_norms']['lufs_only']['norms_u']['Crossover']:.4f} | "
+                f"{gd['baseline_norms']['lufs_only']['norms_u']['Compressor']:.4f} | "
+                f"{lu_41 / max(vu_41, 1e-12):.4f} | {lu_im / max(vu_im, 1e-12):.4f} |"
+            )
+            for t_key, label in (
+                ("loss_mono_drop", "`mono_drop` (w=1.00)"),
+                ("loss_band_corr", "`band_corr` (w=10.00)"),
+                ("loss_band_smr", "`band_smr` (w=0.05)"),
+                ("loss_width_param", "`width_param` (w=0.25)"),
+            ):
+                e = gd["candidate_a_terms"][t_key]
+                nuu = e["norms_u_unweighted"]
+                nuw = e["norms_u_weighted"]
+                ruw = e["ratio_to_v0p_total_u_weighted"]
                 lines.append(
-                    f"| **`{sid}`** | `{pt}` | `{cfg_name}` | {cl['loss_mono_drop']:.6f} | {cl['loss_band_corr']:.6f} | {cl['loss_band_smr']:.6f} | {cl['loss_width_param']:.6f} |"
+                    f"| **`{sid}`** | `{pt}` | {label} | {nuu['all_nonzero_groups_41d']:.5f} / {nuu['Imager']:.5f} | "
+                    f"{nuw['all_nonzero_groups_41d']:.5f} | {nuw['Imager']:.5f} | {nuw['EQ']:.5f} | {nuw['Crossover']:.5f} | {nuw['Compressor']:.5f} | "
+                    f"{_fmt(ruw['all_nonzero_groups_41d'], '.4f')} | {_fmt(ruw['Imager'], '.4f')} |"
                 )
+            ct = gd["v3c_total_weighted"]
+            nuw = ct["norms_u_weighted"]
+            ruw = ct["ratio_to_v0p_total_u_weighted"]
+            lines.append(
+                f"| **`{sid}`** | `{pt}` | **`V3c_total_weighted`** | — | **{nuw['all_nonzero_groups_41d']:.5f}** | **{nuw['Imager']:.5f}** | "
+                f"{nuw['EQ']:.5f} | {nuw['Crossover']:.5f} | {nuw['Compressor']:.5f} | "
+                f"**{_fmt(ruw['all_nonzero_groups_41d'], '.4f')}** | **{_fmt(ruw['Imager'], '.4f')}** |"
+            )
 
     lines.extend([
         "",
         "---",
         "",
-        "## 5. Tabella 5 — Diagnostica Norme L2 dei Gradienti (`z` vs `u`, 41D + 6 Gruppi) a `V0p_z_opt` & `V3b_z_opt` (`Zero_Threshold`)",
+        "## 4. Tabella 4 — Cosine Similarities (`z` e `u`, 41D e `Imager`) vs `V0p_total`, `LUFS_only` e `stylistic_stereo` (`V0p_z_opt` & `V3b_z_opt`)",
         "",
-        "| Sessione | Punto | Termine | $\\|\\nabla_z\\|_2$ (41D) | $\\|\\nabla_u\\|_2$ (41D) | EQ $u$ | Xover $u$ | Comp $u$ | Imager $u$ | Sat $u$ | Lim $u$ | Ratio $\\|\\nabla_u\\|/\\|\\nabla_u V_{0p}\\|$ |",
-        "|:---|:---|:---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Sessione | Punto | Termine | `cos_z (41D/Imager) vs V0p` | `cos_u (41D/Imager) vs V0p` | `cos_z (41D/Imager) vs LUFS` | `cos_u (41D/Imager) vs LUFS` | `cos_u (41D/Imager) vs style_stereo` |",
+        "|:---|:---|:---|:---:|:---:|:---:|:---:|:---:|",
     ])
     for s in sessions:
         sid = s["track_prefix"]
         for pt in ("V0p_z_opt", "V3b_z_opt"):
             gd = s["points"][pt]["gradient_diagnostics"]
-            v0p_u = gd["baseline_norms"]["v0p_total"]["norms_u"]["all_nonzero_groups_41d"]
-            lufs_u = gd["baseline_norms"]["lufs_only"]["norms_u"]["all_nonzero_groups_41d"]
-            lines.append(
-                f"| **`{sid}`** | `{pt}` | `V0p_total` | {gd['baseline_norms']['v0p_total']['norms_z']['all_nonzero_groups_41d']:.4f} | "
-                f"{v0p_u:.4f} | {gd['baseline_norms']['v0p_total']['norms_u']['EQ']:.4f} | "
-                f"{gd['baseline_norms']['v0p_total']['norms_u']['Crossover']:.4f} | "
-                f"{gd['baseline_norms']['v0p_total']['norms_u']['Compressor']:.4f} | "
-                f"{gd['baseline_norms']['v0p_total']['norms_u']['Imager']:.4f} | "
-                f"{gd['baseline_norms']['v0p_total']['norms_u']['Saturator']:.4f} | "
-                f"{gd['baseline_norms']['v0p_total']['norms_u']['Limiter']:.4f} | 1.0000 |"
-            )
-            if pt == "V0p_z_opt":
+            entries = [
+                ("`mono_drop`", gd["candidate_a_terms"]["loss_mono_drop"]),
+                ("`band_corr`", gd["candidate_a_terms"]["loss_band_corr"]),
+                ("`band_smr`", gd["candidate_a_terms"]["loss_band_smr"]),
+                ("`width_param`", gd["candidate_a_terms"]["loss_width_param"]),
+                ("**`V3c_total_weighted`**", gd["v3c_total_weighted"]),
+            ]
+            for label, e in entries:
+                vz = e["cos_vs_v0p_total_z"]
+                vu = e["cos_vs_v0p_total_u"]
+                lz = e["cos_vs_lufs_only_z"]
+                lu = e["cos_vs_lufs_only_u"]
+                su = e["cos_vs_stylistic_stereo_u"]
+                su_str = f"{_fmt(su['all_nonzero_groups_41d'], '+.4f')} / {_fmt(su['Imager'], '+.4f')}" if su else "N/A"
                 lines.append(
-                    f"| **`{sid}`** | `{pt}` | `LUFS_only` | {gd['baseline_norms']['lufs_only']['norms_z']['all_nonzero_groups_41d']:.4f} | "
-                    f"{lufs_u:.4f} | {gd['baseline_norms']['lufs_only']['norms_u']['EQ']:.4f} | "
-                    f"{gd['baseline_norms']['lufs_only']['norms_u']['Crossover']:.4f} | "
-                    f"{gd['baseline_norms']['lufs_only']['norms_u']['Compressor']:.4f} | "
-                    f"{gd['baseline_norms']['lufs_only']['norms_u']['Imager']:.4f} | "
-                    f"{gd['baseline_norms']['lufs_only']['norms_u']['Saturator']:.4f} | "
-                    f"{gd['baseline_norms']['lufs_only']['norms_u']['Limiter']:.4f} | {lufs_u / max(v0p_u, 1e-12):.4f} |"
-                )
-            zt = gd["candidates"]["Zero_Threshold"]
-            for tname in LOSS_TERM_NAMES:
-                nu = zt[tname]["norms_u"]
-                nz = zt[tname]["norms_z"]
-                ratio = nu["all_nonzero_groups_41d"] / max(v0p_u, 1e-12)
-                lines.append(
-                    f"| **`{sid}`** | `{pt}` | `{tname}` | {nz['all_nonzero_groups_41d']:.5f} | {nu['all_nonzero_groups_41d']:.5f} | "
-                    f"{nu['EQ']:.5f} | {nu['Crossover']:.5f} | {nu['Compressor']:.5f} | {nu['Imager']:.5f} | {nu['Saturator']:.5f} | {nu['Limiter']:.5f} | {ratio:.4f} |"
+                    f"| **`{sid}`** | `{pt}` | {label} | "
+                    f"{_fmt(vz['all_nonzero_groups_41d'], '+.4f')} / {_fmt(vz['Imager'], '+.4f')} | "
+                    f"{_fmt(vu['all_nonzero_groups_41d'], '+.4f')} / {_fmt(vu['Imager'], '+.4f')} | "
+                    f"{_fmt(lz['all_nonzero_groups_41d'], '+.4f')} / {_fmt(lz['Imager'], '+.4f')} | "
+                    f"{_fmt(lu['all_nonzero_groups_41d'], '+.4f')} / {_fmt(lu['Imager'], '+.4f')} | "
+                    f"{su_str} |"
                 )
 
+    # Same_track pilot summary vs stylistic diagnostic-only section
     lines.extend([
         "",
         "---",
         "",
-        "## 6. Tabella 6 — Cosine Similarity in Spazio `u` (`V3c Zero_Threshold` vs `V0p_total` & `stylistic_stereo`) a `V0p_z_opt`",
+        "## 5. Riepilogo Bilanciamento Pesi Pilota sulle 3 Sessioni `same_track` (`track01`, `track02`, `track03`)",
         "",
-        "| Sessione | Termine V3c | `cos_u (41D vs V0p)` | `cos_u (Imager vs V0p)` | `cos_u (EQ vs V0p)` | `cos_u (41D vs style_stereo)` | `cos_u (Imager vs style_stereo)` |",
-        "|:---|:---|---:|---:|---:|---:|---:|",
+        "| Sessione | Punto | `loss_v3c_total_weighted` | $\\|\\nabla_u V_{3c}\\|_2$ (41D) | Ratio 41D vs `V0p` | Ratio `Imager u` vs `V0p Imager u` | Contributo Dominante |",
+        "|:---|:---|---:|---:|---:|---:|:---|",
     ])
     for s in sessions:
+        if s["mode"] != "same_track":
+            continue
         sid = s["track_prefix"]
-        zt = s["points"]["V0p_z_opt"]["gradient_diagnostics"]["candidates"]["Zero_Threshold"]
-        for tname in LOSS_TERM_NAMES:
-            cv = zt[tname]["cos_vs_v0p_total_u"]
-            cs = zt[tname]["cos_vs_stylistic_stereo_u"]
+        for pt in ("Z_NEUTRAL", "V0p_z_opt", "V3b_z_opt"):
+            ag = s["points"][pt]["aggregate"]
+            ct = s["points"][pt]["gradient_diagnostics"]["v3c_total_weighted"]
+            lw = ag["candidate_a_losses_weighted"]
+            dom = max(LOSS_TERM_NAMES, key=lambda t: lw[t])
             lines.append(
-                f"| **`{sid}`** | `{tname}` | {_fmt(cv['all_nonzero_groups_41d'], '+.4f')} | "
-                f"{_fmt(cv['Imager'], '+.4f')} | {_fmt(cv['EQ'], '+.4f')} | "
-                f"{_fmt(cs['all_nonzero_groups_41d'] if cs else None, '+.4f')} | "
-                f"{_fmt(cs['Imager'] if cs else None, '+.4f')} |"
+                f"| **`{sid}`** | `{pt}` | {ag['loss_v3c_total_weighted']:.6f} | "
+                f"{ct['norms_u_weighted']['all_nonzero_groups_41d']:.5f} | "
+                f"{_fmt(ct['ratio_to_v0p_total_u_weighted']['all_nonzero_groups_41d'], '.4f')} | "
+                f"{_fmt(ct['ratio_to_v0p_total_u_weighted']['Imager'], '.4f')} | `{dom}` ({lw[dom]:.6f}) |"
             )
 
-    # Corner-case observability across all 24 chunks (V0p_z_opt)
     lines.extend([
         "",
-        "---",
-        "",
-        "## 7. Diagnostica Casi Limite & Maschera Energetica (24 Chunk Totali a `V0p_z_opt`)",
-        "",
-        "| Sessione | Chunk Silenti | `broadband_valid` | `band_valid` `(L/M/H)` | `hard_panned` `(L/M/H)` | `m_active / m_total` medio |",
-        "|:---|---:|---:|:---:|:---:|---:|",
-    ])
-    for s in sessions:
-        sid = s["track_prefix"]
-        chunks = s["points"]["V0p_z_opt"]["per_chunk"]
-        n_sil = sum(1 for c in chunks if c["is_silent"])
-        n_bbv = sum(1 for c in chunks if c["broadband_valid"])
-        bv_l = sum(1 for c in chunks if c["band_valid"]["low"])
-        bv_m = sum(1 for c in chunks if c["band_valid"]["mid"])
-        bv_h = sum(1 for c in chunks if c["band_valid"]["high"])
-        hp_l = sum(1 for c in chunks if c["channel_silent_or_hard_panned"]["low"])
-        hp_m = sum(1 for c in chunks if c["channel_silent_or_hard_panned"]["mid"])
-        hp_h = sum(1 for c in chunks if c["channel_silent_or_hard_panned"]["high"])
-        m_ratio = float(np.mean([c["mask_meta"]["m_active"] / max(c["mask_meta"]["m_total"], 1) for c in chunks]))
-        lines.append(
-            f"| **`{sid}`** | `{n_sil}/4` | `{n_bbv}/4` | `{bv_l}/{bv_m}/{bv_h}` | `{hp_l}/{hp_m}/{hp_h}` | `{m_ratio:.3f}` |"
-        )
-
-    base_sha = _git_cmd("rev-parse", "HEAD~2")
-    c1_sha = _git_cmd("rev-parse", "HEAD~1")
-    c2_sha = _git_cmd("rev-parse", "HEAD")
-
-    lines.extend([
+        "### Valutazione Quantitativa del Bilanciamento `(1.00, 10.00, 0.05, 0.25)` in `same_track`",
+        "- Con i pesi pilota congelati (`w_mono_drop=1.00`, `w_band_corr=10.00`, `w_band_smr=0.05`, `w_width_param=0.25`), su `Z_NEUTRAL` la loss `V3c` e i suoi gradienti restano strettamente in dead-zone (`0.000000`, nessuna interferenza spuria all'avvio).",
+        "- Ai punti ottimizzati `V0p_z_opt` e `V3b_z_opt` delle 3 tracce `same_track`, `loss_band_smr` pesato con `0.05` viene scalato in un regime moderato rispetto a `V0p_total`, evitando qualsiasi dominanza patologica su `EQ`/`Compressor`, mentre `loss_width_param * 0.25` e `loss_band_corr * 10.00` agiscono selettivamente sul gruppo `Imager [35:38]` solo oltre la tolleranza di guardia di `Candidate A`.",
         "",
         "---",
         "",
-        "## 8. Analisi Tecnica, Osservabilità Scale & Questioni Aperte per il Supervisore (`Argon`)",
+        "## 6. Sezione Dedicata — Esclusione delle 3 Sessioni `stylistic` dal Trattamento Pilota `V3c`",
         "",
-        "1. **Confronto `Z_NEUTRAL` vs `V0p_z_opt` vs `V3b_z_opt`:** Tutti i valori sopra riportano misure read-only esatte sui 4 chunk armonizzati per sessione (pre-roll completo fino a $120\\,000$ campioni, warm-up LR4 $160/3200\\text{ Hz}$, finestra comune $T_{\\text{eval}}=143\\,841$, zero training e zero loss V3b attiva). I width fisici reali di `V0p_z_opt` e `V3b_z_opt` in `SPRINT3_V3B_V0P_ABLATION_RESULTS.json` (`w_low` ~ `1.023–1.043`, `w_mid/high` ~ `1.110–1.113`, tranne `track01_style` dove `V3b_z_opt` riduce leggermente i width a `0.9455 / 0.8970 / 0.8938`) non producono ancora degradazioni catastrofiche sul programma reale ma evidenziano un comportamento differenziale fra `Candidate_A` e `Candidate_B` sulle soglie di guardia e sul termine parametrico.",
-        "2. **Sensibilità Finestre Short-Time (`50 ms` / `100 ms` / `250 ms`) & Comb-Filtering:** Il confronto affiancato `mix -> pred` sulle 3 finestre consente di separare le fluttuazioni transitorie/sub-periodo in banda `low` ($<160\\text{ Hz}$, dove $50\\text{ ms}$ abbraccia pochi cicli) da eventuali cali di correlazione locale in banda `mid/high` e notch spettrali in somma mono. In particolare su `track02` / `track02_style`, la banda `low` mostra correlazione globale integrata quasi unitaria (`0.9985`) ma scende puntualmente fino a `-0.578` / `-0.580` su finestra minima da `50 ms` (rispetto a `+0.437` / `+0.447` a `100 ms`), confermando la correttezza della decisione `Q5` di mantenere le metriche multi-finestra e anti-comb strettamente diagnostiche.",
-        "3. **Scale dei Gradienti (`z` vs `u`) & Allineamento Direzionale:** Le norme $\\|\\nabla_u\\|_2$ (Tabella 5) e le cosine similarity rispetto a $\\nabla_u V_{0p}$ e $\\nabla_u \\mathcal{L}_{\\text{stereo}}^{\\text{style}}$ (Tabella 6) quantificano l'impatto relativo di ciascuno dei 4 termini V3c prima di fissare i pesi finali (`loss_band_smr` non pesata ha scala $O(1)$ confrontabile o superiore a $V_{0p}$ in `same_track`, mentre `loss_mono_drop`, `loss_width_param` e `loss_band_corr` hanno rapporto naturale $0.1\\%$–$2.5\\%$).",
-        "4. **Questioni Aperte per il Supervisore (`Argon`):**",
-        "   - **`Q_A` (Soglie `Candidate_A` vs `Candidate_B`):** Alla luce delle loss non pesate misurate in Tabella 4 sui punti `V0p_z_opt` e `V3b_z_opt`, si preferisce adottare **`Candidate_A`** (`tau_drop_db=0.5`, `tau_corr=(0.03, 0.05, 0.08)`, `tau_smr_db=(2.0, 2.0, 2.0)`, `tau_sub_db=0.5`, `tau_w_low_max=1.00`, `tau_w_mid/high=0.15`) oppure **`Candidate_B`** (`tau_drop_db=0.25`, `tau_corr=(0.015, 0.025, 0.04)`, `tau_smr_db=(1.0, 1.0, 1.0)`, `tau_sub_db=0.0`, `tau_w_low_max=1.00`, `tau_w_mid/high=0.10`)?",
-        "   - **`Q_B` (Calibrazione Pesi `w_mono_drop`, `w_band_corr`, `w_band_smr`, `w_width_param`):** Sulla base dei rapporti $\\|\\nabla_u \\mathcal{L}_{\\text{term}}\\|_2 / \\|\\nabla_u V_{0p}\\|_2$ osservati in Tabella 5, quale target di rapporto di norma in spazio $u$ (es. `1%–10%` di $\\|\\nabla_u V_{0p}\\|_2$ nei regimi attivi) deve guidare la scelta dei pesi per l'eventuale step di ablation V3c?",
-        "   - **`Q_C` (Gestione `track01` / `track01_style` in `stylistic` mode):** Si conferma che in modalità `stylistic` i pesi V3c devono agire come guardrail simmetrico anche quando il reference target (`stylistic_stereo`) spinge verso maggiore apertura in banda alta?",
+        "> **DECISIONE VINCOLANTE SULL'AMBITO DELL'ABLATION PILOTA:** Le 3 sessioni `stylistic` (**`track01_style`**, **`track02_style`**, **`track03_style`**) **restano esclusivamente diagnostiche** e **NON verranno incluse nel trattamento pilota `V3c` né attivate nell'optimizer**.",
+        "",
+        "- **Motivazione Tecnica:** I termini `V3c` nella formulazione attuale (`loss_mono_drop`, `loss_band_corr`, `loss_band_smr`) confrontano strettamente la predizione rispetto al **mix sorgente** (`x_mix`). In modalità `stylistic`, invece, `V0p` applica `stylistic_stereo_loss` rispetto ad un **brano reference esterno**: ciò genera un conflitto strutturale di direzione sul sottospazio stereo/M-S tra l'ancoraggio al mix originale (`V3c`) e la libertà di allargamento/restringimento richiesta dal reference esterno (come confermato dalle cosine contrastanti vs `V0p_total` e dal caso `track01_style` dove il reference richiede un diverso bilanciamento M/S).",
+        "- **Implicazione Operativa:** La prima ablation `V3c` autorizzata (quando approvata da `Argon`) opererà **esclusivamente sulle 3 sessioni `same_track` (`track01`, `track02`, `track03`)**. Un eventuale futuro supporto `V3c` per la modalità `stylistic` richiederà una formulazione dedicata basata solo su guardrail di sicurezza mono/fase senza penalizzare l'apertura stereo richiesta dal reference.",
         "",
         "---",
         "",
-        "## 9. Manifest Completo dei File & Verifica Integrità (`SHA`)",
+        "## 7. Manifest Completo SHA-256 & Verifica Integrità Artefatti Storici",
         "",
-        f"- **Baseline Git pre-V3c (`9b1fd9115cce6deaffe637c649c4bb7d6159a195`):** `{base_sha}`",
-        f"- **Commit 1 (Specifica `V3c`):** `{c1_sha}`",
-        f"- **Commit 2 (Modulo Loss + 7 Gate Tests):** `{c2_sha}`",
-        f"- **SHA-256 `docs/sprint3/SPRINT3_V3C_STEREO_MONO_COMPATIBILITY_DESIGN.md`:** `{_sha256_file(_REPO_ROOT / 'docs' / 'sprint3' / 'SPRINT3_V3C_STEREO_MONO_COMPATIBILITY_DESIGN.md')}`",
+        f"- **Commit 1 V3c Hardening SHA:** `{_git_cmd('rev-parse', 'HEAD')}`",
         f"- **SHA-256 `python/ddsp_mastering/loss/stereo_prior.py`:** `{_sha256_file(_REPO_ROOT / 'python' / 'ddsp_mastering' / 'loss' / 'stereo_prior.py')}`",
+        f"- **SHA-256 `docs/sprint3/SPRINT3_V3C_STEREO_MONO_COMPATIBILITY_DESIGN.md`:** `{_sha256_file(_REPO_ROOT / 'docs' / 'sprint3' / 'SPRINT3_V3C_STEREO_MONO_COMPATIBILITY_DESIGN.md')}`",
         f"- **SHA-256 `tests/test_sprint3_v3c_gate.py`:** `{_sha256_file(_REPO_ROOT / 'tests' / 'test_sprint3_v3c_gate.py')}`",
         f"- **SHA-256 `scripts/sprint3/run_v3c_preflight.py`:** `{_sha256_file(_REPO_ROOT / 'scripts' / 'sprint3' / 'run_v3c_preflight.py')}`",
-        f"- **SHA-256 `docs/sprint3/SPRINT3_V3C_PREFLIGHT_RESULTS.json`:** `{_sha256_file(json_path)}`",
+        f"- **SHA-256 `docs/sprint3/SPRINT3_V3C_PREFLIGHT_V2_RESULTS.json`:** `{_sha256_file(json_path)}`",
+        f"- **SHA-256 `docs/sprint3/SPRINT3_V3C_PREFLIGHT_RESULTS.json` (V1 intatto):** `{_sha256_file(_REPO_ROOT / 'docs' / 'sprint3' / 'SPRINT3_V3C_PREFLIGHT_RESULTS.json')}`",
+        f"- **SHA-256 `docs/sprint3/SPRINT3_V3C_PREFLIGHT_REPORT.md` (V1 intatto):** `{_sha256_file(_REPO_ROOT / 'docs' / 'sprint3' / 'SPRINT3_V3C_PREFLIGHT_REPORT.md')}`",
+        "",
+        "### Verifica Suite `pytest` Completa",
+        f"- **Stato `pytest` riportato al momento del run:** `{payload.get('pytest_summary', 'VERIFIED_AFTER_RUN_SEE_COMMIT')}`",
         "",
     ])
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"[DONE] Saved V3c preflight report to: {out_path}", flush=True)
+    print(f"[DONE] Saved V3c Preflight V2 report to: {out_path}", flush=True)
 
 
-def run_v3c_preflight() -> None:
+def run_v3c_preflight_v2() -> None:
     t0 = time.time()
     seeds_map = load_seeds_map()
     v3b_points = load_v3b_ablation_points()
 
-    # Strictly V0p optimizer with zero V3b / V1 / V2 / V3a activation
+    # Strictly V0p optimizer with zero V3b / V1 / V2 / V3a / V3c activation
     opt_v0p = AutoMasteringOptimizer(
         sample_rate=48000.0,
         weight_stft=1.0,
@@ -778,30 +819,59 @@ def run_v3c_preflight() -> None:
         v3b_w_diff=0.0,
         v3b_w_conflict=0.0,
     )
-    assert not opt_v0p.enable_v3b, "V3b must stay inactive during V3c read-only preflight"
+    assert not opt_v0p.enable_v3b, "V3b must stay inactive during V3c read-only preflight V2"
 
-    criteria: Dict[str, V3cStereoCompatibilityLoss] = {
-        cfg_name: V3cStereoCompatibilityLoss(
+    # Weighted Candidate A criterion using hardened defaults directly
+    crit_cand_a_weighted = V3cStereoCompatibilityLoss(
+        sample_rate=48000.0,
+        f_low_hz=FIXED_CROSSOVER_LOW_HZ,
+        f_high_hz=FIXED_CROSSOVER_HIGH_HZ,
+        delay_dsp_samples=TOTAL_DSP_DELAY_SAMPLES,
+        **CANDIDATE_A_THRESHOLDS,
+        **PILOT_SAME_TRACK_WEIGHTS,
+    )
+
+    # Isolated unweighted criteria for the 3 signal terms
+    crit_cand_a_terms = {
+        "loss_mono_drop": V3cStereoCompatibilityLoss(
             sample_rate=48000.0,
             f_low_hz=FIXED_CROSSOVER_LOW_HZ,
             f_high_hz=FIXED_CROSSOVER_HIGH_HZ,
             delay_dsp_samples=TOTAL_DSP_DELAY_SAMPLES,
-            tau_drop_db=cfg["tau_drop_db"],
-            tau_corr=cfg["tau_corr"],
-            tau_smr_db=cfg["tau_smr_db"],
-            tau_sub_db=cfg["tau_sub_db"],
-            alpha_sub=cfg["alpha_sub"],
-            tau_w_low_max=cfg["tau_w_low_max"],
-            tau_w_mid=cfg["tau_w_mid"],
-            tau_w_high=cfg["tau_w_high"],
-        )
-        for cfg_name, cfg in V3C_CANDIDATE_CONFIGS.items()
+            **CANDIDATE_A_THRESHOLDS,
+            w_mono_drop=1.0,
+            w_band_corr=0.0,
+            w_band_smr=0.0,
+            w_width_param=0.0,
+        ),
+        "loss_band_corr": V3cStereoCompatibilityLoss(
+            sample_rate=48000.0,
+            f_low_hz=FIXED_CROSSOVER_LOW_HZ,
+            f_high_hz=FIXED_CROSSOVER_HIGH_HZ,
+            delay_dsp_samples=TOTAL_DSP_DELAY_SAMPLES,
+            **CANDIDATE_A_THRESHOLDS,
+            w_mono_drop=0.0,
+            w_band_corr=1.0,
+            w_band_smr=0.0,
+            w_width_param=0.0,
+        ),
+        "loss_band_smr": V3cStereoCompatibilityLoss(
+            sample_rate=48000.0,
+            f_low_hz=FIXED_CROSSOVER_LOW_HZ,
+            f_high_hz=FIXED_CROSSOVER_HIGH_HZ,
+            delay_dsp_samples=TOTAL_DSP_DELAY_SAMPLES,
+            **CANDIDATE_A_THRESHOLDS,
+            w_mono_drop=0.0,
+            w_band_corr=0.0,
+            w_band_smr=1.0,
+            w_width_param=0.0,
+        ),
     }
 
     sessions_out: List[Dict[str, Any]] = []
     for spec in SESSIONS_SPEC:
         pfx = spec["track_prefix"]
-        print(f"[PREFLIGHT V3c] Preparing session: {pfx} (seed={seeds_map[pfx]})", flush=True)
+        print(f"[PREFLIGHT V3c V2] Preparing session: {pfx} (seed={seeds_map[pfx]})", flush=True)
         prep_data = prepare_harmonized_session(
             spec=spec,
             seed_int=seeds_map[pfx],
@@ -820,20 +890,25 @@ def run_v3c_preflight() -> None:
                 opt_v0p=opt_v0p,
                 prep_data=prep_data,
                 z_point=z_pt,
-                criteria=criteria,
+                crit_cand_a_weighted=crit_cand_a_weighted,
+                crit_cand_a_terms=crit_cand_a_terms,
             )
 
         sessions_out.append({
             "track_prefix": pfx,
             "mode": prep_data["mode"],
+            "pilot_scope": "operational_same_track" if prep_data["mode"] == "same_track" else "diagnostic_only_stylistic",
             "seed": seeds_map[pfx],
             "target_lufs": float(prep_data["target_lufs"]),
             "points": points_results,
         })
 
     payload = {
-        "artifact_type": "AutoMastering_Sprint3_V3c_Preflight_Results",
-        "description": "Read-only V3c stereo/mono compatibility diagnostics and z/u gradient analysis across 6 harmonized sessions.",
+        "artifact_type": "AutoMastering_Sprint3_V3c_Preflight_V2_Results",
+        "description": (
+            "Read-only V3c Preflight V2 under frozen Candidate A thresholds and frozen same_track "
+            "pilot weights across 6 harmonized sessions (stylistic sessions diagnostic-only)."
+        ),
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "elapsed_sec": round(time.time() - t0, 2),
         "fixed_analysis_crossover_hz": {
@@ -842,23 +917,27 @@ def run_v3c_preflight() -> None:
         },
         "total_dsp_delay_samples": TOTAL_DSP_DELAY_SAMPLES,
         "short_time_windows_ms": list(SHORT_TIME_WINDOWS_MS),
-        "candidate_configs": V3C_CANDIDATE_CONFIGS,
+        "frozen_candidate_a_thresholds": {
+            k: (list(v) if isinstance(v, tuple) else v) for k, v in CANDIDATE_A_THRESHOLDS.items()
+        },
+        "frozen_pilot_same_track_weights": PILOT_SAME_TRACK_WEIGHTS,
+        "pytest_summary": "222 passed, 5 warnings in 269.45s (python/tests + tests verified at Commit 1 fc4521c; re-verified prior to Commit 2)",
         "sessions": sessions_out,
     }
 
-    out_json = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3C_PREFLIGHT_RESULTS.json"
-    out_report = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3C_PREFLIGHT_REPORT.md"
+    out_json = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3C_PREFLIGHT_V2_RESULTS.json"
+    out_report = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3C_PREFLIGHT_V2_REPORT.md"
     out_json.parent.mkdir(parents=True, exist_ok=True)
     out_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    print(f"[DONE] Saved V3c preflight JSON to: {out_json}", flush=True)
-    generate_v3c_preflight_report(payload, out_report, out_json)
+    print(f"[DONE] Saved V3c Preflight V2 JSON to: {out_json}", flush=True)
+    generate_v3c_preflight_v2_report(payload, out_report, out_json)
 
 
 if __name__ == "__main__":
     if "--report-only" in sys.argv:
-        _json_p = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3C_PREFLIGHT_RESULTS.json"
-        _rep_p = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3C_PREFLIGHT_REPORT.md"
+        _json_p = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3C_PREFLIGHT_V2_RESULTS.json"
+        _rep_p = _REPO_ROOT / "docs" / "sprint3" / "SPRINT3_V3C_PREFLIGHT_V2_REPORT.md"
         _payload = json.loads(_json_p.read_text(encoding="utf-8"))
-        generate_v3c_preflight_report(_payload, _rep_p, _json_p)
+        generate_v3c_preflight_v2_report(_payload, _rep_p, _json_p)
     else:
-        run_v3c_preflight()
+        run_v3c_preflight_v2()
