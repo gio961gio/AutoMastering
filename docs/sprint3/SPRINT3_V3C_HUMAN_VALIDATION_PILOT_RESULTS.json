@@ -1,0 +1,186 @@
+{
+  "artifact_type": "sprint3_v3c_human_validation_pilot_results",
+  "repository": "gio961gio/AutoMastering",
+  "branch": "human-validation-package",
+  "source_commits": {
+    "phase1_optimizer_opt_in": "a98c2d67b87d798d449a1018157d50d2a2e7be20",
+    "phase2_ablation_pilot": "5709c3f402e434855a28c51e3de4c4b8ae532473",
+    "phase2_errata_blind_pack_v2_gate11": "53bd123d19bba57a18bd0a5970e6a1554329b5ec"
+  },
+  "listening_protocol": {
+    "pack_id": "sprint3_v3c_blind_v2",
+    "completed_at_utc": "2026-11-13T16:42:21.684Z",
+    "daw_and_settings": "Ableton Live 12 Suite, Arrangement aligned 1.1.1, faders 0.0 dB, Warp=OFF, Mono Master Utility fold-down check",
+    "pair_level_match_max_abs_delta_lufs": 0.001739,
+    "true_peak_max_dbtp": -0.35002,
+    "blind_status_note": "Unblinded strictly AFTER completion and export of evaluator JSON responses."
+  },
+  "summary_counts": {
+    "total_pairs": 3,
+    "treatment_v3c_preferred": 0,
+    "control_v0p_preferred": 0,
+    "ties_pari": 3,
+    "perceptual_regressions_observed": 0
+  },
+  "pairs": [
+    {
+      "pair_id": "PAIR01",
+      "track_prefix": "track03",
+      "mode": "same_track",
+      "blind_evaluator_responses": {
+        "stereo": "Pari",
+        "mono": "Pari",
+        "bass": "Pari",
+        "timbre": "Pari",
+        "global": "Pari",
+        "notes": "Sembrano uguali."
+      },
+      "unblinded_assignment": {
+        "A_file": "PAIR01_A.wav",
+        "A_arm": "Treatment_V3c",
+        "B_file": "PAIR01_B.wav",
+        "B_arm": "Control_V0p"
+      },
+      "v2_audio_verification": {
+        "common_attenuation_db": 0.2663,
+        "common_linear_gain": 0.9698062977054278,
+        "A_true_peak_4x_dbtp": -0.350093,
+        "B_true_peak_4x_dbtp": -0.353111,
+        "A_lufs_bs1770": -13.768089,
+        "B_lufs_bs1770": -13.768012,
+        "abs_delta_lufs_lu": 7.7e-05
+      },
+      "null_test_A_minus_B": {
+        "max_abs_diff": 0.0033568143844604492,
+        "max_abs_diff_dbfs": -49.4815,
+        "rms_diff": 0.000546952600590794,
+        "rms_diff_dbfs": -65.241
+      },
+      "objective_context_from_5709c3f": {
+        "loss_v0p_total_control": 6.23495626449585,
+        "loss_v0p_total_treatment": 6.234994888305664,
+        "loss_v3c_weighted_control": 0.0008046845524396057,
+        "loss_v3c_weighted_treatment": 0.0007858747071728517,
+        "imager_width_low_delta": -0.00026404857635498047,
+        "imager_width_mid_delta": -6.73532485961914e-05,
+        "imager_width_high_delta": -6.67572021484375e-06,
+        "crossover_f_high_delta_hz": -4.42236328125,
+        "l2_norm_delta_z_41d": 0.0020800491761257174,
+        "group_l2_delta_z": {
+          "EQ": 0.000153567791579664,
+          "Crossover": 0.00203482090704293,
+          "Compressor": 0.00010432132347977258,
+          "Imager": 0.0003894129506778374,
+          "Saturator": 7.961227675580843e-09,
+          "Limiter": 1.8917489796876907e-10
+        }
+      }
+    },
+    {
+      "pair_id": "PAIR02",
+      "track_prefix": "track01",
+      "mode": "same_track",
+      "blind_evaluator_responses": {
+        "stereo": "Pari",
+        "mono": "Pari",
+        "bass": "Pari",
+        "timbre": "Pari",
+        "global": "Pari",
+        "notes": "Sembrano uguali."
+      },
+      "unblinded_assignment": {
+        "A_file": "PAIR02_A.wav",
+        "A_arm": "Treatment_V3c",
+        "B_file": "PAIR02_B.wav",
+        "B_arm": "Control_V0p"
+      },
+      "v2_audio_verification": {
+        "common_attenuation_db": 0.6575,
+        "common_linear_gain": 0.9270966248402059,
+        "A_true_peak_4x_dbtp": -0.35007,
+        "B_true_peak_4x_dbtp": -0.392791,
+        "A_lufs_bs1770": -11.167835,
+        "B_lufs_bs1770": -11.169574,
+        "abs_delta_lufs_lu": 0.001739
+      },
+      "null_test_A_minus_B": {
+        "max_abs_diff": 0.04020488262176514,
+        "max_abs_diff_dbfs": -27.9144,
+        "rms_diff": 0.004482204538105285,
+        "rms_diff_dbfs": -46.9702
+      },
+      "objective_context_from_5709c3f": {
+        "loss_v0p_total_control": 2.8223822116851807,
+        "loss_v0p_total_treatment": 2.8199706077575684,
+        "loss_v3c_weighted_control": 0.0024833711330754884,
+        "loss_v3c_weighted_treatment": 0.0023057233291260966,
+        "imager_width_low_delta": -0.0007089376449584961,
+        "imager_width_mid_delta": -0.000316619873046875,
+        "imager_width_high_delta": 7.510185241699219e-06,
+        "crossover_f_high_delta_hz": -49.9736328125,
+        "l2_norm_delta_z_41d": 0.014583790867320116,
+        "group_l2_delta_z": {
+          "EQ": 0.00021124560465577655,
+          "Crossover": 0.014397069274787795,
+          "Compressor": 0.0020337734639556833,
+          "Imager": 0.0011092759499620217,
+          "Saturator": 1.3100434908432517e-07,
+          "Limiter": 1.3707904145121574e-08
+        }
+      }
+    },
+    {
+      "pair_id": "PAIR03",
+      "track_prefix": "track02",
+      "mode": "same_track",
+      "blind_evaluator_responses": {
+        "stereo": "Pari",
+        "mono": "Pari",
+        "bass": "Pari",
+        "timbre": "Pari",
+        "global": "Pari",
+        "notes": "Sembrano uguali."
+      },
+      "unblinded_assignment": {
+        "A_file": "PAIR03_A.wav",
+        "A_arm": "Treatment_V3c",
+        "B_file": "PAIR03_B.wav",
+        "B_arm": "Control_V0p"
+      },
+      "v2_audio_verification": {
+        "common_attenuation_db": 0.2787,
+        "common_linear_gain": 0.9684227873470045,
+        "A_true_peak_4x_dbtp": -0.35002,
+        "B_true_peak_4x_dbtp": -0.350035,
+        "A_lufs_bs1770": -18.318654,
+        "B_lufs_bs1770": -18.318616,
+        "abs_delta_lufs_lu": 3.8e-05
+      },
+      "null_test_A_minus_B": {
+        "max_abs_diff": 0.00014066696166992188,
+        "max_abs_diff_dbfs": -77.0362,
+        "rms_diff": 1.1713275516334696e-05,
+        "rms_diff_dbfs": -98.6264
+      },
+      "objective_context_from_5709c3f": {
+        "loss_v0p_total_control": 10.355216979980469,
+        "loss_v0p_total_treatment": 10.355347633361816,
+        "loss_v3c_weighted_control": 0.0008066148390994332,
+        "loss_v3c_weighted_treatment": 0.0007272358140970011,
+        "imager_width_low_delta": -0.00438690185546875,
+        "imager_width_mid_delta": -0.00018310546875,
+        "imager_width_high_delta": -7.3909759521484375e-06,
+        "crossover_f_high_delta_hz": 0.0146484375,
+        "l2_norm_delta_z_41d": 0.006275501674259843,
+        "group_l2_delta_z": {
+          "EQ": 0.00018605019517920716,
+          "Crossover": 3.841148253850465e-05,
+          "Compressor": 5.814140825985758e-05,
+          "Imager": 0.006272356074316272,
+          "Saturator": 1.2374881032660715e-08,
+          "Limiter": 1.1204974725842476e-09
+        }
+      }
+    }
+  ]
+}
