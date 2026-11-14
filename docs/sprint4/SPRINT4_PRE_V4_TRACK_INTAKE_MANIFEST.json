@@ -3,7 +3,7 @@
   "artifact_type": "sprint4_pre_v4_track_intake_manifest",
   "repository": "gio961gio/AutoMastering",
   "branch": "human-validation-package",
-  "status": "EMPTY_TEMPLATE_PENDING_AUTHORIZED_LOCAL_AUDIO",
+  "status": "STAGED_SAME_TRACK_AND_H06_PENDING_OPTIONAL_STYLISTIC_REFS",
   "policy": {
     "private_audio_root": "human_validation/private/input/",
     "git_tracking_forbidden_for_audio": true,
@@ -17,7 +17,9 @@
     "commercial_stream_rips_forbidden": true,
     "provenance_and_license_required": true,
     "dsp_optimization_executed": false,
-    "blind_pack_generated": false
+    "blind_pack_generated": false,
+    "resampling_disclosure": "All staged track04..track09 files originated as lossless 44100 Hz WAVs and were resampled offline to 48000 Hz via scipy.signal.resample_poly(160, 147) with explicit user approval; source SHA-256 and pre-resample parameters are recorded per track.",
+    "subtypes_note": "PCM_24 is used by default; IEEE FLOAT WAV (permitted by policy.allowed_subtypes) is used for track06_ref, track07_ref, track08_mix, and track08_ref so post-48kHz inter-sample excursions above 0 dBFS are preserved without fixed-point clipping."
   },
   "existing_inventory_reference": [
     {
@@ -60,7 +62,7 @@
   "intake_slots": [
     {
       "track_id": "track04",
-      "status": "MISSING_AWAITING_USER_SOURCE",
+      "status": "STAGED_VALIDATED_48K_FROM_44K1",
       "acoustic_profile": "Acustico / Dinamico (voce, chitarra acustica, pianoforte)",
       "target_hypotheses": [
         "H01",
@@ -80,30 +82,56 @@
       },
       "source_mix": {
         "local_relative_path": "human_validation/private/input/track04_mix.wav",
-        "sha256": null,
-        "sample_rate_hz": null,
-        "channels": null,
-        "duration_sec": null,
-        "bit_depth_or_subtype": null,
-        "integrated_lufs_bs1770": null,
-        "sample_peak_dbfs": null,
-        "true_peak_4x_dbtp": null,
-        "plr_db": null,
-        "stereo_correlation": null
+        "sha256": "c51bb33234a5ad83ad621b295422f395b756a8baa154886928d3c3c6456215f9",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 84.5,
+        "bit_depth_or_subtype": "PCM_24",
+        "integrated_lufs_bs1770": -14.044,
+        "sample_peak_dbfs": -0.007,
+        "true_peak_4x_dbtp": -0.001,
+        "plr_db": 14.037,
+        "stereo_correlation": 0.8263,
+        "mid_side_ratio_db": 10.218,
+        "mono_sum_drop_db": -0.395,
+        "sub20_80_rel_db": -13.788,
+        "pres3k_7k_rel_db": -26.707,
+        "source_provenance": {
+          "source_file_name": "xarc_tico_U.wav",
+          "source_sha256": "58343dc031fb35d27988f484f2542206057465ce05b338741501bf0cfbf7bcee",
+          "source_format": "WAV/PCM_24",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 0.0,
+          "slice_end_sec": 84.5,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
       },
       "same_track_reference": {
         "required": true,
         "local_relative_path": "human_validation/private/input/track04_ref.wav",
-        "sha256": null,
-        "sample_rate_hz": null,
-        "channels": null,
-        "duration_sec": null,
-        "bit_depth_or_subtype": null,
-        "integrated_lufs_bs1770": null,
-        "sample_peak_dbfs": null,
-        "true_peak_4x_dbtp": null,
-        "plr_db": null,
-        "stereo_correlation": null
+        "sha256": "8e73b459cb564dcefb82eb09fc091f8397a49a92764a7bd7f029a837c523e162",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 84.5,
+        "bit_depth_or_subtype": "PCM_24",
+        "integrated_lufs_bs1770": -9.813,
+        "sample_peak_dbfs": -0.119,
+        "true_peak_4x_dbtp": -0.105,
+        "plr_db": 9.694,
+        "stereo_correlation": 0.8047,
+        "mid_side_ratio_db": 9.657,
+        "mono_sum_drop_db": -0.446,
+        "sub20_80_rel_db": -12.801,
+        "pres3k_7k_rel_db": -21.416,
+        "source_provenance": {
+          "source_file_name": "xarc_tico_M.wav",
+          "source_sha256": "f6ef8452db7a7f9336efa4ee0ad75e7fd21612a42a9ca11edb49ef95e961ae68",
+          "source_format": "WAV/PCM_16",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 0.0,
+          "slice_end_sec": 84.5,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
       },
       "stylistic_external_reference": {
         "required": false,
@@ -117,26 +145,41 @@
         "sample_peak_dbfs": null,
         "true_peak_4x_dbtp": null,
         "plr_db": null,
-        "stereo_correlation": null
+        "stereo_correlation": null,
+        "notes": "Optional stylistic external ref deferred per user instruction (regime same_track ready)."
       },
       "candidate_listening_section": {
-        "label": null,
-        "start_sec": null,
-        "end_sec": null,
-        "duration_sec": null,
-        "notes": "Selezionare passaggio vocale/acustico naturale >= 20s"
+        "label": "Tico Da Costa - Lagartixa (Track 1 standalone acoustic slice)",
+        "start_sec": 0.0,
+        "end_sec": 84.5,
+        "duration_sec": 84.5,
+        "notes": "Full standalone acoustic song extracted cleanly from 5-track XARC Mastering showcase; envelope alignment env_corr=0.9615, lag=+0.00s."
       },
       "provenance_and_licensing": {
-        "source_type": null,
-        "license": null,
-        "usage_authorization_confirmed": false,
-        "authorized_by": null,
-        "notes": null
+        "source_type": "Studio mastering before/after showcase WAV (XARC Mastering portfolio)",
+        "source_url": "https://www.xarcmastering.com/demos/",
+        "download_urls": [
+          "https://www.xarcmastering.com/demos/www.xarcmastering.com-Tico_Da_Costa_-_Lagartixa_(5_Tracks)-Unmastered.wav",
+          "https://www.xarcmastering.com/demos/www.xarcmastering.com-Tico_Da_Costa_-_Lagartixa_(5_Tracks)-Mastered.wav"
+        ],
+        "license": "Public studio portfolio showcase (unspecified permissive web demo; private local validation only, non-redistributable)",
+        "usage_authorization_confirmed": true,
+        "authorized_by": "Giovanni (project owner, explicit chat approval)",
+        "notes": "Native 44100 Hz WAV (PCM_24 unmastered / PCM_16 mastered) converted offline to 48000 Hz PCM_24 after user approval."
+      },
+      "acoustic_suitability_verified": {
+        "plr_min_db_target": 11.0,
+        "mix_plr_measured_db": 14.037,
+        "meets_target": true,
+        "alignment_48k": {
+          "env_corr_best": 0.9615,
+          "env_lag_sec": 0.0
+        }
       }
     },
     {
       "track_id": "track05",
-      "status": "MISSING_AWAITING_USER_SOURCE",
+      "status": "STAGED_SAME_TRACK_PENDING_OPTIONAL_STYLISTIC_REF",
       "acoustic_profile": "Transienti rapidi (batteria acustica/elettronica, percussioni secche)",
       "target_hypotheses": [
         "H03",
@@ -155,33 +198,60 @@
       },
       "source_mix": {
         "local_relative_path": "human_validation/private/input/track05_mix.wav",
-        "sha256": null,
-        "sample_rate_hz": null,
-        "channels": null,
-        "duration_sec": null,
-        "bit_depth_or_subtype": null,
-        "integrated_lufs_bs1770": null,
-        "sample_peak_dbfs": null,
-        "true_peak_4x_dbtp": null,
-        "plr_db": null,
-        "stereo_correlation": null
+        "sha256": "9ba2f5dba96f50a2da326753233d3fb410682fdef2d08f7103f3c018ae77167f",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 77.0,
+        "bit_depth_or_subtype": "PCM_24",
+        "integrated_lufs_bs1770": -17.555,
+        "sample_peak_dbfs": -2.168,
+        "true_peak_4x_dbtp": -2.158,
+        "plr_db": 15.387,
+        "stereo_correlation": 0.947,
+        "mid_side_ratio_db": 15.623,
+        "mono_sum_drop_db": -0.117,
+        "sub20_80_rel_db": -6.194,
+        "pres3k_7k_rel_db": -19.27,
+        "source_provenance": {
+          "source_file_name": "xarc_jmac_U.wav",
+          "source_sha256": "575c5d1b655e559ece3e0ed1494a0344659559275e5b6cedc2624eda1435da5f",
+          "source_format": "WAV/PCM_16",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 0.0,
+          "slice_end_sec": 77.0,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
       },
       "same_track_reference": {
         "required": true,
         "local_relative_path": "human_validation/private/input/track05_ref.wav",
-        "sha256": null,
-        "sample_rate_hz": null,
-        "channels": null,
-        "duration_sec": null,
-        "bit_depth_or_subtype": null,
-        "integrated_lufs_bs1770": null,
-        "sample_peak_dbfs": null,
-        "true_peak_4x_dbtp": null,
-        "plr_db": null,
-        "stereo_correlation": null
+        "sha256": "4771979167b6a3a726168d52532c90a1871c05fb146deabba28ea04aeb9d7ed9",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 77.0,
+        "bit_depth_or_subtype": "PCM_24",
+        "integrated_lufs_bs1770": -10.1,
+        "sample_peak_dbfs": -0.189,
+        "true_peak_4x_dbtp": -0.189,
+        "plr_db": 9.911,
+        "stereo_correlation": 0.9221,
+        "mid_side_ratio_db": 13.893,
+        "mono_sum_drop_db": -0.174,
+        "sub20_80_rel_db": -5.221,
+        "pres3k_7k_rel_db": -16.272,
+        "source_provenance": {
+          "source_file_name": "xarc_jmac_M.wav",
+          "source_sha256": "21038b536d0e4cc7a72a95edbcb9f60ff8d04c1592bd3a4280f493ac6cef0ec8",
+          "source_format": "WAV/PCM_16",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 0.0,
+          "slice_end_sec": 77.0,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
       },
       "stylistic_external_reference": {
         "required": true,
+        "status": "DEFERRED_OPTIONAL_TO_USER",
         "local_relative_path": "human_validation/private/input/track05_ref_altro_brano.wav",
         "sha256": null,
         "sample_rate_hz": null,
@@ -192,26 +262,42 @@
         "sample_peak_dbfs": null,
         "true_peak_4x_dbtp": null,
         "plr_db": null,
-        "stereo_correlation": null
+        "stereo_correlation": null,
+        "notes": "track05_ref_altro_brano.wav omitted per user instruction ('opzionale, nel caso posso farlo io'); stylistic regime for track05 awaits user optional external ref."
       },
       "candidate_listening_section": {
-        "label": null,
-        "start_sec": null,
-        "end_sec": null,
-        "duration_sec": null,
-        "notes": "Selezionare groove/break con attacchi cassa-rullante scoperti >= 20s"
+        "label": "J-Mac! - Everything (Track 1 standalone transient/drum slice)",
+        "start_sec": 0.0,
+        "end_sec": 77.0,
+        "duration_sec": 77.0,
+        "notes": "Clean standalone percussive track from XARC 3-track showcase; clean mix headroom (SP -2.168 dBFS), 10ms crest p95=10.24 dB / p99=11.43 dB / max=13.60 dB at 48 kHz."
       },
       "provenance_and_licensing": {
-        "source_type": null,
-        "license": null,
-        "usage_authorization_confirmed": false,
-        "authorized_by": null,
-        "notes": null
+        "source_type": "Studio mastering before/after showcase WAV (XARC Mastering portfolio)",
+        "source_url": "https://www.xarcmastering.com/demos/",
+        "download_urls": [
+          "https://www.xarcmastering.com/demos/www.xarcmastering.com-J-Mac!_-_Everything_(3_Tracks)-Unmastered.wav",
+          "https://www.xarcmastering.com/demos/www.xarcmastering.com-J-Mac!_-_Everything_(3_Tracks)-Mastered.wav"
+        ],
+        "license": "Public studio portfolio showcase (unspecified permissive web demo; private local validation only, non-redistributable)",
+        "usage_authorization_confirmed": true,
+        "authorized_by": "Giovanni (project owner, explicit chat approval)",
+        "notes": "Native 44100 Hz PCM_16 converted offline to 48000 Hz PCM_24 after user approval."
+      },
+      "acoustic_suitability_verified": {
+        "p95_10ms_crest_db": 10.24,
+        "p99_10ms_crest_db": 11.43,
+        "max_10ms_crest_db": 13.6,
+        "meets_target": true,
+        "alignment_48k": {
+          "env_corr_best": 0.9422,
+          "env_lag_sec": 0.02
+        }
       }
     },
     {
       "track_id": "track06",
-      "status": "MISSING_AWAITING_USER_SOURCE",
+      "status": "STAGED_MIX_AND_SOS_REMIX_PENDING_OPTIONAL_STYLISTIC_REF",
       "acoustic_profile": "Bright / Harshness & Sibilanza (eccesso energetico 3-7 kHz)",
       "target_hypotheses": [
         "H02",
@@ -229,33 +315,60 @@
       },
       "source_mix": {
         "local_relative_path": "human_validation/private/input/track06_mix.wav",
-        "sha256": null,
-        "sample_rate_hz": null,
-        "channels": null,
-        "duration_sec": null,
-        "bit_depth_or_subtype": null,
-        "integrated_lufs_bs1770": null,
-        "sample_peak_dbfs": null,
-        "true_peak_4x_dbtp": null,
-        "plr_db": null,
-        "stereo_correlation": null
+        "sha256": "3ae24037f515c67f2016f6ae81613278f0879d3bdeefd40fb3a2ca38696fc17c",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 72.0,
+        "bit_depth_or_subtype": "PCM_24",
+        "integrated_lufs_bs1770": -18.13,
+        "sample_peak_dbfs": -0.021,
+        "true_peak_4x_dbtp": -0.013,
+        "plr_db": 18.109,
+        "stereo_correlation": 0.7791,
+        "mid_side_ratio_db": 9.06,
+        "mono_sum_drop_db": -0.508,
+        "sub20_80_rel_db": -20.646,
+        "pres3k_7k_rel_db": -10.302,
+        "source_provenance": {
+          "source_file_name": "Original mix.wav",
+          "source_sha256": "3c2e907e084e3a4f25967680d15c94dcaf20e5b84af31491b34a8677abeff258",
+          "source_format": "WAV/PCM_16",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 16.0,
+          "slice_end_sec": 88.0,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
       },
       "same_track_reference": {
         "required": false,
-        "local_relative_path": null,
-        "sha256": null,
-        "sample_rate_hz": null,
-        "channels": null,
-        "duration_sec": null,
-        "bit_depth_or_subtype": null,
-        "integrated_lufs_bs1770": null,
-        "sample_peak_dbfs": null,
-        "true_peak_4x_dbtp": null,
-        "plr_db": null,
-        "stereo_correlation": null
+        "local_relative_path": "human_validation/private/input/track06_ref.wav",
+        "sha256": "74c08c803b2ed244bb0eb30959b742863d68d530802fd06fc8488ad624e9a191",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 72.0,
+        "bit_depth_or_subtype": "FLOAT",
+        "integrated_lufs_bs1770": -13.015,
+        "sample_peak_dbfs": -0.0,
+        "true_peak_4x_dbtp": 0.017,
+        "plr_db": 13.015,
+        "stereo_correlation": 0.575,
+        "mid_side_ratio_db": 5.689,
+        "mono_sum_drop_db": -1.037,
+        "sub20_80_rel_db": -3.671,
+        "pres3k_7k_rel_db": -20.796,
+        "source_provenance": {
+          "source_file_name": "Remix.wav",
+          "source_sha256": "b5db2cd25f9f12c01888111d1c9fe0ee1d77a44c26f1fb053686cf469978f314",
+          "source_format": "WAV/PCM_16",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 16.0,
+          "slice_end_sec": 88.0,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
       },
       "stylistic_external_reference": {
         "required": true,
+        "status": "DEFERRED_OPTIONAL_TO_USER",
         "local_relative_path": "human_validation/private/input/track06_ref_altro_brano.wav",
         "sha256": null,
         "sample_rate_hz": null,
@@ -266,26 +379,47 @@
         "sample_peak_dbfs": null,
         "true_peak_4x_dbtp": null,
         "plr_db": null,
-        "stereo_correlation": null
+        "stereo_correlation": null,
+        "notes": "Same-track SOS Remix staged as track06_ref.wav; external stylistic track06_ref_altro_brano.wav omitted per user instruction (CC-BY candidate jw_01_release.flac verified in scratch if needed)."
       },
       "candidate_listening_section": {
-        "label": null,
-        "start_sec": null,
-        "end_sec": null,
-        "duration_sec": null,
-        "notes": "Selezionare ritornello vocale/hi-hat denso in zona 3-7 kHz >= 20s"
+        "label": "SOS Mix Rescue - Kirsty Cooke (unclipped harshness window 16-88s)",
+        "start_sec": 16.0,
+        "end_sec": 88.0,
+        "duration_sec": 72.0,
+        "notes": "Cut at 16.0-88.0s to skip leading silence gaps and stop prior to clipping events starting at 88.54s in Original mix.wav. Demonstrates +10.49 dB relative 3-7 kHz energy vs SOS Remix (-10.30 vs -20.80 dB) and +4.8732 dB ERBSpectralLoss presence tilt surplus."
       },
       "provenance_and_licensing": {
-        "source_type": null,
-        "license": null,
-        "usage_authorization_confirmed": false,
-        "authorized_by": null,
-        "notes": null
+        "source_type": "Editorial educational audio pack (Sound On Sound Mix Rescue, Oct 2021)",
+        "source_url": "https://www.soundonsound.com/techniques/mix-rescue-kirsty-cooke",
+        "download_urls": [
+          "https://dt7v1i9vyp3mf.cloudfront.net/assetlibrary/m/mix-rescue-kirsty-cooke-audio-1021.zip?B47d1dK7rwyOx5aM9nEtJbMvdx67AfJw"
+        ],
+        "license": "Sound On Sound editorial educational download (private evaluation only, non-redistributable)",
+        "usage_authorization_confirmed": true,
+        "authorized_by": "Giovanni (project owner, explicit chat approval)",
+        "notes": "Native 44100 Hz PCM_16 converted offline to 48000 Hz (mix PCM_24, Remix ref FLOAT due to TP=+0.017 dBTP). Note: SOS Remix alters arrangement/low-end alongside de-harshing; external stylistic ref_altro_brano.wav deferred per user instruction."
+      },
+      "acoustic_suitability_verified": {
+        "pres3k_7k_mix_minus_ref_db": 10.494,
+        "erb_stylistic_shape_loss": 2.7872,
+        "erb_stylistic_std_loss": 2.9704,
+        "erb_stylistic_p90_p10_loss": 9.9906,
+        "erb_stylistic_total_loss": 5.0284,
+        "erb_presence_tilt_pred_db": -14.0849,
+        "erb_presence_tilt_ref_db": -18.9581,
+        "erb_presence_surplus_db": 4.8732,
+        "erb_de_harsh_loss": 17.001,
+        "meets_target": true,
+        "alignment_48k": {
+          "env_corr_best": 0.508,
+          "env_lag_sec": -0.01
+        }
       }
     },
     {
       "track_id": "track07",
-      "status": "MISSING_AWAITING_USER_SOURCE",
+      "status": "STAGED_SAME_TRACK_PENDING_OPTIONAL_STYLISTIC_REF",
       "acoustic_profile": "Sub-bass denso & Limiter Stress (target competitivo <= -8.5 LUFS)",
       "target_hypotheses": [
         "H05",
@@ -304,33 +438,60 @@
       },
       "source_mix": {
         "local_relative_path": "human_validation/private/input/track07_mix.wav",
-        "sha256": null,
-        "sample_rate_hz": null,
-        "channels": null,
-        "duration_sec": null,
-        "bit_depth_or_subtype": null,
-        "integrated_lufs_bs1770": null,
-        "sample_peak_dbfs": null,
-        "true_peak_4x_dbtp": null,
-        "plr_db": null,
-        "stereo_correlation": null
+        "sha256": "e7fddd048a5ef74b3eb0ffd471bc9530d86fccd432ff68b6a01fdfa89c01a505",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 33.306,
+        "bit_depth_or_subtype": "PCM_24",
+        "integrated_lufs_bs1770": -14.911,
+        "sample_peak_dbfs": -0.832,
+        "true_peak_4x_dbtp": -0.747,
+        "plr_db": 14.079,
+        "stereo_correlation": 0.967,
+        "mid_side_ratio_db": 17.738,
+        "mono_sum_drop_db": -0.073,
+        "sub20_80_rel_db": -2.216,
+        "pres3k_7k_rel_db": -18.173,
+        "source_provenance": {
+          "source_file_name": "simonv_cloudspotter_mix.wav",
+          "source_sha256": "d67e1a211c7352eae529e4c8174693ada53e285534c65730e465bf945f984d5d",
+          "source_format": "WAV/PCM_16",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 14.0,
+          "slice_end_sec": 47.306,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
       },
       "same_track_reference": {
         "required": true,
         "local_relative_path": "human_validation/private/input/track07_ref.wav",
-        "sha256": null,
-        "sample_rate_hz": null,
-        "channels": null,
-        "duration_sec": null,
-        "bit_depth_or_subtype": null,
-        "integrated_lufs_bs1770": null,
-        "sample_peak_dbfs": null,
-        "true_peak_4x_dbtp": null,
-        "plr_db": null,
-        "stereo_correlation": null
+        "sha256": "e367bd31399ec05c52e7ac25f189eafef0a51147cf5277b09d88990505cfebe2",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 33.308,
+        "bit_depth_or_subtype": "FLOAT",
+        "integrated_lufs_bs1770": -7.32,
+        "sample_peak_dbfs": 0.131,
+        "true_peak_4x_dbtp": 0.215,
+        "plr_db": 7.451,
+        "stereo_correlation": 0.9614,
+        "mid_side_ratio_db": 17.048,
+        "mono_sum_drop_db": -0.085,
+        "sub20_80_rel_db": -2.157,
+        "pres3k_7k_rel_db": -18.066,
+        "source_provenance": {
+          "source_file_name": "simonv_cloudspotter_mst.wav",
+          "source_sha256": "e26155d11e00cf86693db3b3f49ab602d687d8f82693471f44b6fd845903024a",
+          "source_format": "WAV/PCM_16",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 14.0,
+          "slice_end_sec": 47.308,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
       },
       "stylistic_external_reference": {
         "required": true,
+        "status": "DEFERRED_OPTIONAL_TO_USER",
         "local_relative_path": "human_validation/private/input/track07_ref_altro_brano.wav",
         "sha256": null,
         "sample_rate_hz": null,
@@ -341,26 +502,42 @@
         "sample_peak_dbfs": null,
         "true_peak_4x_dbtp": null,
         "plr_db": null,
-        "stereo_correlation": null
+        "stereo_correlation": null,
+        "notes": "track07_ref_altro_brano.wav explicitly waived by user ('non serve, nel caso posso farlo io')."
       },
       "candidate_listening_section": {
-        "label": null,
-        "start_sec": null,
-        "end_sec": null,
-        "duration_sec": null,
-        "notes": "Selezionare drop con 808/sub sostenuto e picchi alti per stimolare V3b >= 20s"
+        "label": "SIMON_V - Cloudspotter (trimmed from 0:14 per explicit user cut)",
+        "start_sec": 14.0,
+        "end_sec": 47.308,
+        "duration_sec": 33.306,
+        "notes": "Sliced from t=14.0s per explicit user instruction ('deve iniziare da 0:14'); dense DnB sub-bass (-2.216 dB in 20-80 Hz) and +7.591 LU mix->ref target gain with SP=-0.832 dBFS ensures heavy limiter GR >> 0.5 dB."
       },
       "provenance_and_licensing": {
-        "source_type": null,
-        "license": null,
-        "usage_authorization_confirmed": false,
-        "authorized_by": null,
-        "notes": null
+        "source_type": "Mastering before/after lossless demo WAV (Simon V Mastering)",
+        "source_url": "https://www.simonv.com/mastering/",
+        "download_urls": [
+          "https://www.simonv.com/mastering/"
+        ],
+        "license": "Public mastering portfolio demo (private local validation only, non-redistributable)",
+        "usage_authorization_confirmed": true,
+        "authorized_by": "Giovanni (project owner, explicit confirmation on cut >= 0:14 & 48kHz conversion)",
+        "notes": "Native 44100 Hz PCM_16 converted offline to 48000 Hz (mix PCM_24, ref FLOAT due to TP=+0.215 dBTP)."
+      },
+      "acoustic_suitability_verified": {
+        "mix_sub20_80_rel_db": -2.216,
+        "mix_to_ref_lufs_delta_db": 7.591,
+        "mix_headroom_to_minus0_5_ceiling_db": 0.247,
+        "expected_limiter_gr_gt_0_5_db_guaranteed": true,
+        "note": "Track07 duration (33.31s) is slightly below [35.0, 90.0] heuristic due to user-mandated 0:14 start cut; well above 20s minimum listening length.",
+        "alignment_48k": {
+          "env_corr_best": 0.9007,
+          "env_lag_sec": 0.0
+        }
       }
     },
     {
       "track_id": "track08",
-      "status": "MISSING_AWAITING_USER_SOURCE",
+      "status": "STAGED_VALIDATED_48K_FROM_44K1",
       "acoustic_profile": "Wide Stereo & Rischio Cancellazione Mono (synth/pad/cori larghi, bassa correlazione)",
       "target_hypotheses": [
         "H06"
@@ -377,20 +554,60 @@
       },
       "source_mix": {
         "local_relative_path": "human_validation/private/input/track08_mix.wav",
-        "sha256": null,
-        "sample_rate_hz": null,
-        "channels": null,
-        "duration_sec": null,
-        "bit_depth_or_subtype": null,
-        "integrated_lufs_bs1770": null,
-        "sample_peak_dbfs": null,
-        "true_peak_4x_dbtp": null,
-        "plr_db": null,
-        "stereo_correlation": null
+        "sha256": "8873275e961d44b70cd6dc8ee915a36843b2e2e47201235f772425b938d784b5",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 334.679,
+        "bit_depth_or_subtype": "FLOAT",
+        "integrated_lufs_bs1770": -12.938,
+        "sample_peak_dbfs": 0.057,
+        "true_peak_4x_dbtp": 0.057,
+        "plr_db": 12.995,
+        "stereo_correlation": 0.3141,
+        "mid_side_ratio_db": 2.819,
+        "mono_sum_drop_db": -1.826,
+        "sub20_80_rel_db": -2.417,
+        "pres3k_7k_rel_db": -21.828,
+        "source_provenance": {
+          "source_file_name": "ainst_drive_unmastered.wav",
+          "source_sha256": "50d3220dd4cef61d12e9300e2c959ba6c20abbdbe20d0090141d4d30c38b7429",
+          "source_format": "WAVEX/PCM_24",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 0.0,
+          "slice_end_sec": 334.67863945578233,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
       },
       "same_track_reference": {
         "required": true,
         "local_relative_path": "human_validation/private/input/track08_ref.wav",
+        "sha256": "7e7ec8f95024dfdad104cb19247c8b4c07f58d3426e5c9a42e7dce4a91f168a2",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 334.679,
+        "bit_depth_or_subtype": "FLOAT",
+        "integrated_lufs_bs1770": -9.679,
+        "sample_peak_dbfs": 1.071,
+        "true_peak_4x_dbtp": 1.11,
+        "plr_db": 10.75,
+        "stereo_correlation": 0.3063,
+        "mid_side_ratio_db": 2.745,
+        "mono_sum_drop_db": -1.851,
+        "sub20_80_rel_db": -2.293,
+        "pres3k_7k_rel_db": -20.795,
+        "source_provenance": {
+          "source_file_name": "ainst_drive_club_master.wav",
+          "source_sha256": "eca9c91ef70b7ab0cb79f118f04b216910b56e23a23d9d827f0427931e205dff",
+          "source_format": "WAVEX/PCM_24",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 0.0,
+          "slice_end_sec": 334.67863945578233,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
+      },
+      "stylistic_external_reference": {
+        "required": false,
+        "local_relative_path": null,
         "sha256": null,
         "sample_rate_hz": null,
         "channels": null,
@@ -400,7 +617,109 @@
         "sample_peak_dbfs": null,
         "true_peak_4x_dbtp": null,
         "plr_db": null,
-        "stereo_correlation": null
+        "stereo_correlation": null,
+        "notes": null
+      },
+      "candidate_listening_section": {
+        "label": "Ainst - Drive (Full track, Club Master ref)",
+        "start_sec": 0.0,
+        "end_sec": 334.679,
+        "duration_sec": 334.679,
+        "notes": "Trailing 1.92s silence on Unmastered trimmed to match Club Master length; ideal wide stereo correlation +0.3141 (<= 0.55) with mono sum drop -1.826 dB and lag +0.00s (env_corr=0.9640)."
+      },
+      "provenance_and_licensing": {
+        "source_type": "Internet Archive lossless audio release (Beriga Recordings ANST-BR-2023)",
+        "source_url": "https://archive.org/details/ainst-drive",
+        "download_urls": [
+          "https://archive.org/download/ainst-drive/Ainst%20-%20Drive%20-%2003%20Drive%20%28Unmastered%29.wav",
+          "https://archive.org/download/ainst-drive/Ainst%20-%20Drive%20-%2001%20Drive%20%28Club%20Master%29.wav"
+        ],
+        "license": "Archive.org item with licenseurl=None (creator='neo'; private local evaluation only per user copyright waiver, non-redistributable)",
+        "usage_authorization_confirmed": true,
+        "authorized_by": "Giovanni (project owner, explicit chat approval)",
+        "notes": "Native 44100 Hz WAVEX PCM_24 converted offline to 48000 Hz FLOAT to preserve +0.057 dBTP (mix) and +1.110 dBTP (Club Master) without integer clipping."
+      },
+      "acoustic_suitability_verified": {
+        "stereo_correlation_max_target": 0.65,
+        "stereo_correlation_ideal_target": 0.55,
+        "mix_stereo_correlation_measured": 0.3141,
+        "mix_mono_sum_drop_db": -1.826,
+        "meets_ideal_target": true,
+        "alignment_48k": {
+          "env_corr_best": 0.964,
+          "env_lag_sec": 0.0
+        }
+      }
+    },
+    {
+      "track_id": "track09",
+      "status": "STAGED_VALIDATED_48K_FROM_44K1",
+      "acoustic_profile": "Wide Stereo #2 / Orchestra Spaziale (H06 second independent wide-stereo track)",
+      "target_hypotheses": [
+        "H06"
+      ],
+      "intended_regimes": [
+        "same_track"
+      ],
+      "expected_acoustic_targets": {
+        "stereo_correlation_max": 0.65,
+        "recommended_duration_sec": [
+          35.0,
+          90.0
+        ]
+      },
+      "source_mix": {
+        "local_relative_path": "human_validation/private/input/track09_mix.wav",
+        "sha256": "4616c48bc7cea6341b6e48cd615f9d1f742be886e55625f7a8afa378a4a2e409",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 33.098,
+        "bit_depth_or_subtype": "PCM_24",
+        "integrated_lufs_bs1770": -12.772,
+        "sample_peak_dbfs": -1.215,
+        "true_peak_4x_dbtp": -1.211,
+        "plr_db": 11.557,
+        "stereo_correlation": 0.4209,
+        "mid_side_ratio_db": 3.898,
+        "mono_sum_drop_db": -1.485,
+        "sub20_80_rel_db": -11.175,
+        "pres3k_7k_rel_db": -35.078,
+        "source_provenance": {
+          "source_file_name": "aa_orch1_U.wav",
+          "source_sha256": "f420bd5dc11935607de58984e6bf77b7d07e9a6b1835ece93c2eec235909817b",
+          "source_format": "WAV/PCM_16",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 0.0,
+          "slice_end_sec": 33.09786848072562,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
+      },
+      "same_track_reference": {
+        "required": true,
+        "local_relative_path": "human_validation/private/input/track09_ref.wav",
+        "sha256": "9c54c6af2eadd01519b2be751995e1ea4e4621d9d33bda9af1898b6e2b09b8e1",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration_sec": 33.098,
+        "bit_depth_or_subtype": "PCM_24",
+        "integrated_lufs_bs1770": -11.221,
+        "sample_peak_dbfs": -1.03,
+        "true_peak_4x_dbtp": -1.03,
+        "plr_db": 10.191,
+        "stereo_correlation": 0.4757,
+        "mid_side_ratio_db": 4.478,
+        "mono_sum_drop_db": -1.324,
+        "sub20_80_rel_db": -7.408,
+        "pres3k_7k_rel_db": -37.261,
+        "source_provenance": {
+          "source_file_name": "aa_orch1_M.wav",
+          "source_sha256": "0618d7cfbe7a5d70a49c880cd342dc9756330bd2bd9bcdae6283169003ba61f2",
+          "source_format": "WAV/PCM_16",
+          "source_sample_rate_hz": 44100,
+          "slice_start_sec": 0.0,
+          "slice_end_sec": 33.09786848072562,
+          "resampled_to_48k_via": "scipy.signal.resample_poly(160, 147)"
+        }
       },
       "stylistic_external_reference": {
         "required": false,
@@ -417,19 +736,49 @@
         "stereo_correlation": null
       },
       "candidate_listening_section": {
-        "label": null,
-        "start_sec": null,
-        "end_sec": null,
-        "duration_sec": null,
-        "notes": "Selezionare sezione con side/riverbero molto ampio o chitarre raddoppiate >= 20s"
+        "label": "Audio Animals - Film Library Mastering Orchestral 1 (full demo clip)",
+        "start_sec": 0.0,
+        "end_sec": 33.098,
+        "duration_sec": 33.098,
+        "notes": "Full orchestral studio before/after clip; stereo_correlation=+0.4209 (<= 0.55 ideal), mono_sum_drop=-1.485 dB, PLR=11.557 dB, lag=+0.00s."
       },
       "provenance_and_licensing": {
-        "source_type": null,
-        "license": null,
-        "usage_authorization_confirmed": false,
-        "authorized_by": null,
-        "notes": null
+        "source_type": "Studio mastering before/after demo WAV (Audio Animals)",
+        "source_url": "https://www.audioanimals.co.uk/pages/before-after-audio-examples",
+        "download_urls": [
+          "https://www.audioanimals.co.uk/pages/before-after-audio-examples"
+        ],
+        "license": "Public studio portfolio demo (private local validation only, non-redistributable)",
+        "usage_authorization_confirmed": true,
+        "authorized_by": "Giovanni (project owner, explicit chat approval)",
+        "notes": "Native 44100 Hz PCM_16 converted offline to 48000 Hz PCM_24. Duration 33.10s is slightly below [35.0, 90.0] heuristic but exceeds >= 20-25s listening minimum."
+      },
+      "acoustic_suitability_verified": {
+        "stereo_correlation_max_target": 0.65,
+        "stereo_correlation_ideal_target": 0.55,
+        "mix_stereo_correlation_measured": 0.4209,
+        "mix_mono_sum_drop_db": -1.485,
+        "meets_ideal_target": true,
+        "duration_note": "33.098s is slightly under [35.0, 90.0] heuristic; meets >= 20s minimum listening requirement.",
+        "alignment_48k": {
+          "env_corr_best": 0.7361,
+          "env_lag_sec": 0.0
+        }
       }
     }
-  ]
+  ],
+  "h06_wide_stereo_coverage": {
+    "independent_wide_tracks_count": 2,
+    "track_ids": [
+      "track08",
+      "track09"
+    ],
+    "mix_correlations": {
+      "track08": 0.3141,
+      "track09": 0.4209
+    },
+    "both_meet_ideal_threshold_0_55": true,
+    "exploratory_only_caveat_resolved_by_count": true,
+    "governance_note": "Both track08 (0.3141) and track09 (0.4209) are independent same_track wide-stereo pairs meeting stereo_correlation <= 0.55. Supervisor should note track09 duration (33.10s) vs [35.0, 90.0] guideline before promoting H06 beyond exploratory; as per Sprint 4 rules, V3c->V4 promotion is not claimed at intake time."
+  }
 }
